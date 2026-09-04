@@ -36,6 +36,7 @@ const today = new Date();
 const currentMonthStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
 document.querySelector('#panoramaMonthFilter').value = currentMonthStr;
 document.querySelector('#panoramaMonthFilter').addEventListener('change', renderPanorama);
+document.querySelector('#panoramaCompanyFilter').addEventListener('change', renderPanorama);
 
 loadData();
 
@@ -119,14 +120,37 @@ function renderPanoramaCompanyFilter() {
   const options = '<option value="total">Visão Geral (Todas as Empresas)</option>' +
     companies.map(c => `<option value="${escapeAttribute(c)}">${escapeHtml(c)}</option>`).join('');
 
-  select.innerHTML = options;
-  if (modalSelect) modalSelect.innerHTML = options;
-
   const companyOnlyOptions = companies.map(c => `<option value="${escapeAttribute(c)}">${escapeHtml(c)}</option>`).join('');
+
+  select.innerHTML = options;
+  // O modal de edição de benefício não pode salvar sob "Total (Visão Geral)" — não é uma empresa real.
+  if (modalSelect) modalSelect.innerHTML = companyOnlyOptions;
   if (hcSelect) hcSelect.innerHTML = companyOnlyOptions;
 
   if ([...select.options].some(opt => opt.value === current)) select.value = current;
-  select.addEventListener('change', renderPanorama);
+}
+
+function computeMonthTotalEmployees(monthStr, companyFilter) {
+  const monthHist = panoramaHistory && panoramaHistory[monthStr];
+  if (!monthHist) return 0;
+
+  if (companyFilter === 'total') {
+    let sum = 0;
+    Object.keys(monthHist).forEach(comp => {
+      if (comp === 'total') return;
+      if (monthHist[comp].totalEmployees > 0) sum += monthHist[comp].totalEmployees;
+    });
+    return sum;
+  }
+
+  return (monthHist[companyFilter] && monthHist[companyFilter].totalEmployees) || 0;
+}
+
+function getPreviousMonthStr(monthStr) {
+  const parts = String(monthStr || '').split('-').map(Number);
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return '';
+  const date = new Date(parts[0], parts[1] - 2, 1);
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
 }
 
 function renderPanorama() {
@@ -137,28 +161,14 @@ function renderPanorama() {
     companyFilter === 'total' ? panoramaData.total : (panoramaData.companies[companyFilter] || { employees: 0, benefitsData: {} })
   ));
 
-  let monthTotalEmps = 0;
+  let monthTotalEmps = computeMonthTotalEmployees(monthFilter, companyFilter);
 
   if (panoramaHistory && panoramaHistory[monthFilter]) {
     const monthHist = panoramaHistory[monthFilter];
 
     if (companyFilter === 'total') {
-      let totalEmpSum = 0;
-      const allCompanies = new Set([
-        ...Object.keys(panoramaData.companies || {}),
-        ...Object.keys(monthHist)
-      ]);
-
-      allCompanies.forEach(comp => {
-        if (comp === 'total') return;
-        if (monthHist[comp] && monthHist[comp].totalEmployees > 0) {
-          totalEmpSum += monthHist[comp].totalEmployees;
-        }
-      });
-
-      monthTotalEmps = totalEmpSum;
-
       Object.keys(monthHist).forEach(comp => {
+        if (comp === 'total') return;
         const compBenefits = monthHist[comp].benefits || {};
         Object.keys(compBenefits).forEach(ben => {
           if (!dataRef.benefitsData[ben]) dataRef.benefitsData[ben] = { users: 0, total: 0, company: 0, employee: 0, holders: 0 };
@@ -172,10 +182,7 @@ function renderPanorama() {
       });
 
     } else if (monthHist[companyFilter]) {
-      const compHist = monthHist[companyFilter];
-      monthTotalEmps = compHist.totalEmployees || 0;
-
-      const compBenefits = compHist.benefits || {};
+      const compBenefits = monthHist[companyFilter].benefits || {};
       Object.keys(compBenefits).forEach(ben => {
         dataRef.benefitsData[ben] = compBenefits[ben];
       });
@@ -230,6 +237,32 @@ function renderPanorama() {
   document.getElementById('panTotalCost').textContent = formatCurrency(calcTotalCost);
   document.getElementById('panTotalCompany').textContent = formatCurrency(calcCompanyCost);
   document.getElementById('panTotalEmployee').textContent = formatCurrency(calcEmployeeCost);
+
+  renderPanoramaInsights(monthFilter, companyFilter, monthTotalEmps, calcTotalCost);
+}
+
+function renderPanoramaInsights(monthFilter, companyFilter, monthTotalEmps, calcTotalCost) {
+  const avgEl = document.getElementById('panCostPerEmployee');
+  if (avgEl) {
+    avgEl.textContent = monthTotalEmps > 0
+      ? formatCurrency(calcTotalCost / monthTotalEmps) + ' / colaborador'
+      : 'Sem colaboradores base no mês';
+  }
+
+  const deltaEl = document.getElementById('panHeadcountDelta');
+  if (deltaEl) {
+    const prevMonthEmps = computeMonthTotalEmployees(getPreviousMonthStr(monthFilter), companyFilter);
+    deltaEl.classList.remove('up', 'down');
+
+    if (prevMonthEmps > 0) {
+      const diff = monthTotalEmps - prevMonthEmps;
+      deltaEl.textContent = (diff === 0 ? 'Estável' : (diff > 0 ? '+' + diff : String(diff))) + ' vs mês anterior';
+      if (diff > 0) deltaEl.classList.add('up');
+      if (diff < 0) deltaEl.classList.add('down');
+    } else {
+      deltaEl.textContent = '';
+    }
+  }
 }
 
 function openHeadcountModal() {
@@ -280,12 +313,17 @@ function openPanEditModal(benefitName) {
   const monthFilter = document.getElementById('panoramaMonthFilter').value;
   const companyFilter = document.getElementById('panoramaCompanyFilter').value;
 
+  if (companyFilter === 'total') {
+    alert('Selecione uma empresa específica no filtro do Panorama antes de editar os valores de um benefício. "Visão Geral" é somente a soma das empresas.');
+    return;
+  }
+
   document.getElementById('panEditTitle').textContent = 'Editar: ' + benefitName;
   document.getElementById('panEditBenefit').value = benefitName;
   document.getElementById('panEditMonth').value = monthFilter;
   document.getElementById('panEditCompany').value = companyFilter;
 
-  let savedData = { users: 0, total: 0, company: 0, employee: 0, holders: 0 };
+  let savedData = null;
   let savedTotalEmps = 0;
 
   if (panoramaHistory && panoramaHistory[monthFilter] && panoramaHistory[monthFilter][companyFilter]) {
@@ -296,9 +334,13 @@ function openPanEditModal(benefitName) {
     }
   }
 
-  if (!savedData.users && panoramaData && panoramaData.companies[companyFilter] && panoramaData.companies[companyFilter].benefitsData[benefitName]) {
+  // Só cai para o valor calculado ao vivo quando NÃO existe lançamento manual salvo —
+  // "Vidas" igual a 0 é um valor manual legítimo (ex: benefícios só financeiros) e não pode ser tratado como "sem dados".
+  if (!savedData && panoramaData && panoramaData.companies[companyFilter] && panoramaData.companies[companyFilter].benefitsData[benefitName]) {
     savedData = panoramaData.companies[companyFilter].benefitsData[benefitName];
   }
+
+  if (!savedData) savedData = { users: 0, total: 0, company: 0, employee: 0, holders: 0 };
 
   document.getElementById('panEditCompanyEmployees').value = savedTotalEmps || '';
   document.getElementById('panEditHolders').value = savedData.holders || savedData.users || 0;

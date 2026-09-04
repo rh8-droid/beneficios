@@ -132,6 +132,10 @@ main { min-width: 0; padding: 0 34px 42px; }
 .metric span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; }
 .metric strong { display: block; margin-top: 15px; font-size: 30px; line-height: 1; }
 
+.metric-sub { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; font-weight: 800; }
+.metric-sub.up { color: var(--success); }
+.metric-sub.down { color: var(--danger); }
+
 .metric.danger { border-top: 4px solid var(--danger); }
 .metric.success { border-top: 4px solid var(--success); }
 .metric.info { border-top: 4px solid var(--accent); }

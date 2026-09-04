@@ -99,6 +99,7 @@
                 <button type="button" onclick="openHeadcountModal()" style="background: var(--accent); color: #111; border: 0; padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 900; cursor: pointer;">Ajustar Base</button>
               </div>
               <strong id="panTotalEmployees">0</strong>
+              <span class="metric-sub" id="panHeadcountDelta"></span>
             </article>
             <article class="metric success">
               <span>🏢 Invest. da Empresa</span>
@@ -111,6 +112,7 @@
             <article class="metric danger">
               <span>💰 Custo Mensal Total</span>
               <strong id="panTotalCost">R$ 0,00</strong>
+              <span class="metric-sub" id="panCostPerEmployee"></span>
             </article>
           </div>
 
