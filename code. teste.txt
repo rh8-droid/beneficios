@@ -88,6 +88,7 @@ function getPortalData() {
     return {
       employees: [],
       benefits: benefitLabels_(),
+      benefitCatalog: getBenefitCatalog_(),
       updatedAt: formatDateTime_(new Date()),
       panorama: getFinancialPanorama(values, buildHeaderMap_(values[0])),
       panoramaHistory: getPanoramaHistory_()
@@ -106,6 +107,7 @@ function getPortalData() {
   return {
     employees,
     benefits: benefitLabels_(),
+    benefitCatalog: getBenefitCatalog_(),
     updatedAt: formatDateTime_(new Date()),
     panorama: getFinancialPanorama(values, map),
     panoramaHistory: getPanoramaHistory_()
@@ -238,6 +240,81 @@ function saveCompanyHeadcount_(monthYear, company, totalEmployees) {
 function saveHeadcountDirect(monthYear, company, totalEmployees) {
   saveCompanyHeadcount_(monthYear, company, totalEmployees);
   SpreadsheetApp.flush();
+  return getPortalData();
+}
+
+/* =========================================================
+   CATÁLOGO DE BENEFÍCIOS DO PANORAMA (INCLUIR / EXCLUIR)
+========================================================= */
+const DEFAULT_BENEFIT_CATALOG = [
+  'Vale refeição',
+  'Vale transporte',
+  'Assistência médica (titular e dependentes)',
+  'Plano odontológico (titular e dependentes)',
+  'Coparticipação médica',
+  'Farmácia',
+  'Convênios Acqua Park',
+  'Convênio Total Pass',
+  'E-consignado',
+  'Vale combustível',
+  'Bolsa de estudos'
+];
+
+function getCatalogSheet_() {
+  const spreadsheet = SpreadsheetApp.openById(CONFIG.spreadsheetId);
+  let sheet = spreadsheet.getSheetByName('CATALOGO_BENEFICIOS');
+
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet('CATALOGO_BENEFICIOS');
+    sheet.appendRow(['Benefício']);
+    sheet.getRange(1, 1, 1, 1).setFontWeight('bold');
+    DEFAULT_BENEFIT_CATALOG.forEach(name => sheet.appendRow([name]));
+  }
+
+  return sheet;
+}
+
+function getBenefitCatalog_() {
+  const sheet = getCatalogSheet_();
+  const values = sheet.getDataRange().getDisplayValues();
+  const names = values
+    .slice(1)
+    .map(row => String(row[0] || '').trim())
+    .filter(Boolean);
+
+  return names.length ? names : DEFAULT_BENEFIT_CATALOG.slice();
+}
+
+function addBenefitToCatalog(name) {
+  const clean = String(name || '').trim();
+  if (!clean) throw new Error('Informe um nome para o benefício.');
+
+  const sheet = getCatalogSheet_();
+  const existing = getBenefitCatalog_();
+  const alreadyExists = existing.some(item => normalize_(item) === normalize_(clean));
+
+  if (alreadyExists) throw new Error('Este benefício já existe no catálogo.');
+
+  sheet.appendRow([clean]);
+  SpreadsheetApp.flush();
+  return getPortalData();
+}
+
+function removeBenefitFromCatalog(name) {
+  const clean = String(name || '').trim();
+  if (!clean) throw new Error('Benefício inválido.');
+
+  const sheet = getCatalogSheet_();
+  const values = sheet.getDataRange().getDisplayValues();
+
+  for (let i = values.length - 1; i >= 1; i--) {
+    if (normalize_(String(values[i][0] || '').trim()) === normalize_(clean)) {
+      sheet.deleteRow(i + 1);
+    }
+  }
+
+  SpreadsheetApp.flush();
+  // O histórico já lançado em HISTORICO_PANORAMA é preservado — remover do catálogo só oculta a linha na tela.
   return getPortalData();
 }
 

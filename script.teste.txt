@@ -1,9 +1,11 @@
 <script>
 let employees = [];
 let benefits = {};
+let benefitCatalog = [];
 let panoramaData = {};
 let panoramaHistory = {};
 let currentEmployee = null;
+let analyticsCharts = {};
 
 const pageTitle = document.querySelector('#pageTitle');
 const sidebar = document.querySelector('.sidebar');
@@ -36,6 +38,11 @@ const today = new Date();
 const currentMonthStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
 document.querySelector('#panoramaMonthFilter').value = currentMonthStr;
 document.querySelector('#panoramaMonthFilter').addEventListener('change', renderPanorama);
+document.querySelector('#panoramaCompanyFilter').addEventListener('change', renderPanorama);
+document.querySelector('#addBenefitButton').addEventListener('click', addBenefitCatalogItem);
+
+document.querySelector('#analyticsMonthsFilter').addEventListener('change', renderAnalytics);
+document.querySelector('#analyticsCompanyFilter').addEventListener('change', renderAnalytics);
 
 loadData();
 
@@ -46,11 +53,13 @@ function loadData() {
     .withSuccessHandler(data => {
       employees = data.employees || [];
       benefits = data.benefits || {};
+      benefitCatalog = data.benefitCatalog || [];
       panoramaData = data.panorama || { companies: {}, total: {} };
       panoramaHistory = data.panoramaHistory || {};
 
       syncStatus.textContent = data.updatedAt ? `Atualizado em ${data.updatedAt}` : 'Atualizado';
-      
+
+      applyDefaultPanoramaMonth();
       renderCompanyFilter();
       renderPanoramaCompanyFilter();
       renderAll();
@@ -62,10 +71,24 @@ function loadData() {
     .getPortalData();
 }
 
+function applyDefaultPanoramaMonth() {
+  // Sempre que a página carrega (inclusive ao reabrir o link depois de um "Salvar"),
+  // o filtro de mês volta para o mês corrente. Se não houver nada lançado nesse mês,
+  // o painel aparecia "zerado" mesmo com dados salvos em meses anteriores. Aqui,
+  // se o mês atual não tiver histórico, mostramos o mês mais recente que tiver.
+  const monthInput = document.getElementById('panoramaMonthFilter');
+  if (!monthInput) return;
+  if (panoramaHistory && panoramaHistory[currentMonthStr]) return;
+
+  const months = getSortedHistoryMonths();
+  if (months.length) monthInput.value = months[months.length - 1];
+}
+
 function showView(view) {
   const titles = {
     dashboard: 'Painel',
     panorama: 'Panorama',
+    analytics: 'Análise Estratégica',
     employees: 'Colaboradores',
     pending: 'Pendências',
     settings: 'Benefícios'
@@ -80,6 +103,10 @@ function showView(view) {
 
   pageTitle.textContent = titles[view];
   sidebar.classList.remove('open');
+
+  // Gráficos criados enquanto a aba estava oculta ficam com tamanho zero;
+  // ao abrir a aba, força o Chart.js a recalcular o tamanho do canvas.
+  if (view === 'analytics') renderAnalytics();
 }
 
 function renderAll() {
@@ -88,77 +115,127 @@ function renderAll() {
   renderPending();
   renderBenefits();
   renderPanorama();
+  renderAnalytics();
 }
 
 /* =========================================================
    PANORAMA FINANCEIRO E HISTÓRICO DE COLABORADORES BASE
+   O catálogo de benefícios (quais linhas aparecem no Detalhamento)
+   é carregado do servidor e pode ser ajustado pelo RH na tela.
 ========================================================= */
-const baseBenefitsList = [
-  "Vale refeição",
-  "Vale transporte",
-  "Assistência médica (titular e dependentes)",
-  "Plano odontológico (titular e dependentes)",
-  "Coparticipação médica",
-  "Farmácia",
-  "Convênios Acqua Park",
-  "Convênio Total Pass",
-  "E-consignado",
-  "Vale combustível",
-  "Bolsa de estudos"
-];
+function addBenefitCatalogItem() {
+  const input = document.getElementById('newBenefitName');
+  const name = (input.value || '').trim();
+  if (!name) { alert('Informe o nome do benefício.'); return; }
+
+  syncStatus.textContent = 'Adicionando benefício...';
+
+  google.script.run
+    .withSuccessHandler(data => {
+      employees = data.employees || [];
+      benefitCatalog = data.benefitCatalog || [];
+      panoramaData = data.panorama || { companies: {}, total: {} };
+      panoramaHistory = data.panoramaHistory || {};
+
+      syncStatus.textContent = 'Benefício adicionado!';
+      input.value = '';
+      renderAll();
+    })
+    .withFailureHandler(error => {
+      syncStatus.textContent = 'Erro ao adicionar';
+      alert(error.message || error);
+    })
+    .addBenefitToCatalog(name);
+}
+
+function removeBenefitCatalogItem(benefitName) {
+  if (!confirm(`Remover "${benefitName}" da lista do Panorama?\n\nOs lançamentos já salvos para este benefício continuam no histórico, apenas a linha deixa de aparecer na tela.`)) return;
+
+  syncStatus.textContent = 'Removendo benefício...';
+
+  google.script.run
+    .withSuccessHandler(data => {
+      employees = data.employees || [];
+      benefitCatalog = data.benefitCatalog || [];
+      panoramaData = data.panorama || { companies: {}, total: {} };
+      panoramaHistory = data.panoramaHistory || {};
+
+      syncStatus.textContent = 'Benefício removido!';
+      renderAll();
+    })
+    .withFailureHandler(error => {
+      syncStatus.textContent = 'Erro ao remover';
+      alert(error.message || error);
+    })
+    .removeBenefitFromCatalog(benefitName);
+}
 
 function renderPanoramaCompanyFilter() {
   const select = document.getElementById('panoramaCompanyFilter');
   const modalSelect = document.getElementById('panEditCompany');
   const hcSelect = document.getElementById('hcCompany');
+  const analyticsSelect = document.getElementById('analyticsCompanyFilter');
   if(!select) return;
 
   const current = select.value;
+  const currentAnalytics = analyticsSelect ? analyticsSelect.value : 'total';
   const companies = Object.keys(panoramaData.companies || {}).sort();
 
   const options = '<option value="total">Visão Geral (Todas as Empresas)</option>' +
     companies.map(c => `<option value="${escapeAttribute(c)}">${escapeHtml(c)}</option>`).join('');
 
-  select.innerHTML = options;
-  if (modalSelect) modalSelect.innerHTML = options;
-
   const companyOnlyOptions = companies.map(c => `<option value="${escapeAttribute(c)}">${escapeHtml(c)}</option>`).join('');
+
+  select.innerHTML = options;
+  // O modal de edição de benefício não pode salvar sob "Total (Visão Geral)" — não é uma empresa real.
+  if (modalSelect) modalSelect.innerHTML = companyOnlyOptions;
   if (hcSelect) hcSelect.innerHTML = companyOnlyOptions;
+  if (analyticsSelect) analyticsSelect.innerHTML = options;
 
   if ([...select.options].some(opt => opt.value === current)) select.value = current;
-  select.addEventListener('change', renderPanorama);
+  if (analyticsSelect && [...analyticsSelect.options].some(opt => opt.value === currentAnalytics)) analyticsSelect.value = currentAnalytics;
 }
 
-function renderPanorama() {
-  const companyFilter = document.getElementById('panoramaCompanyFilter').value;
-  const monthFilter = document.getElementById('panoramaMonthFilter').value;
+function computeMonthTotalEmployees(monthStr, companyFilter) {
+  const monthHist = panoramaHistory && panoramaHistory[monthStr];
+  if (!monthHist) return 0;
 
+  if (companyFilter === 'total') {
+    let sum = 0;
+    Object.keys(monthHist).forEach(comp => {
+      if (comp === 'total') return;
+      if (monthHist[comp].totalEmployees > 0) sum += monthHist[comp].totalEmployees;
+    });
+    return sum;
+  }
+
+  return (monthHist[companyFilter] && monthHist[companyFilter].totalEmployees) || 0;
+}
+
+function getSortedHistoryMonths() {
+  return Object.keys(panoramaHistory || {}).filter(m => /^\d{4}-\d{2}$/.test(m)).sort();
+}
+
+function getPreviousMonthStr(monthStr) {
+  const parts = String(monthStr || '').split('-').map(Number);
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return '';
+  const date = new Date(parts[0], parts[1] - 2, 1);
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
+}
+
+function buildPanoramaDataRef(monthFilter, companyFilter) {
   let dataRef = JSON.parse(JSON.stringify(
     companyFilter === 'total' ? panoramaData.total : (panoramaData.companies[companyFilter] || { employees: 0, benefitsData: {} })
   ));
 
-  let monthTotalEmps = 0;
+  const monthTotalEmps = computeMonthTotalEmployees(monthFilter, companyFilter);
 
   if (panoramaHistory && panoramaHistory[monthFilter]) {
     const monthHist = panoramaHistory[monthFilter];
 
     if (companyFilter === 'total') {
-      let totalEmpSum = 0;
-      const allCompanies = new Set([
-        ...Object.keys(panoramaData.companies || {}),
-        ...Object.keys(monthHist)
-      ]);
-
-      allCompanies.forEach(comp => {
-        if (comp === 'total') return;
-        if (monthHist[comp] && monthHist[comp].totalEmployees > 0) {
-          totalEmpSum += monthHist[comp].totalEmployees;
-        }
-      });
-
-      monthTotalEmps = totalEmpSum;
-
       Object.keys(monthHist).forEach(comp => {
+        if (comp === 'total') return;
         const compBenefits = monthHist[comp].benefits || {};
         Object.keys(compBenefits).forEach(ben => {
           if (!dataRef.benefitsData[ben]) dataRef.benefitsData[ben] = { users: 0, total: 0, company: 0, employee: 0, holders: 0 };
@@ -172,21 +249,27 @@ function renderPanorama() {
       });
 
     } else if (monthHist[companyFilter]) {
-      const compHist = monthHist[companyFilter];
-      monthTotalEmps = compHist.totalEmployees || 0;
-
-      const compBenefits = compHist.benefits || {};
+      const compBenefits = monthHist[companyFilter].benefits || {};
       Object.keys(compBenefits).forEach(ben => {
         dataRef.benefitsData[ben] = compBenefits[ben];
       });
     }
   }
 
+  return { dataRef, monthTotalEmps };
+}
+
+function renderPanorama() {
+  const companyFilter = document.getElementById('panoramaCompanyFilter').value;
+  const monthFilter = document.getElementById('panoramaMonthFilter').value;
+
+  const { dataRef, monthTotalEmps } = buildPanoramaDataRef(monthFilter, companyFilter);
+
   let calcTotalCost = 0;
   let calcCompanyCost = 0;
   let calcEmployeeCost = 0;
 
-  baseBenefitsList.forEach(ben => {
+  benefitCatalog.forEach(ben => {
     if (dataRef.benefitsData && dataRef.benefitsData[ben]) {
       calcTotalCost += Number(dataRef.benefitsData[ben].total) || 0;
       calcCompanyCost += Number(dataRef.benefitsData[ben].company) || 0;
@@ -197,12 +280,12 @@ function renderPanorama() {
   const tbody = document.getElementById('panoramaBenefitsRows');
   if(!tbody) return;
 
-  tbody.innerHTML = baseBenefitsList.map(benefitName => {
+  tbody.innerHTML = benefitCatalog.map(benefitName => {
     const data = (dataRef.benefitsData && dataRef.benefitsData[benefitName]) || { users: 0, total: 0, company: 0, employee: 0, holders: 0 };
-    
+
     const holdersCount = Number(data.holders) || Number(data.users) || 0;
     const percent = monthTotalEmps > 0 ? ((holdersCount / monthTotalEmps) * 100).toFixed(1) : 0;
-    
+
     return `
       <tr>
         <td><strong>${escapeHtml(benefitName)}</strong></td>
@@ -219,17 +302,239 @@ function renderPanorama() {
         <td>${formatCurrency(data.total)}</td>
         <td>${formatCurrency(data.company)}</td>
         <td>${formatCurrency(data.employee)}</td>
-        <td>
+        <td class="row-actions">
           <button class="secondary" style="padding: 6px 10px; font-size: 11px;" onclick="openPanEditModal('${escapeAttribute(benefitName)}')">Editar Valores</button>
+          <button class="danger-link" title="Remover benefício da lista" onclick="removeBenefitCatalogItem('${escapeAttribute(benefitName)}')">Excluir</button>
         </td>
       </tr>
     `;
   }).join('');
 
+  if (!benefitCatalog.length) {
+    tbody.innerHTML = `<tr><td colspan="8">Nenhum benefício cadastrado. Use "Adicionar benefício" acima para começar.</td></tr>`;
+  }
+
   document.getElementById('panTotalEmployees').textContent = monthTotalEmps;
   document.getElementById('panTotalCost').textContent = formatCurrency(calcTotalCost);
   document.getElementById('panTotalCompany').textContent = formatCurrency(calcCompanyCost);
   document.getElementById('panTotalEmployee').textContent = formatCurrency(calcEmployeeCost);
+
+  renderPanoramaInsights(monthFilter, companyFilter, monthTotalEmps, calcTotalCost);
+}
+
+function renderPanoramaInsights(monthFilter, companyFilter, monthTotalEmps, calcTotalCost) {
+  const avgEl = document.getElementById('panCostPerEmployee');
+  if (avgEl) {
+    avgEl.textContent = monthTotalEmps > 0
+      ? formatCurrency(calcTotalCost / monthTotalEmps) + ' / colaborador'
+      : 'Sem colaboradores base no mês';
+  }
+
+  const deltaEl = document.getElementById('panHeadcountDelta');
+  if (deltaEl) {
+    const prevMonthEmps = computeMonthTotalEmployees(getPreviousMonthStr(monthFilter), companyFilter);
+    deltaEl.classList.remove('up', 'down');
+
+    if (prevMonthEmps > 0) {
+      const diff = monthTotalEmps - prevMonthEmps;
+      deltaEl.textContent = (diff === 0 ? 'Estável' : (diff > 0 ? '+' + diff : String(diff))) + ' vs mês anterior';
+      if (diff > 0) deltaEl.classList.add('up');
+      if (diff < 0) deltaEl.classList.add('down');
+    } else {
+      deltaEl.textContent = '';
+    }
+  }
+}
+
+/* =========================================================
+   ANÁLISE ESTRATÉGICA — visão executiva alimentada pelo
+   histórico do Panorama (HISTORICO_PANORAMA)
+========================================================= */
+const CHART_PALETTE = ['#171717', '#e2bd19', '#496653', '#963f3f', '#50636d', '#80651e', '#303030', '#6b6b68', '#c9a227', '#2f4a3d', '#734b4b'];
+
+function formatMonthLabel(monthStr) {
+  const parts = String(monthStr || '').split('-');
+  if (parts.length !== 2) return monthStr || '';
+  const names = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const idx = Number(parts[1]) - 1;
+  return (names[idx] || parts[1]) + '/' + parts[0].slice(2);
+}
+
+function ensureChart(id, config) {
+  const canvas = document.getElementById(id);
+  if (!canvas || typeof Chart === 'undefined') return null;
+
+  if (analyticsCharts[id]) {
+    analyticsCharts[id].data = config.data;
+    analyticsCharts[id].options = config.options;
+    // O canvas pode ter sido criado enquanto a aba estava oculta (tamanho zero) — resize() força reler o container atual.
+    analyticsCharts[id].resize();
+    analyticsCharts[id].update();
+    return analyticsCharts[id];
+  }
+
+  analyticsCharts[id] = new Chart(canvas.getContext('2d'), config);
+  return analyticsCharts[id];
+}
+
+function renderAnalytics() {
+  const monthsSelect = document.getElementById('analyticsMonthsFilter');
+  const companySelect = document.getElementById('analyticsCompanyFilter');
+  const emptyState = document.getElementById('analyticsEmptyState');
+  if (!monthsSelect || !companySelect) return;
+
+  const monthsBack = Number(monthsSelect.value) || 6;
+  const companyFilter = companySelect.value;
+  const allMonths = getSortedHistoryMonths();
+
+  if (emptyState) emptyState.classList.toggle('hidden', allMonths.length > 0);
+  if (!allMonths.length) {
+    renderAnalyticsKpis([], { benefitsData: {} }, 0, '');
+    return;
+  }
+
+  const months = allMonths.slice(-monthsBack);
+
+  const trend = months.map(month => {
+    const { dataRef } = buildPanoramaDataRef(month, companyFilter);
+    let totalCost = 0, companyCost = 0, employeeCost = 0;
+
+    benefitCatalog.forEach(ben => {
+      const data = dataRef.benefitsData && dataRef.benefitsData[ben];
+      if (data) {
+        totalCost += Number(data.total) || 0;
+        companyCost += Number(data.company) || 0;
+        employeeCost += Number(data.employee) || 0;
+      }
+    });
+
+    return { month, totalCost, companyCost, employeeCost };
+  });
+
+  const latestMonth = allMonths[allMonths.length - 1];
+  const { dataRef: latestRef, monthTotalEmps: latestEmps } = buildPanoramaDataRef(latestMonth, companyFilter);
+
+  renderCostTrendChart(trend);
+  renderCostDistributionChart(latestRef, latestMonth);
+  renderAdhesionRankingChart(latestRef, latestMonth);
+  renderAnalyticsKpis(trend, latestRef, latestEmps, latestMonth);
+}
+
+function renderCostTrendChart(trend) {
+  ensureChart('chartCostTrend', {
+    type: 'line',
+    data: {
+      labels: trend.map(t => formatMonthLabel(t.month)),
+      datasets: [
+        { label: 'Empresa', data: trend.map(t => t.companyCost), borderColor: '#496653', backgroundColor: 'rgba(73,102,83,0.15)', tension: 0.3, fill: true },
+        { label: 'Colaborador', data: trend.map(t => t.employeeCost), borderColor: '#80651e', backgroundColor: 'rgba(128,101,30,0.15)', tension: 0.3, fill: true }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { beginAtZero: true, ticks: { callback: value => formatCurrency(value) } } }
+    }
+  });
+}
+
+function renderCostDistributionChart(dataRef, monthStr) {
+  const entries = benefitCatalog
+    .map(ben => ({ name: ben, total: (dataRef.benefitsData && dataRef.benefitsData[ben] && Number(dataRef.benefitsData[ben].total)) || 0 }))
+    .filter(entry => entry.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+  const titleEl = document.getElementById('chartDistributionTitle');
+  if (titleEl) titleEl.textContent = entries.length ? 'Mês de referência: ' + formatMonthLabel(monthStr) : 'Sem custos lançados no mês mais recente';
+
+  ensureChart('chartCostDistribution', {
+    type: 'doughnut',
+    data: {
+      labels: entries.map(entry => entry.name),
+      datasets: [{ data: entries.map(entry => entry.total), backgroundColor: entries.map((_, index) => CHART_PALETTE[index % CHART_PALETTE.length]) }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } } }
+    }
+  });
+}
+
+function renderAdhesionRankingChart(dataRef, monthStr) {
+  const entries = benefitCatalog
+    .map(ben => ({
+      name: ben,
+      holders: (dataRef.benefitsData && dataRef.benefitsData[ben] && (Number(dataRef.benefitsData[ben].holders) || Number(dataRef.benefitsData[ben].users))) || 0
+    }))
+    .filter(entry => entry.holders > 0)
+    .sort((a, b) => b.holders - a.holders);
+
+  const titleEl = document.getElementById('chartRankingTitle');
+  if (titleEl) titleEl.textContent = entries.length ? 'Mês de referência: ' + formatMonthLabel(monthStr) : 'Sem adesões lançadas no mês mais recente';
+
+  ensureChart('chartAdhesionRanking', {
+    type: 'bar',
+    data: {
+      labels: entries.map(entry => entry.name),
+      datasets: [{ label: 'Titulares', data: entries.map(entry => entry.holders), backgroundColor: '#e2bd19' }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+function renderAnalyticsKpis(trend, latestRef, latestEmps, latestMonth) {
+  const periodCostEl = document.getElementById('kpiPeriodCost');
+  const periodLabelEl = document.getElementById('kpiPeriodLabel');
+  const momEl = document.getElementById('kpiMomVariation');
+  const costliestEl = document.getElementById('kpiCostliestBenefit');
+  const adheredEl = document.getElementById('kpiMostAdheredBenefit');
+
+  const totalPeriodCost = trend.reduce((sum, t) => sum + t.totalCost, 0);
+  if (periodCostEl) periodCostEl.textContent = formatCurrency(totalPeriodCost);
+  if (periodLabelEl) {
+    periodLabelEl.textContent = trend.length
+      ? `${formatMonthLabel(trend[0].month)} – ${formatMonthLabel(trend[trend.length - 1].month)}`
+      : 'Sem lançamentos no Panorama ainda';
+  }
+
+  let momAvg = 0;
+  if (trend.length > 1) {
+    const diffs = [];
+    for (let i = 1; i < trend.length; i++) {
+      if (trend[i - 1].totalCost > 0) diffs.push((trend[i].totalCost - trend[i - 1].totalCost) / trend[i - 1].totalCost);
+    }
+    momAvg = diffs.length ? (diffs.reduce((a, b) => a + b, 0) / diffs.length) * 100 : 0;
+  }
+
+  if (momEl) {
+    momEl.textContent = trend.length > 1 ? (momAvg >= 0 ? '+' : '') + momAvg.toFixed(1) + '%' : 'Sem histórico suficiente';
+    momEl.classList.remove('up', 'down');
+    if (momAvg > 0) momEl.classList.add('up');
+    if (momAvg < 0) momEl.classList.add('down');
+  }
+
+  const entries = benefitCatalog.map(ben => {
+    const data = latestRef.benefitsData && latestRef.benefitsData[ben];
+    return {
+      name: ben,
+      total: (data && Number(data.total)) || 0,
+      holders: (data && (Number(data.holders) || Number(data.users))) || 0
+    };
+  });
+
+  const costliest = entries.slice().sort((a, b) => b.total - a.total)[0];
+  const mostAdhered = entries.slice().sort((a, b) => b.holders - a.holders)[0];
+
+  if (costliestEl) costliestEl.textContent = costliest && costliest.total > 0 ? costliest.name : 'Sem dados';
+  if (adheredEl) adheredEl.textContent = mostAdhered && mostAdhered.holders > 0 ? `${mostAdhered.name} (${mostAdhered.holders})` : 'Sem dados';
 }
 
 function openHeadcountModal() {
@@ -265,6 +570,13 @@ function saveHeadcountValue() {
       panoramaData = data.panorama || { companies: {}, total: {} };
       panoramaHistory = data.panoramaHistory || {};
 
+      // Sem isso, o painel continua mostrando o mês/empresa que estava selecionado
+      // antes de abrir o modal — mesmo quando o lançamento salvo é de outro mês —
+      // dando a impressão de que os valores "não salvaram" quando na verdade só
+      // não estavam sendo exibidos.
+      document.getElementById('panoramaMonthFilter').value = monthYear;
+      document.getElementById('panoramaCompanyFilter').value = company;
+
       syncStatus.textContent = 'Colaboradores Base Salvos!';
       headcountDialog.close();
       renderAll();
@@ -280,12 +592,17 @@ function openPanEditModal(benefitName) {
   const monthFilter = document.getElementById('panoramaMonthFilter').value;
   const companyFilter = document.getElementById('panoramaCompanyFilter').value;
 
+  if (companyFilter === 'total') {
+    alert('Selecione uma empresa específica no filtro do Panorama antes de editar os valores de um benefício. "Visão Geral" é somente a soma das empresas.');
+    return;
+  }
+
   document.getElementById('panEditTitle').textContent = 'Editar: ' + benefitName;
   document.getElementById('panEditBenefit').value = benefitName;
   document.getElementById('panEditMonth').value = monthFilter;
   document.getElementById('panEditCompany').value = companyFilter;
 
-  let savedData = { users: 0, total: 0, company: 0, employee: 0, holders: 0 };
+  let savedData = null;
   let savedTotalEmps = 0;
 
   if (panoramaHistory && panoramaHistory[monthFilter] && panoramaHistory[monthFilter][companyFilter]) {
@@ -296,9 +613,13 @@ function openPanEditModal(benefitName) {
     }
   }
 
-  if (!savedData.users && panoramaData && panoramaData.companies[companyFilter] && panoramaData.companies[companyFilter].benefitsData[benefitName]) {
+  // Só cai para o valor calculado ao vivo quando NÃO existe lançamento manual salvo —
+  // "Vidas" igual a 0 é um valor manual legítimo (ex: benefícios só financeiros) e não pode ser tratado como "sem dados".
+  if (!savedData && panoramaData && panoramaData.companies[companyFilter] && panoramaData.companies[companyFilter].benefitsData[benefitName]) {
     savedData = panoramaData.companies[companyFilter].benefitsData[benefitName];
   }
+
+  if (!savedData) savedData = { users: 0, total: 0, company: 0, employee: 0, holders: 0 };
 
   document.getElementById('panEditCompanyEmployees').value = savedTotalEmps || '';
   document.getElementById('panEditHolders').value = savedData.holders || savedData.users || 0;
@@ -329,6 +650,11 @@ function savePanManualValues() {
       employees = data.employees || [];
       panoramaData = data.panorama || { companies: {}, total: {} };
       panoramaHistory = data.panoramaHistory || {};
+
+      // Mesma razão do saveHeadcountValue: mostra o mês/empresa que acabou de ser
+      // salvo, senão o painel parece "não ter salvo" quando só está olhando outro mês.
+      document.getElementById('panoramaMonthFilter').value = monthYear;
+      document.getElementById('panoramaCompanyFilter').value = company;
 
       syncStatus.textContent = 'Salvo com sucesso!';
       panoramaEditDialog.close();
