@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Portal de Benefícios</title>
     <?!= include('styles'); ?>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   </head>
   <body>
     <div class="layout">
@@ -21,6 +22,7 @@
         <nav>
           <button class="nav-button active" data-view="dashboard">Painel</button>
           <button class="nav-button" data-view="panorama">Panorama</button>
+          <button class="nav-button" data-view="analytics">Análise Estratégica</button>
           <button class="nav-button" data-view="employees">Colaboradores</button>
           <button class="nav-button" data-view="pending">Pendências</button>
           <button class="nav-button" data-view="settings">Benefícios</button>
@@ -117,10 +119,14 @@
           </div>
 
           <section class="panel table-panel" style="margin-top: 18px;">
-            <div class="panel-head" style="padding: 18px 18px 0;">
+            <div class="panel-head" style="padding: 18px 18px 0; align-items: flex-start;">
               <div>
                 <h2>Detalhamento por Benefício</h2>
                 <p class="panel-description">Acompanhe a utilização e os valores investidos por categoria no mês selecionado.</p>
+              </div>
+              <div class="add-benefit-form">
+                <input type="text" id="newBenefitName" placeholder="Nome do novo benefício">
+                <button type="button" id="addBenefitButton" class="secondary">+ Adicionar benefício</button>
               </div>
             </div>
             <table>
@@ -138,6 +144,66 @@
               </thead>
               <tbody id="panoramaBenefitsRows"></tbody>
             </table>
+          </section>
+        </section>
+
+        <!-- ANÁLISE ESTRATÉGICA -->
+        <section id="analyticsView" class="view hidden">
+          <div class="filters" style="grid-template-columns: 200px 220px;">
+            <select id="analyticsCompanyFilter">
+              <option value="total">Visão Geral (Todas as Empresas)</option>
+            </select>
+            <select id="analyticsMonthsFilter">
+              <option value="3">Últimos 3 meses</option>
+              <option value="6" selected>Últimos 6 meses</option>
+              <option value="12">Últimos 12 meses</option>
+            </select>
+          </div>
+
+          <div id="analyticsEmptyState" class="attention-item hidden" style="margin-bottom: 18px;">
+            <strong>Ainda não há histórico suficiente</strong>
+            <span>Cadastre lançamentos mensais no Panorama (Editar Valores / Ajustar Base) para habilitar a análise estratégica.</span>
+          </div>
+
+          <div class="metrics" style="grid-template-columns: repeat(5, minmax(150px, 1fr));">
+            <article class="metric info">
+              <span>📅 Período analisado</span>
+              <strong id="kpiPeriodLabel" style="font-size: 16px;">—</strong>
+            </article>
+            <article class="metric success">
+              <span>💰 Custo total no período</span>
+              <strong id="kpiPeriodCost">R$ 0,00</strong>
+            </article>
+            <article class="metric warn">
+              <span>📈 Variação média mensal</span>
+              <strong class="metric-sub" id="kpiMomVariation" style="font-size: 22px; margin-top: 12px;">—</strong>
+            </article>
+            <article class="metric danger">
+              <span>🏆 Benefício mais custoso</span>
+              <strong id="kpiCostliestBenefit" style="font-size: 16px;">—</strong>
+            </article>
+            <article class="metric info">
+              <span>🤝 Benefício mais aderido</span>
+              <strong id="kpiMostAdheredBenefit" style="font-size: 16px;">—</strong>
+            </article>
+          </div>
+
+          <div class="grid two">
+            <section class="panel">
+              <div class="panel-head"><h2>Evolução de custo — Empresa x Colaborador</h2></div>
+              <div class="chart-box"><canvas id="chartCostTrend"></canvas></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>Distribuição de custo por benefício</h2></div>
+              <p class="panel-description" id="chartDistributionTitle"></p>
+              <div class="chart-box"><canvas id="chartCostDistribution"></canvas></div>
+            </section>
+          </div>
+
+          <section class="panel" style="margin-top: 18px;">
+            <div class="panel-head"><h2>Ranking de adesão por benefício</h2></div>
+            <p class="panel-description" id="chartRankingTitle"></p>
+            <div class="chart-box tall"><canvas id="chartAdhesionRanking"></canvas></div>
           </section>
         </section>
 

@@ -191,6 +191,20 @@ tbody tr:hover { background: #fafaf8; }
 .pdf-box span { margin-top: 4px; color: rgba(255, 255, 255, 0.72); font-size: 12px; }
 .pdf-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
 
+.add-benefit-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.add-benefit-form input { min-height: 38px; width: 220px; }
+.add-benefit-form button { min-height: 38px; white-space: nowrap; }
+
+.row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.danger-link {
+  border: 0; background: transparent; color: var(--danger); font-weight: 800;
+  font-size: 11px; padding: 6px 8px; border-radius: 8px;
+}
+.danger-link:hover { background: var(--danger-soft); }
+
+.chart-box { position: relative; height: 280px; margin-top: 12px; }
+.chart-box.tall { height: 360px; }
+
 .benefit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-top: 18px; }
 .benefit-card { padding: 18px; border: 1px solid var(--border); border-radius: 15px; background: var(--surface-soft); }
 .benefit-card strong { display: block; margin-bottom: 6px; }
