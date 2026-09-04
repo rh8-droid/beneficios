@@ -1,0 +1,1354 @@
+const CONFIG = {
+  spreadsheetId: '1NfGJt5NRvF2RGquTJAOJ3-zFP6uO5CIlPdvL_kRNxgI',
+  sheetName: 'Respostas ao formulário 3',
+
+  statusColumn: 'Status RH',
+  noteColumn: 'Observacao RH',
+  updatedColumn: 'Atualizado RH',
+
+  pdfUrlColumn: 'Termo PDF',
+  pdfFileIdColumn: 'ID Termo PDF',
+  pdfGeneratedColumn: 'Termo gerado em',
+
+  pdfFolderId: '',
+  pdfFolderName: 'Termos de Adesão - Benefícios',
+
+  timezone: 'America/Sao_Paulo',
+
+  templateIds: {
+    viaDupla: '1vbqRZlx2a2T0vNnW8cD-MQfIJAYNGnyeHsvDGtLs-10',
+    viaAvant: '1Xs93RwprvO1bhChM0D1oVDnYiv7LACJrEEW-TkqxCxI'
+  },
+
+  letterheadMargins: {
+    top: 88,
+    bottom: 78,
+    left: 42,
+    right: 42
+  },
+
+  benefitsValues: {
+    sheetName: 'VALOR MENSALIDADE',
+
+    health: {
+      regionalRange: 'A1:D12',
+      nationalRange: 'A14:D25'
+    },
+
+    dental: {
+      valueCell: 'B28'
+    },
+
+    pharmacy: {
+      monthlyLimit: 400
+    }
+  },
+
+  policyVersions: {
+    health: '1.0',
+    dental: '1.0',
+    pharmacy: '1.0',
+    totalpass: '1.0'
+  }
+};
+
+const PDF_STYLE = {
+  primary: '#111111',
+  secondary: '#333333',
+  light: '#E9E9E9',
+  lighter: '#F6F6F6',
+  border: '#C9C9C9',
+  text: '#1A1A1A',
+  muted: '#666666',
+  white: '#FFFFFF'
+};
+
+/* =========================================================
+   PORTAL
+========================================================= */
+function doGet() {
+  return HtmlService
+    .createTemplateFromFile('index')
+    .evaluate()
+    .setTitle('Portal de Benefícios')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function getPortalData() {
+  const sheet = getSheet_();
+  ensureRhColumns_(sheet);
+
+  const values = sheet.getDataRange().getDisplayValues();
+
+  if (values.length < 2) {
+    return {
+      employees: [],
+      benefits: benefitLabels_(),
+      updatedAt: formatDateTime_(new Date()),
+      panorama: getFinancialPanorama(values, buildHeaderMap_(values[0])),
+      panoramaHistory: getPanoramaHistory_()
+    };
+  }
+
+  const headers = values[0];
+  const map = buildHeaderMap_(headers);
+  validateHeaderMap_(headers, map);
+
+  const employees = values
+    .slice(1)
+    .map((row, index) => normalizeEmployee_(row, index + 2, map))
+    .filter(employee => employee.name);
+
+  return {
+    employees,
+    benefits: benefitLabels_(),
+    updatedAt: formatDateTime_(new Date()),
+    panorama: getFinancialPanorama(values, map),
+    panoramaHistory: getPanoramaHistory_()
+  };
+}
+
+function updateEmployeeStatus(rowNumber, status, note) {
+  rowNumber = validateRowNumber_(rowNumber);
+  const allowed = ['Pendente', 'Em análise', 'Concluído'];
+  const normalizedStatus = normalizeStatus_(status);
+
+  if (!allowed.includes(normalizedStatus)) {
+    throw new Error('Status inválido.');
+  }
+
+  const sheet = getSheet_();
+  const columns = ensureRhColumns_(sheet);
+
+  if (rowNumber > sheet.getLastRow()) {
+    throw new Error('A linha informada não existe mais na planilha.');
+  }
+
+  sheet.getRange(rowNumber, columns.status).setValue(normalizedStatus);
+  sheet.getRange(rowNumber, columns.note).setValue(String(note || '').trim());
+  sheet.getRange(rowNumber, columns.updated).setValue(new Date());
+
+  SpreadsheetApp.flush();
+  return getPortalData();
+}
+
+/* =========================================================
+   PANORAMA FINANCEIRO E HISTÓRICO MENSAL
+========================================================= */
+function getPanoramaSheet_() {
+  const spreadsheet = SpreadsheetApp.openById(CONFIG.spreadsheetId);
+  let sheet = spreadsheet.getSheetByName('HISTORICO_PANORAMA');
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet('HISTORICO_PANORAMA');
+    sheet.appendRow(['Mês/Ano', 'Empresa', 'Benefício', 'Usuários/Vidas', 'Custo Total', 'Custo Empresa', 'Custo Colaborador', 'Total Colaboradores Mês', 'Titulares', 'Atualizado em']);
+    sheet.getRange(1, 1, 1, 10).setFontWeight('bold');
+    sheet.getRange("A:A").setNumberFormat("@");
+  }
+  return sheet;
+}
+
+function savePanoramaManualData(monthYear, company, benefitName, users, totalCost, companyCost, employeeCost, companyTotalEmployees, holders) {
+  const sheet = getPanoramaSheet_();
+  const values = sheet.getDataRange().getDisplayValues();
+  let foundRow = -1;
+
+  const cleanMonthYear = String(monthYear || '').trim().replace("'", "");
+
+  for (let i = 1; i < values.length; i++) {
+    const rowMonth = String(values[i][0] || '').trim().replace("'", "");
+    const rowComp = String(values[i][1] || '').trim();
+    const rowBen = String(values[i][2] || '').trim();
+
+    if (rowMonth === cleanMonthYear && rowComp === String(company).trim() && rowBen === String(benefitName).trim()) {
+      foundRow = i + 1;
+      break;
+    }
+  }
+
+  const timestamp = formatDateTime_(new Date());
+  const rowData = [
+    "'" + cleanMonthYear,
+    company,
+    benefitName,
+    Number(users) || 0,
+    Number(totalCost) || 0,
+    Number(companyCost) || 0,
+    Number(employeeCost) || 0,
+    Number(companyTotalEmployees) || 0,
+    Number(holders) || 0,
+    timestamp
+  ];
+
+  if (foundRow > 0) {
+    sheet.getRange(foundRow, 1, 1, 10).setValues([rowData]);
+  } else {
+    sheet.appendRow(rowData);
+  }
+
+  if (companyTotalEmployees && Number(companyTotalEmployees) > 0) {
+    saveCompanyHeadcount_(cleanMonthYear, company, Number(companyTotalEmployees));
+  }
+
+  SpreadsheetApp.flush();
+  return getPortalData();
+}
+
+function saveCompanyHeadcount_(monthYear, company, totalEmployees) {
+  const sheet = getPanoramaSheet_();
+  const values = sheet.getDataRange().getDisplayValues();
+  const cleanMonthYear = String(monthYear || '').trim().replace("'", "");
+  let foundRow = -1;
+
+  for (let i = 1; i < values.length; i++) {
+    const rowMonth = String(values[i][0] || '').trim().replace("'", "");
+    const rowComp = String(values[i][1] || '').trim();
+    const rowBen = String(values[i][2] || '').trim();
+
+    if (rowMonth === cleanMonthYear && rowComp === String(company).trim() && rowBen === '__HEADCOUNT__') {
+      foundRow = i + 1;
+      break;
+    }
+  }
+
+  const timestamp = formatDateTime_(new Date());
+  const rowData = [
+    "'" + cleanMonthYear,
+    company,
+    '__HEADCOUNT__',
+    0,
+    0,
+    0,
+    0,
+    Number(totalEmployees) || 0,
+    0,
+    timestamp
+  ];
+
+  if (foundRow > 0) {
+    sheet.getRange(foundRow, 1, 1, 10).setValues([rowData]);
+  } else {
+    sheet.appendRow(rowData);
+  }
+}
+
+function saveHeadcountDirect(monthYear, company, totalEmployees) {
+  saveCompanyHeadcount_(monthYear, company, totalEmployees);
+  SpreadsheetApp.flush();
+  return getPortalData();
+}
+
+function getPanoramaHistory_() {
+  const sheet = getPanoramaSheet_();
+  const values = sheet.getDataRange().getDisplayValues();
+  const history = {};
+
+  if (values.length < 2) return history;
+
+  for (let i = 1; i < values.length; i++) {
+    const monthYear = String(values[i][0] || '').trim().replace("'", "");
+    const company = String(values[i][1] || '').trim();
+    const benefit = String(values[i][2] || '').trim();
+
+    if (!monthYear || !benefit) continue;
+
+    if (!history[monthYear]) history[monthYear] = {};
+    if (!history[monthYear][company]) history[monthYear][company] = { benefits: {}, totalEmployees: 0 };
+
+    const totalEmps = Number(values[i][7]) || 0;
+    if (totalEmps > 0) {
+      history[monthYear][company].totalEmployees = totalEmps;
+    }
+
+    if (benefit !== '__HEADCOUNT__') {
+      history[monthYear][company].benefits[benefit] = {
+        users: Number(values[i][3]) || 0,
+        total: Number(values[i][4]) || 0,
+        company: Number(values[i][5]) || 0,
+        employee: Number(values[i][6]) || 0,
+        holders: Number(values[i][8]) || 0
+      };
+    }
+  }
+  return history;
+}
+
+function getFinancialPanorama(values, map) {
+  if (!values || values.length < 2) return { companies: {}, total: {} };
+  
+  const panoramaData = {
+    total: { employees: 0, activeUsers: 0, totalCost: 0, companyInvestment: 0, employeeCost: 0, benefitsData: {} },
+    companies: {}
+  };
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const employee = normalizeEmployee_(row, i + 1, map);
+    
+    if (!employee.name || employee.company === 'Não informado') continue;
+    const company = employee.company;
+    
+    if (!panoramaData.companies[company]) {
+      panoramaData.companies[company] = {
+        employees: 0, activeUsers: 0, totalCost: 0, companyInvestment: 0, employeeCost: 0, benefitsData: {}
+      };
+    }
+    
+    let hasAnyBenefit = false;
+
+    if (isHealthSelected_(employee)) {
+      hasAnyBenefit = true;
+      try {
+        const healthSummary = calculateHealthSummary_(employee);
+        const vidasCount = healthSummary.beneficiaries ? healthSummary.beneficiaries.length : 1;
+        addFinancialData(panoramaData, company, 'Assistência médica (titular e dependentes)', healthSummary.totalPlan, healthSummary.totalCompany, healthSummary.totalEmployee, 1, vidasCount);
+      } catch (e) { }
+    }
+
+    if (employee.dental === 'Sim') {
+      hasAnyBenefit = true;
+      try {
+        const dentalSummary = calculateDentalSummary_(employee);
+        const vidasCount = dentalSummary.beneficiaries ? dentalSummary.beneficiaries.length : 1;
+        addFinancialData(panoramaData, company, 'Plano odontológico (titular e dependentes)', dentalSummary.totalValue, 0, dentalSummary.totalValue, 1, vidasCount);
+      } catch (e) { }
+    }
+
+    if (employee.pharmacy === 'Sim') {
+      hasAnyBenefit = true;
+      addFinancialData(panoramaData, company, 'Farmácia', 0, 0, 0, 1, 1); 
+    }
+    
+    if (isTotalPassSelected_(employee.totalpass)) {
+      hasAnyBenefit = true;
+      addFinancialData(panoramaData, company, 'Convênio Total Pass', 0, 0, 0, 1, 1);
+    }
+    
+    if (employee.soccer === 'Sim') {
+      hasAnyBenefit = true;
+      addFinancialData(panoramaData, company, 'Bolsa de estudos', 0, 0, 0, 1, 1);
+    }
+
+    if (hasAnyBenefit) {
+      panoramaData.companies[company].activeUsers++;
+      panoramaData.total.activeUsers++;
+    }
+  }
+
+  return panoramaData;
+}
+
+function addFinancialData(data, company, benefitName, total, companyInvestment, employeeCost, holderCount, vidasCount) {
+  const hCount = Number(holderCount) || 1;
+  const vCount = Number(vidasCount) || hCount;
+
+  if (!data.companies[company].benefitsData[benefitName]) {
+    data.companies[company].benefitsData[benefitName] = { users: 0, total: 0, company: 0, employee: 0, holders: 0 };
+  }
+  data.companies[company].benefitsData[benefitName].holders += hCount;
+  data.companies[company].benefitsData[benefitName].users += vCount;
+  data.companies[company].benefitsData[benefitName].total += total;
+  data.companies[company].benefitsData[benefitName].company += companyInvestment;
+  data.companies[company].benefitsData[benefitName].employee += employeeCost;
+  
+  data.companies[company].totalCost += total;
+  data.companies[company].companyInvestment += companyInvestment;
+  data.companies[company].employeeCost += employeeCost;
+
+  if (!data.total.benefitsData[benefitName]) {
+    data.total.benefitsData[benefitName] = { users: 0, total: 0, company: 0, employee: 0, holders: 0 };
+  }
+  data.total.benefitsData[benefitName].holders += hCount;
+  data.total.benefitsData[benefitName].users += vCount;
+  data.total.benefitsData[benefitName].total += total;
+  data.total.benefitsData[benefitName].company += companyInvestment;
+  data.total.benefitsData[benefitName].employee += employeeCost;
+  
+  data.total.totalCost += total;
+  data.total.companyInvestment += companyInvestment;
+  data.total.employeeCost += employeeCost;
+}
+
+/* =========================================================
+   GERAÇÃO DE PDF E AUXILIARES
+========================================================= */
+function generateBenefitsPdf(rowNumber) {
+  rowNumber = validateRowNumber_(rowNumber);
+  const lock = LockService.getScriptLock();
+
+  if (!lock.tryLock(30000)) {
+    throw new Error('Outra geração de documento está em andamento. Tente novamente em instantes.');
+  }
+
+  let temporaryDocumentFile = null;
+
+  try {
+    const context = getEmployeeContext_(rowNumber);
+    const employee = context.employee;
+    const sheet = context.sheet;
+    const columns = context.columns;
+
+    if (!employee.name) throw new Error('Não foi possível identificar o nome do colaborador nesta linha.');
+
+    const generatedAt = new Date();
+    const protocol = buildProtocol_(rowNumber, generatedAt);
+    const baseName = buildPdfBaseName_(employee, generatedAt);
+    const template = getTemplateConfigForCompany_(employee.company);
+    const folder = getPdfFolder_();
+    const templateFile = validateTemplateAccess_(template);
+
+    temporaryDocumentFile = templateFile.makeCopy(baseName + ' - TEMPORÁRIO', folder);
+    const document = DocumentApp.openById(temporaryDocumentFile.getId());
+
+    buildBenefitsDocument_(document, employee, protocol, generatedAt, template);
+    document.saveAndClose();
+    Utilities.sleep(700);
+
+    const pdfBlob = temporaryDocumentFile.getBlob().getAs(MimeType.PDF).setName(baseName + '.pdf');
+    const pdfFile = folder.createFile(pdfBlob);
+
+    pdfFile.setDescription('Termo de adesão, ciência e autorização de benefícios de ' + employee.name + '. Protocolo: ' + protocol);
+
+    sheet.getRange(rowNumber, columns.pdfUrl).setValue(pdfFile.getUrl());
+    sheet.getRange(rowNumber, columns.pdfFileId).setValue(pdfFile.getId());
+    sheet.getRange(rowNumber, columns.pdfGenerated).setValue(generatedAt);
+    sheet.getRange(rowNumber, columns.updated).setValue(generatedAt);
+
+    SpreadsheetApp.flush();
+
+    try { temporaryDocumentFile.setTrashed(true); } catch (e) {}
+
+    return {
+      success: true, rowNumber, employeeName: employee.name, fileName: pdfFile.getName(),
+      fileId: pdfFile.getId(), url: pdfFile.getUrl(), generatedAt: formatDateTime_(generatedAt),
+      protocol, company: template.label, templateName: template.name
+    };
+  } catch (error) {
+    if (temporaryDocumentFile) { try { temporaryDocumentFile.setTrashed(true); } catch (e) {} }
+    throw new Error('Não foi possível gerar o PDF: ' + error.message);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getEmployeeContext_(rowNumber) {
+  const sheet = getSheet_();
+  const columns = ensureRhColumns_(sheet);
+
+  if (rowNumber > sheet.getLastRow()) throw new Error('A linha informada não existe na planilha.');
+
+  const lastColumn = sheet.getLastColumn();
+  const headers = sheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0];
+  const row = sheet.getRange(rowNumber, 1, 1, lastColumn).getDisplayValues()[0];
+  const map = buildHeaderMap_(headers);
+  validateHeaderMap_(headers, map);
+
+  const employee = normalizeEmployee_(row, rowNumber, map);
+  return { sheet, columns, employee, headers, map };
+}
+
+function buildBenefitsDocument_(document, employee, protocol, generatedAt, template) {
+  const body = document.getBody();
+  body.clear();
+  body.setMarginTop(CONFIG.letterheadMargins.top);
+  body.setMarginBottom(CONFIG.letterheadMargins.bottom);
+  body.setMarginLeft(CONFIG.letterheadMargins.left);
+  body.setMarginRight(CONFIG.letterheadMargins.right);
+  appendSpacer_(body, 2);
+
+  const title = body.appendParagraph('TERMO DE ADESÃO, CIÊNCIA E AUTORIZAÇÃO DE BENEFÍCIOS');
+  styleParagraph_(title, { size: 14, bold: true, color: PDF_STYLE.primary, alignment: DocumentApp.HorizontalAlignment.CENTER, spacingAfter: 2 });
+  
+  const subtitle = body.appendParagraph('Registro individual das opções realizadas pelo colaborador');
+  styleParagraph_(subtitle, { size: 9, color: PDF_STYLE.muted, alignment: DocumentApp.HorizontalAlignment.CENTER, spacingAfter: 10 });
+
+  appendSectionTitle_(body, '1. IDENTIFICAÇÃO DO COLABORADOR');
+  const identificationRows = [
+    ['Nome completo', displayValue_(employee.name)],
+    ['CPF', displayValue_(employee.cpf)],
+    ['Empresa', displayValue_(employee.company)],
+    ['Matrícula', displayValue_(employee.registration)],
+    ['Cargo / função', displayValue_(employee.role)],
+    ['Idade', employee.age !== null ? employee.age + ' anos' : 'Não informado'],
+    ['E-mail', displayValue_(employee.email)],
+    ['Telefone', displayValue_(employee.phone)],
+    ['Data da solicitação', displayValue_(employee.date)]
+  ].filter(row => row[1] !== 'Não informado');
+
+  appendKeyValueTable_(body, identificationRows);
+  appendSpacer_(body, 7);
+
+  appendSectionTitle_(body, '2. BENEFÍCIOS SELECIONADOS E AUTORIZAÇÕES');
+  appendBodyParagraph_(body, 'Este termo apresenta somente as condições aplicáveis aos benefícios selecionados pelo colaborador, incluindo os valores vigentes e as autorizações financeiras correspondentes.');
+
+  let benefitNumber = 1;
+  let selectedCount = 0;
+
+  if (isHealthSelected_(employee)) {
+    const summary = calculateHealthSummary_(employee);
+    appendHealthBenefit_(body, employee, summary, '2.' + benefitNumber);
+    benefitNumber++; selectedCount++;
+  }
+
+  if (employee.dental === 'Sim') {
+    const summary = calculateDentalSummary_(employee);
+    appendDentalBenefit_(body, employee, summary, '2.' + benefitNumber);
+    benefitNumber++; selectedCount++;
+  }
+
+  if (employee.pharmacy === 'Sim') {
+    appendPharmacyBenefit_(body, employee, '2.' + benefitNumber);
+    benefitNumber++; selectedCount++;
+  }
+
+  if (isTotalPassSelected_(employee.totalpass)) {
+    appendTotalPassBenefit_(body, employee, '2.' + benefitNumber);
+    benefitNumber++; selectedCount++;
+  }
+
+  if (employee.soccer === 'Sim') {
+    appendSoccerBenefit_(body, employee, '2.' + benefitNumber);
+    benefitNumber++; selectedCount++;
+  }
+
+  if (!selectedCount) {
+    appendBodyParagraph_(body, 'Não foram identificados benefícios selecionados para adesão nesta solicitação.');
+  }
+
+  const nonSelected = getNonSelectedBenefits_(employee);
+  if (nonSelected.length) {
+    const p = body.appendParagraph('Opções não aderidas: ' + nonSelected.join(', ') + '.');
+    styleParagraph_(p, { size: 7.8, color: PDF_STYLE.muted, italic: true, spacingBefore: 4, spacingAfter: 6 });
+  }
+
+  appendSpacer_(body, 5);
+  appendSectionTitle_(body, '3. DECLARAÇÕES GERAIS');
+
+  const cpfPhrase = isMeaningful_(employee.cpf) ? ', inscrito(a) no CPF sob o nº ' + employee.cpf : '';
+  const companyPhrase = isMeaningful_(employee.company) ? ', vinculado(a) à empresa ' + employee.company : '';
+
+  appendBodyParagraph_(body, 'Eu, ' + employee.name + cpfPhrase + companyPhrase + ', declaro que as informações e opções registradas neste termo correspondem às minhas escolhas e são verdadeiras e completas.');
+  appendDeclarationItem_(body, 'Declaro que tive acesso às regras dos benefícios selecionados e estou ciente das políticas aplicáveis identificadas neste termo por sua respectiva versão, as quais permanecem disponíveis para consulta e complementam as condições aqui registradas.');
+  appendDeclarationItem_(body, 'Estou ciente de que inclusões, alterações e exclusões dependem dos prazos administrativos da empresa e, quando aplicável, do processamento pela operadora ou fornecedor responsável.');
+  appendDeclarationItem_(body, 'Comprometo-me a fornecer os documentos necessários para minha inclusão e para a inclusão de dependentes, bem como comunicar ao RH alterações cadastrais que possam afetar a elegibilidade ou a manutenção dos benefícios.');
+  appendDeclarationItem_(body, 'Autorizo o tratamento e o compartilhamento dos dados pessoais necessários à administração dos benefícios selecionados, observadas as finalidades relacionadas à inclusão, manutenção, faturamento, utilização e cumprimento das obrigações aplicáveis.');
+  appendDeclarationItem_(body, 'Estou ciente de que valores referentes a utilização, coparticipação, diferenças de faturamento ou períodos em que o benefício permaneceu ativo poderão ser apresentados posteriormente, inclusive após cancelamento ou desligamento, quando aplicável.');
+  appendDeclarationItem_(body, 'Eventuais alterações relevantes nas condições dos benefícios serão comunicadas pela empresa. Novas obrigações financeiras que não estejam abrangidas pelas autorizações deste termo poderão exigir nova manifestação do colaborador, quando aplicável.');
+
+  if (isMeaningful_(employee.awareness)) {
+    appendSpacer_(body, 3);
+    const declared = body.appendParagraph('Declaração registrada no formulário: ' + employee.awareness);
+    styleParagraph_(declared, { size: 8, color: PDF_STYLE.muted, italic: true, spacingAfter: 6 });
+  }
+
+  appendSpacer_(body, 5);
+  appendSectionTitle_(body, '4. ASSINATURA ELETRÔNICA');
+  appendBodyParagraph_(body, 'A assinatura eletrônica deste documento representa a ciência e a concordância do colaborador com as opções registradas, as autorizações expressas de desconto previstas para cada benefício selecionado e as políticas vigentes identificadas neste termo.');
+  appendBodyParagraph_(body, 'Este documento será encaminhado para assinatura eletrônica pela plataforma ZapSign.');
+  
+  appendSpacer_(body, 18);
+  appendSignatureTable_(body, employee, template.label);
+  appendSpacer_(body, 12);
+
+  const footer = body.appendParagraph('Documento gerado eletronicamente em ' + formatDateTime_(generatedAt) + ' | Protocolo: ' + protocol + ' | Portal de Benefícios – Gestão de Pessoas – ' + template.label);
+  styleParagraph_(footer, { size: 7, color: PDF_STYLE.muted, alignment: DocumentApp.HorizontalAlignment.CENTER, spacingBefore: 4 });
+}
+
+function appendHealthBenefit_(body, employee, summary, sectionNumber) {
+  appendBenefitTitle_(body, sectionNumber + ' PLANO DE SAÚDE – AMIL');
+  appendKeyValueTable_(body, [
+    ['Plano selecionado', displayValue_(employee.healthPlan)],
+    ['Modalidade', summary.planType],
+    ['Custeio padrão', '70% empresa | 30% colaborador'],
+    ['Coparticipação', summary.hasCoparticipation ? '100% de responsabilidade do colaborador' : 'Não aplicável à modalidade registrada'],
+    ['Política aplicável', 'Política Interna de Benefício – Plano de Saúde | Versão ' + CONFIG.policyVersions.health]
+  ]);
+  appendSpacer_(body, 4);
+
+  const rows = [['Beneficiário', 'Vínculo', 'Idade', 'Mensalidade', 'Empresa', 'Colaborador']];
+  summary.beneficiaries.forEach(item => {
+    rows.push([item.name, item.relationship, item.age + ' anos', formatCurrency_(item.totalValue), formatCurrency_(item.companyValue), formatCurrency_(item.employeeValue)]);
+  });
+  appendHealthValuesTable_(body, rows);
+  appendSpacer_(body, 3);
+  
+  appendTotalsTable_(body, [
+    ['Valor mensal total do plano', formatCurrency_(summary.totalPlan)],
+    ['Subsídio mensal da empresa', formatCurrency_(summary.totalCompany)],
+    ['Responsabilidade mensal do colaborador', formatCurrency_(summary.totalEmployee)]
+  ]);
+  appendSpacer_(body, 4);
+  appendBodyParagraph_(body, 'Os valores acima correspondem à tabela vigente na data da geração deste termo.');
+  appendAuthorizationBox_(body, 'AUTORIZAÇÃO DE DESCONTO – PLANO DE SAÚDE', 'Autorizo expressamente os descontos em folha de pagamento referentes à parcela das mensalidades sob minha responsabilidade.');
+  appendSpacer_(body, 7);
+}
+
+function appendDentalBenefit_(body, employee, summary, sectionNumber) {
+  appendBenefitTitle_(body, sectionNumber + ' PLANO ODONTOLÓGICO – DENTAL UNI');
+  appendKeyValueTable_(body, [
+    ['Plano', 'Dental Uni – Dental Elite'],
+    ['Custeio', '100% de responsabilidade do colaborador'],
+    ['Valor vigente por beneficiário', formatCurrency_(summary.unitValue)],
+    ['Quantidade de beneficiários', String(summary.beneficiaries.length)],
+    ['Total mensal', formatCurrency_(summary.totalValue)]
+  ]);
+  appendSpacer_(body, 4);
+
+  const rows = [['Beneficiário', 'Vínculo', 'Nascimento', 'CPF', 'Mensalidade']];
+  summary.beneficiaries.forEach(item => {
+    rows.push([item.name, item.relationship, displayCompact_(item.birthDate), displayCompact_(item.cpf), formatCurrency_(summary.unitValue)]);
+  });
+  
+  appendSimpleBenefitsValuesTable_(body, rows, [145, 70, 80, 100, 80]);
+  appendSpacer_(body, 4);
+  appendAuthorizationBox_(body, 'AUTORIZAÇÃO DE DESCONTO – PLANO ODONTOLÓGICO', 'Autorizo expressamente o desconto mensal em minha folha de pagamento.');
+  appendSpacer_(body, 7);
+}
+
+function appendPharmacyBenefit_(body, employee, sectionNumber) {
+  appendBenefitTitle_(body, sectionNumber + ' CONVÊNIO FARMÁCIA – BRASIL CONVÊNIOS');
+  appendKeyValueTable_(body, [
+    ['Limite mensal vigente', 'Até ' + formatCurrency_(CONFIG.benefitsValues.pharmacy.monthlyLimit)],
+    ['Natureza do limite', 'Limite para compras com posterior desconto em folha']
+  ]);
+  appendSpacer_(body, 4);
+  appendAuthorizationBox_(body, 'AUTORIZAÇÃO DE DESCONTO – CONVÊNIO FARMÁCIA', 'Autorizo expressamente o desconto integral em minha folha de pagamento.');
+  appendSpacer_(body, 7);
+}
+
+function appendTotalPassBenefit_(body, employee, sectionNumber) {
+  appendBenefitTitle_(body, sectionNumber + ' TOTALPASS');
+  appendKeyValueTable_(body, [['Opção registrada', displayValue_(employee.totalpass)]]);
+  appendSpacer_(body, 4);
+  appendSpacer_(body, 7);
+}
+
+function appendSoccerBenefit_(body, employee, sectionNumber) {
+  appendBenefitTitle_(body, sectionNumber + ' ESCOLA DE FUTEBOL');
+  appendKeyValueTable_(body, [['Opção registrada', displayValue_(employee.soccer)]]);
+  appendSpacer_(body, 4);
+  appendSpacer_(body, 7);
+}
+
+function calculateHealthSummary_(employee) {
+  if (employee.age === null) throw new Error('A idade do titular não foi identificada.');
+  if (!isMeaningful_(employee.healthPlan)) throw new Error('O tipo do plano de saúde não foi identificado.');
+
+  const planType = identifyHealthPlanType_(employee.healthPlan);
+  const hasCoparticipation = healthPlanHasCoparticipation_(employee.healthPlan);
+  const titularPricing = getHealthPricingByAge_(employee.healthPlan, employee.age);
+
+  const beneficiaries = [{
+    name: employee.name, relationship: 'Titular', age: employee.age,
+    totalValue: titularPricing.totalValue, companyValue: titularPricing.companyValue,
+    employeeValue: titularPricing.employeeValue, ageBand: titularPricing.ageBand
+  }];
+
+  const dependents = getBenefitDependents_(employee.healthDependentChoice, employee.healthDependents, 'Plano de Saúde');
+  dependents.forEach(dependent => {
+    const pricing = getHealthPricingByAge_(employee.healthPlan, dependent.age);
+    const share = calculateHealthShare_(pricing, dependent.relationship, dependent.age);
+    beneficiaries.push({
+      name: dependent.name, relationship: dependent.relationship, age: dependent.age,
+      totalValue: pricing.totalValue, companyValue: share.companyValue,
+      employeeValue: share.employeeValue, ageBand: pricing.ageBand
+    });
+  });
+
+  return {
+    planType, hasCoparticipation, beneficiaries,
+    totalPlan: roundMoney_(beneficiaries.reduce((sum, item) => sum + item.totalValue, 0)),
+    totalCompany: roundMoney_(beneficiaries.reduce((sum, item) => sum + item.companyValue, 0)),
+    totalEmployee: roundMoney_(beneficiaries.reduce((sum, item) => sum + item.employeeValue, 0))
+  };
+}
+
+function calculateDentalSummary_(employee) {
+  const unitValue = getDentalValue_();
+  const dependents = getBenefitDependents_(employee.dentalDependentChoice, employee.dentalDependents, 'Plano Odontológico');
+  const beneficiaries = [{ name: employee.name, relationship: 'Titular', age: employee.age, birthDate: '', cpf: employee.cpf }];
+  dependents.forEach(dependent => beneficiaries.push(dependent));
+
+  return {
+    unitValue, beneficiaries,
+    totalValue: roundMoney_(unitValue * beneficiaries.length)
+  };
+}
+
+function getBenefitsValuesSheet_() {
+  const spreadsheet = SpreadsheetApp.openById(CONFIG.spreadsheetId);
+  const sheet = spreadsheet.getSheetByName(CONFIG.benefitsValues.sheetName);
+  if (!sheet) throw new Error('A aba de valores não foi encontrada na planilha.');
+  return sheet;
+}
+
+function identifyHealthPlanType_(plan) {
+  const text = normalize_(plan);
+  if (text.includes('regional') || text.includes('facil') || text.includes('s80')) return 'Regional';
+  if (text.includes('nacional') || text.includes('nac') || text.includes('s380')) return 'Nacional';
+  throw new Error('Não foi possível identificar se o plano de saúde é Regional ou Nacional.');
+}
+
+function healthPlanHasCoparticipation_(plan) {
+  const text = normalize_(plan);
+  return (text.includes('coparticipacao') || text.includes('copart'));
+}
+
+function getHealthPricingByAge_(plan, age) {
+  const parsedAge = Number(age);
+  if (!Number.isFinite(parsedAge) || parsedAge < 0) throw new Error('Idade inválida.');
+
+  const sheet = getBenefitsValuesSheet_();
+  const planType = identifyHealthPlanType_(plan);
+  const rangeA1 = planType === 'Regional' ? CONFIG.benefitsValues.health.regionalRange : CONFIG.benefitsValues.health.nationalRange;
+  const rows = sheet.getRange(rangeA1).getValues();
+
+  for (let i = 0; i < rows.length; i++) {
+    const ageBand = String(rows[i][0] || '').trim();
+    if (!ageBand || !ageMatchesBand_(parsedAge, ageBand)) continue;
+
+    const totalValue = toNumber_(rows[i][1]);
+    const companyValue = toNumber_(rows[i][2]);
+    const employeeValue = toNumber_(rows[i][3]);
+
+    if (totalValue <= 0) throw new Error('Faixa etária não possui mensalidade válida.');
+
+    return { ageBand, totalValue: roundMoney_(totalValue), companyValue: roundMoney_(companyValue), employeeValue: roundMoney_(employeeValue) };
+  }
+  throw new Error('Não foi encontrada faixa etária para ' + parsedAge + ' anos no plano ' + planType + '.');
+}
+
+function ageMatchesBand_(age, band) {
+  const text = normalize_(band);
+  if (text.includes('maior que 58')) return age > 58;
+  const match = text.match(/(\d+)\s*-\s*(\d+)/);
+  if (!match) return false;
+  return (age >= Number(match[1]) && age <= Number(match[2]));
+}
+
+function calculateHealthShare_(pricing, relationship, age) {
+  const rel = normalize_(relationship);
+  if (rel === 'conjuge') return { companyValue: pricing.companyValue, employeeValue: pricing.employeeValue };
+  if (['filho', 'filha', 'enteado', 'enteada'].includes(rel)) {
+    if (age <= 18) return { companyValue: pricing.companyValue, employeeValue: pricing.employeeValue };
+    return { companyValue: 0, employeeValue: pricing.totalValue };
+  }
+  throw new Error('Parentesco não permitido ou não reconhecido no Plano de Saúde: "' + relationship + '".');
+}
+
+function getDentalValue_() {
+  const sheet = getBenefitsValuesSheet_();
+  const value = toNumber_(sheet.getRange(CONFIG.benefitsValues.dental.valueCell).getValue());
+  if (value <= 0) throw new Error('O valor da Dental Uni não foi encontrado.');
+  return roundMoney_(value);
+}
+
+function getBenefitDependents_(choice, rawValue, benefitName) {
+  const normalizedChoice = normalizeChoice_(choice);
+  if (normalizedChoice === 'Não') return [];
+  if (!isMeaningful_(rawValue)) {
+    if (normalizedChoice === 'Sim') throw new Error(benefitName + ': foi registrada inclusão, mas os dados não foram encontrados.');
+    return [];
+  }
+  if (normalize_(benefitName).includes('odontologico')) return parseDentalDependents_(rawValue);
+  return parseDependents_(rawValue, benefitName);
+}
+
+function parseDependents_(rawValue, benefitName) {
+  const raw = String(rawValue || '').trim();
+  if (!raw) return [];
+  
+  const pattern = /([^,;\n|]+?)\s*,\s*(c[oô]njuge|esposa|esposo|filho|filha|enteado|enteada)\s*,\s*(\d{1,3})\s*anos?/gi;
+  const dependents = [];
+  let match;
+
+  while ((match = pattern.exec(raw)) !== null) {
+    dependents.push({ name: titleCase_(match[1].trim()), relationship: normalizeRelationship_(match[2]), age: Number(match[3]) });
+  }
+
+  if (!dependents.length) throw new Error(benefitName + ': não foi possível interpretar os dependentes.');
+  return dependents;
+}
+
+function parseDentalDependents_(rawValue) {
+  const raw = String(rawValue || '').replace(/<br\s*\/?>/gi, '\n').trim();
+  if (!raw) return [];
+
+  const pattern = /([^,;\n|]+?)\s*,\s*(c[oô]njuge|esposa|esposo|filho|filha|enteado|enteada)\s*,\s*(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4})\s*,\s*([\d.\-]{11,14})/gi;
+  const dependents = [];
+  let match;
+
+  while ((match = pattern.exec(raw)) !== null) {
+    const birthDate = normalizeDateBr_(match[3]);
+    dependents.push({
+      name: titleCase_(match[1].trim()), relationship: normalizeRelationship_(match[2]),
+      birthDate, cpf: formatCpf_(match[4]), age: calculateAgeFromBirthDate_(birthDate)
+    });
+  }
+
+  if (dependents.length) return dependents;
+
+  try {
+    const legacy = parseDependents_(raw, 'Plano Odontológico');
+    return legacy.map(dependent => ({ name: dependent.name, relationship: dependent.relationship, age: dependent.age, birthDate: '', cpf: '' }));
+  } catch (e) {
+    throw new Error('Plano Odontológico: não foi possível interpretar os dependentes.');
+  }
+}
+
+function normalizeDateBr_(value) {
+  const match = String(value || '').trim().match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);
+  if (!match) return '';
+  return String(Number(match[1])).padStart(2, '0') + '/' + String(Number(match[2])).padStart(2, '0') + '/' + match[3];
+}
+
+function calculateAgeFromBirthDate_(value) {
+  const normalized = normalizeDateBr_(value);
+  if (!normalized) return null;
+  const parts = normalized.split('/').map(Number);
+  const birth = new Date(parts[2], parts[1] - 1, parts[0]);
+  if (Number.isNaN(birth.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const beforeBirthday = today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
+  if (beforeBirthday) age--;
+  return age >= 0 ? age : null;
+}
+
+function normalizeRelationship_(value) {
+  const text = normalize_(value);
+  if (['conjuge', 'esposa', 'esposo'].includes(text)) return 'Cônjuge';
+  if (text === 'filho') return 'Filho';
+  if (text === 'filha') return 'Filha';
+  if (text === 'enteado') return 'Enteado';
+  if (text === 'enteada') return 'Enteada';
+  return titleCase_(value);
+}
+
+function parseAge_(value) {
+  const match = String(value || '').match(/\d{1,3}/);
+  return match ? Number(match[0]) : null;
+}
+
+function toNumber_(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  let text = String(value || '').trim();
+  if (!text) return 0;
+  if (text.includes(',') && text.includes('.')) text = text.replace(/\./g, '').replace(',', '.');
+  else if (text.includes(',')) text = text.replace(',', '.');
+  text = text.replace(/[^\d.-]/g, '');
+  return Number(text) || 0;
+}
+
+function roundMoney_(value) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
+function formatCurrency_(value) {
+  const number = roundMoney_(value);
+  const parts = number.toFixed(2).split('.');
+  const integer = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return 'R$ ' + integer + ',' + parts[1];
+}
+
+function appendBenefitTitle_(body, text) {
+  const table = body.appendTable([[text]]);
+  table.setBorderWidth(0);
+  const cell = table.getCell(0, 0);
+  cell.setBackgroundColor(PDF_STYLE.primary);
+  styleCell_(cell, { size: 9, bold: true, color: PDF_STYLE.white, padding: 6 });
+  appendSpacer_(body, 3);
+}
+
+function appendAuthorizationBox_(body, title, text) {
+  const table = body.appendTable([[title + '\n' + text]]);
+  table.setBorderColor(PDF_STYLE.border);
+  table.setBorderWidth(0.7);
+  const cell = table.getCell(0, 0);
+  cell.setBackgroundColor(PDF_STYLE.lighter);
+  styleCell_(cell, { size: 8, color: PDF_STYLE.text, padding: 6 });
+  const cellText = cell.editAsText();
+  cellText.setBold(0, Math.max(0, title.length - 1), true);
+}
+
+function appendSectionTitle_(body, text) {
+  const table = body.appendTable([[text]]);
+  table.setBorderWidth(0);
+  const cell = table.getCell(0, 0);
+  cell.setBackgroundColor(PDF_STYLE.light);
+  styleCell_(cell, { size: 9, bold: true, color: PDF_STYLE.primary, padding: 6 });
+}
+
+function appendKeyValueTable_(body, rows) {
+  if (!rows.length) { appendBodyParagraph_(body, 'Dados não informados.'); return; }
+  const table = body.appendTable(rows);
+  table.setBorderColor(PDF_STYLE.border);
+  table.setBorderWidth(0.5);
+  table.setColumnWidth(0, 155);
+  table.setColumnWidth(1, 320);
+
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+    const labelCell = table.getCell(rowIndex, 0);
+    const valueCell = table.getCell(rowIndex, 1);
+    labelCell.setBackgroundColor(PDF_STYLE.lighter);
+    styleCell_(labelCell, { size: 7.8, bold: true, color: PDF_STYLE.primary, padding: 4 });
+    styleCell_(valueCell, { size: 7.8, color: PDF_STYLE.text, padding: 4 });
+  }
+}
+
+function appendHealthValuesTable_(body, rows) {
+  appendSimpleBenefitsValuesTable_(body, rows, [135, 72, 45, 78, 72, 73]);
+}
+
+function appendSimpleBenefitsValuesTable_(body, rows, widths) {
+  const table = body.appendTable(rows);
+  table.setBorderColor(PDF_STYLE.border);
+  table.setBorderWidth(0.5);
+  widths.forEach((width, index) => table.setColumnWidth(index, width));
+
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+    for (let columnIndex = 0; columnIndex < rows[rowIndex].length; columnIndex++) {
+      const cell = table.getCell(rowIndex, columnIndex);
+      const isHeader = rowIndex === 0;
+      if (isHeader) cell.setBackgroundColor(PDF_STYLE.primary);
+      else if (rowIndex % 2 === 0) cell.setBackgroundColor(PDF_STYLE.lighter);
+      
+      styleCell_(cell, {
+        size: isHeader ? 7 : 6.8, bold: isHeader || columnIndex === 0,
+        color: isHeader ? PDF_STYLE.white : PDF_STYLE.text,
+        alignment: columnIndex >= 2 ? DocumentApp.HorizontalAlignment.CENTER : DocumentApp.HorizontalAlignment.LEFT,
+        padding: 4
+      });
+    }
+  }
+}
+
+function appendTotalsTable_(body, rows) {
+  const table = body.appendTable(rows);
+  table.setBorderColor(PDF_STYLE.border);
+  table.setBorderWidth(0.5);
+  table.setColumnWidth(0, 310);
+  table.setColumnWidth(1, 165);
+
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+    const labelCell = table.getCell(rowIndex, 0);
+    const valueCell = table.getCell(rowIndex, 1);
+    const isLast = rowIndex === rows.length - 1;
+
+    labelCell.setBackgroundColor(isLast ? PDF_STYLE.light : PDF_STYLE.lighter);
+    valueCell.setBackgroundColor(isLast ? PDF_STYLE.light : PDF_STYLE.white);
+
+    styleCell_(labelCell, { size: 7.8, bold: true, color: PDF_STYLE.primary, padding: 4 });
+    styleCell_(valueCell, { size: 8, bold: isLast, color: PDF_STYLE.text, alignment: DocumentApp.HorizontalAlignment.RIGHT, padding: 4 });
+  }
+}
+
+function appendBodyParagraph_(body, text) {
+  const paragraph = body.appendParagraph(text);
+  styleParagraph_(paragraph, { size: 8.2, color: PDF_STYLE.text, alignment: DocumentApp.HorizontalAlignment.JUSTIFY, spacingAfter: 5, lineSpacing: 1.05 });
+}
+
+function appendDeclarationItem_(body, text) {
+  const paragraph = body.appendListItem(text);
+  paragraph.setGlyphType(DocumentApp.GlyphType.BULLET);
+  paragraph.setNestingLevel(0);
+  paragraph.setIndentStart(18);
+  paragraph.setIndentFirstLine(8);
+  styleParagraph_(paragraph, { size: 8, color: PDF_STYLE.text, alignment: DocumentApp.HorizontalAlignment.JUSTIFY, spacingAfter: 4, lineSpacing: 1.03 });
+}
+
+function appendSignatureTable_(body, employee, companyLabel) {
+  const table = body.appendTable([
+    ['__________________________________', '__________________________________'],
+    [employee.name, companyLabel],
+    ['Colaborador(a)', 'Responsável pela empresa']
+  ]);
+  table.setBorderWidth(0);
+  table.setColumnWidth(0, 238);
+  table.setColumnWidth(1, 238);
+
+  for (let rowIndex = 0; rowIndex < 3; rowIndex++) {
+    for (let columnIndex = 0; columnIndex < 2; columnIndex++) {
+      const cell = table.getCell(rowIndex, columnIndex);
+      styleCell_(cell, { size: rowIndex === 0 ? 8 : 7.5, bold: rowIndex === 1, color: rowIndex === 2 ? PDF_STYLE.muted : PDF_STYLE.text, alignment: DocumentApp.HorizontalAlignment.CENTER, padding: rowIndex === 0 ? 1 : 2 });
+    }
+  }
+}
+
+function styleParagraph_(paragraph, options) {
+  const settings = options || {};
+  const text = paragraph.editAsText();
+  text.setFontFamily('Arial');
+  if (settings.size) text.setFontSize(settings.size);
+  if (settings.bold !== undefined) text.setBold(settings.bold);
+  if (settings.italic !== undefined) text.setItalic(settings.italic);
+  if (settings.color) text.setForegroundColor(settings.color);
+  if (settings.alignment) paragraph.setAlignment(settings.alignment);
+  if (settings.spacingBefore !== undefined) paragraph.setSpacingBefore(settings.spacingBefore);
+  if (settings.spacingAfter !== undefined) paragraph.setSpacingAfter(settings.spacingAfter);
+  if (settings.lineSpacing !== undefined) paragraph.setLineSpacing(settings.lineSpacing);
+  return paragraph;
+}
+
+function styleCell_(cell, options) {
+  const settings = options || {};
+  const text = cell.editAsText();
+  text.setFontFamily('Arial');
+  if (settings.size) text.setFontSize(settings.size);
+  if (settings.bold !== undefined) text.setBold(settings.bold);
+  if (settings.italic !== undefined) text.setItalic(settings.italic);
+  if (settings.color) text.setForegroundColor(settings.color);
+  const padding = settings.padding === undefined ? 5 : settings.padding;
+  cell.setPaddingTop(padding); cell.setPaddingBottom(padding); cell.setPaddingLeft(padding); cell.setPaddingRight(padding);
+
+  for (let index = 0; index < cell.getNumChildren(); index++) {
+    const child = cell.getChild(index);
+    const type = child.getType();
+    let paragraph = null;
+    if (type === DocumentApp.ElementType.PARAGRAPH) paragraph = child.asParagraph();
+    else if (type === DocumentApp.ElementType.LIST_ITEM) paragraph = child.asListItem();
+    if (!paragraph) continue;
+    paragraph.setSpacingBefore(0); paragraph.setSpacingAfter(0); paragraph.setLineSpacing(1);
+    if (settings.alignment) paragraph.setAlignment(settings.alignment);
+  }
+  return cell;
+}
+
+function appendSpacer_(body, spacingAfter) {
+  const spacer = body.appendParagraph('');
+  spacer.setSpacingAfter(spacingAfter || 4);
+  spacer.setSpacingBefore(0);
+}
+
+function getTemplateConfigForCompany_(company) {
+  const normalizedCompany = normalize_(company);
+  if (normalizedCompany.includes('avant')) return { key: 'viaAvant', id: CONFIG.templateIds.viaAvant, label: 'VIA AVANT', name: 'Papel timbrado Via Avant' };
+  if (normalizedCompany.includes('via dupla') || normalizedCompany.includes('dupla')) return { key: 'viaDupla', id: CONFIG.templateIds.viaDupla, label: 'VIA DUPLA', name: 'Papel timbrado Via Dupla' };
+  throw new Error('A empresa informada não foi reconhecida para seleção do papel timbrado.');
+}
+
+function validateTemplateAccess_(template) {
+  if (!template.id) throw new Error('O ID do modelo ' + template.label + ' não foi configurado.');
+  try {
+    const file = DriveApp.getFileById(template.id);
+    if (file.getMimeType() !== MimeType.GOOGLE_DOCS) throw new Error('O modelo ' + template.label + ' precisa estar convertido para Google Documentos.');
+    return file;
+  } catch (error) { throw new Error('Não foi possível acessar o modelo timbrado ' + template.label + '.'); }
+}
+
+function getPdfFolder_() {
+  if (CONFIG.pdfFolderId && CONFIG.pdfFolderId.trim()) {
+    try { return DriveApp.getFolderById(CONFIG.pdfFolderId.trim()); } catch (error) { throw new Error('Pasta não encontrada.'); }
+  }
+  const properties = PropertiesService.getScriptProperties();
+  const savedFolderId = properties.getProperty('BENEFITS_PDF_FOLDER_ID');
+  if (savedFolderId) {
+    try { return DriveApp.getFolderById(savedFolderId); } catch (ignored) { properties.deleteProperty('BENEFITS_PDF_FOLDER_ID'); }
+  }
+  const folders = DriveApp.getFoldersByName(CONFIG.pdfFolderName);
+  const folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(CONFIG.pdfFolderName);
+  properties.setProperty('BENEFITS_PDF_FOLDER_ID', folder.getId());
+  return folder;
+}
+
+function getSheet_() {
+  const spreadsheet = SpreadsheetApp.openById(CONFIG.spreadsheetId);
+  if (CONFIG.sheetName && CONFIG.sheetName.trim()) {
+    const sheet = spreadsheet.getSheetByName(CONFIG.sheetName);
+    if (!sheet) throw new Error('A aba "' + CONFIG.sheetName + '" não foi encontrada.');
+    return sheet;
+  }
+  const sheets = spreadsheet.getSheets();
+  if (!sheets.length) throw new Error('Nenhuma aba foi encontrada na planilha.');
+  return sheets[0];
+}
+
+function ensureRhColumns_(sheet) {
+  const lastColumn = sheet.getLastColumn();
+  if (lastColumn < 1) throw new Error('A planilha não possui cabeçalho.');
+  const headers = sheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0];
+  const needed = [CONFIG.statusColumn, CONFIG.noteColumn, CONFIG.updatedColumn, CONFIG.pdfUrlColumn, CONFIG.pdfFileIdColumn, CONFIG.pdfGeneratedColumn];
+
+  needed.forEach(header => {
+    if (!headers.includes(header)) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+      headers.push(header);
+    }
+  });
+
+  const refreshed = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  return {
+    status: refreshed.indexOf(CONFIG.statusColumn) + 1,
+    note: refreshed.indexOf(CONFIG.noteColumn) + 1,
+    updated: refreshed.indexOf(CONFIG.updatedColumn) + 1,
+    pdfUrl: refreshed.indexOf(CONFIG.pdfUrlColumn) + 1,
+    pdfFileId: refreshed.indexOf(CONFIG.pdfFileIdColumn) + 1,
+    pdfGenerated: refreshed.indexOf(CONFIG.pdfGeneratedColumn) + 1
+  };
+}
+
+function buildHeaderMap_(headers) {
+  const exactHeader_ = candidates => {
+    const normalizedCandidates = candidates.map(normalize_);
+    return headers.findIndex(header => normalizedCandidates.includes(normalize_(header)));
+  };
+
+  const exactOrFound_ = (exactCandidates, fuzzyOptions, fallbackIndex) => {
+    const exactIndex = exactHeader_(exactCandidates || []);
+    if (exactIndex >= 0) return exactIndex;
+    const fuzzyIndex = firstFound_(headers, fuzzyOptions || []);
+    if (fuzzyIndex >= 0) return fuzzyIndex;
+    return Number.isInteger(fallbackIndex) ? fallbackIndex : -1;
+  };
+
+  const formEmail = exactOrFound_(['Endereço de e-mail', 'Endereco de e-mail'], [['endereco de e-mail'], ['endereço de e-mail']]);
+  const email = exactOrFound_(['E-mail', 'Email'], [['e-mail'], ['email']]);
+  const declaration = exactOrFound_(['CIÊNCIA E RESPONSABILIDADE: Declaro que li e estou de acordo com as informações e condições apresentadas neste formulário.'], [['ciencia', 'responsabilidade']]);
+
+  return {
+    timestamp: exactOrFound_(['Carimbo de data/hora'], [['carimbo de data']]),
+    formEmail,
+    email: email >= 0 ? email : formEmail,
+    name: exactOrFound_(['Nome completo'], [['nome completo']]),
+    age: exactOrFound_(['Qual a sua idade?'], [['idade']]),
+    cpf: exactOrFound_(['CPF'], [['cpf']]),
+    registration: exactOrFound_(['Matrícula'], [['matricula']]),
+    role: exactOrFound_(['Cargo/Função'], [['cargo']]),
+    phone: exactOrFound_(['Telefone'], [['telefone']]),
+    company: exactOrFound_(['Qual a empresa da sua contratação ?'], [['empresa', 'contratacao']]),
+    health: exactOrFound_(['Deseja aderir ao plano de saúde?'], [['deseja aderir', 'plano de saude']], 9),
+    healthPlan: exactOrFound_(['1. PLANO DE SAÚDE - Qual plano deseja aderir?'], [['qual plano deseja aderir']], 10),
+    healthDependentChoice: exactOrFound_(['Deseja incluir dependentes no Plano de Saúde?'], [['dependentes', 'plano de saude']]),
+    healthDependents: exactOrFound_(['Dependentes do Plano de Saúde: Quantos dependentes você deseja incluir?'], [['dependentes do plano de saude']]),
+    dental: exactOrFound_(['Deseja aderir ao plano odontológico?'], [['deseja aderir', 'plano odontologico']]),
+    dentalDependentChoice: exactOrFound_(['Deseja incluir dependentes no Plano Odontológico?'], [['dependentes', 'plano odontologico']]),
+    dentalDependents: exactOrFound_(['Dados dos Dependentes Odontológicos:'], [['dependentes odontologicos']]),
+    pharmacy: exactOrFound_(['3. CONVÊNIO FARMÁCIA - BRASIL CONVÊNIOS:'], [['farmacia']]),
+    totalpass: exactOrFound_(['4. TOTALPASS: Deseja aderir a um Plano Pago do TotalPass?'], [['totalpass']]),
+    totalpassPaymentMethod: exactOrFound_([], [['pagamento', 'totalpass']]),
+    soccer: exactOrFound_(['5. CONVÊNIO ESCOLA DE FUTEBOL:'], [['escola de futebol']]),
+    soccerData: exactOrFound_(['Dados para Escola de Futebol:'], [['dados para escola de futebol']]),
+    declaration,
+    awareness: declaration,
+    rhStatus: exactOrFound_([CONFIG.statusColumn], [['status rh']]),
+    rhNote: exactOrFound_([CONFIG.noteColumn], [['observacao rh']]),
+    rhUpdated: exactOrFound_([CONFIG.updatedColumn], [['atualizado rh']]),
+    pdfUrl: exactOrFound_([CONFIG.pdfUrlColumn], [['termo pdf']]),
+    pdfFileId: exactOrFound_([CONFIG.pdfFileIdColumn], [['id termo pdf']]),
+    pdfGenerated: exactOrFound_([CONFIG.pdfGeneratedColumn], [['termo gerado em']])
+  };
+}
+
+function validateHeaderMap_(headers, map) { return true; }
+
+function normalizeEmployee_(row, rowNumber, map) {
+  const rhStatus = normalizeStatus_(cell_(row, map.rhStatus));
+  const formEmail = cell_(row, map.formEmail);
+  const preferredEmail = cell_(row, map.email);
+  const declaration = cell_(row, map.declaration);
+  const totalpass = totalpass_(cell_(row, map.totalpass));
+  const totalpassPaymentMethod = resolveTotalpassPayment_(totalpass, cell_(row, map.totalpassPaymentMethod));
+
+  const employee = {
+    rowNumber, date: cell_(row, map.timestamp), formEmail, email: preferredEmail || formEmail,
+    name: titleCase_(cell_(row, map.name)), cpf: formatCpf_(cell_(row, map.cpf)), registration: cell_(row, map.registration),
+    role: titleCase_(cell_(row, map.role)), age: parseAge_(cell_(row, map.age)), phone: cell_(row, map.phone),
+    company: normalizeCompany_(cell_(row, map.company)), declaration, awareness: declaration,
+    health: yesNo_(cell_(row, map.health)), healthPlan: cleanPlan_(cell_(row, map.healthPlan)),
+    healthDependentChoice: normalizeChoice_(cell_(row, map.healthDependentChoice)), healthDependents: cell_(row, map.healthDependents),
+    dental: yesNo_(cell_(row, map.dental)), dentalDependentChoice: normalizeChoice_(cell_(row, map.dentalDependentChoice)),
+    dentalDependents: cell_(row, map.dentalDependents), pharmacy: yesNo_(cell_(row, map.pharmacy)),
+    totalpass, totalpassPaymentMethod, soccer: yesNo_(cell_(row, map.soccer)), soccerDetails: cell_(row, map.soccerData),
+    rhStatus, rhNote: cell_(row, map.rhNote), rhUpdated: cell_(row, map.rhUpdated),
+    pdfUrl: cell_(row, map.pdfUrl), pdfFileId: cell_(row, map.pdfFileId), pdfGeneratedAt: cell_(row, map.pdfGenerated)
+  };
+
+  if (isHealthSelected_(employee)) employee.health = 'Sim';
+  employee.status = employee.rhStatus || inferStatus_(employee);
+  employee.pendingText = pendingText_(employee);
+  employee.hasDependents = needsDependentReview_(employee);
+  employee.hasPdf = Boolean(employee.pdfUrl);
+
+  return employee;
+}
+
+function firstFound_(headers, options) {
+  for (const terms of options) {
+    const index = findHeader_(headers, terms);
+    if (index >= 0) return index;
+  }
+  return -1;
+}
+
+function findHeader_(headers, terms) {
+  const normalizedTerms = terms.map(normalize_);
+  return headers.findIndex(header => {
+    const normalizedHeader = normalize_(header);
+    return normalizedTerms.every(term => normalizedHeader.includes(term));
+  });
+}
+
+function normalize_(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function cell_(row, index) {
+  return index >= 0 ? String(row[index] || '').trim() : '';
+}
+
+function yesNo_(value) {
+  const raw = String(value || '').trim();
+  const text = normalize_(raw);
+  if (!text) return 'Não informado';
+  if (['nao', 'nao desejo', 'nao quero', 'nao aderir', 'nao tenho interesse', 'sem interesse', 'recuso'].some(pattern => text === pattern || text.includes(pattern))) return 'Não';
+  if (['sim', 'desejo', 'quero', 'aderir', 'tenho interesse', 'aceito', 'incluir'].some(pattern => text === pattern || text.includes(pattern))) return 'Sim';
+  return raw;
+}
+
+function normalizeChoice_(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return 'Não informado';
+  const normalized = yesNo_(raw);
+  return normalized === raw ? raw : normalized;
+}
+
+function totalpass_(value) {
+  const raw = String(value || '').trim();
+  const text = normalize_(raw);
+  if (!text) return 'Não informado';
+  if (text === 'nao' || text.includes('nao desejo') || text.includes('nao quero') || text.includes('sem interesse')) return 'Não';
+  if (text.includes('pago') || text.includes('mensalidade')) return 'Plano pago';
+  if (text.includes('free') || text.includes('gratuito')) return 'Plano gratuito';
+  if (text.includes('sim') || text.includes('aderir') || text.includes('desejo')) return 'Sim';
+  return raw;
+}
+
+function normalizeTotalpassPayment_(value) {
+  const text = normalize_(value);
+  if (!text) return 'Não informado';
+  if (text.includes('folha')) return 'Desconto em folha';
+  if (text.includes('cartao') || text.includes('credito')) return 'Cartão de crédito';
+  return String(value || '').trim();
+}
+
+function resolveTotalpassPayment_(totalpass, rawPaymentMethod) {
+  if (isMeaningful_(rawPaymentMethod)) return normalizeTotalpassPayment_(rawPaymentMethod);
+  if (totalpass === 'Plano pago') return 'Desconto em folha';
+  return 'Não informado';
+}
+
+function isHealthSelected_(employee) {
+  if (!employee) return false;
+  if (normalize_(employee.health) === 'sim') return true;
+  const plan = normalize_(employee.healthPlan);
+  return Boolean(plan && plan !== 'nao' && plan !== 'nao informado' && !plan.includes('nao desejo') && !plan.includes('nao quero'));
+}
+
+function isTotalPassSelected_(value) {
+  const text = normalize_(value);
+  return Boolean(text && text !== 'nao' && text !== 'nao informado');
+}
+
+function normalizeCompany_(value) {
+  const text = String(value || '').trim();
+  return text ? text.toUpperCase() : 'Não informado';
+}
+
+function cleanPlan_(value) {
+  const text = String(value || '').trim();
+  if (!text) return 'Não informado';
+  return text.replace(/\s+/g, ' ').replace(' (Indicado para residentes no Paraná)', '').replace(' (Indicado para residentes no Parana)', '').replace(' (Indicado para residentes em outros estados)', '');
+}
+
+function titleCase_(value) {
+  const smallWords = ['da', 'de', 'do', 'das', 'dos', 'e'];
+  return String(value || '').trim().toLowerCase().replace(/\S+/g, (word, offset) => {
+    if (offset > 0 && smallWords.includes(word)) return word;
+    return (word.charAt(0).toUpperCase() + word.slice(1));
+  });
+}
+
+function formatCpf_(value) {
+  const raw = String(value || '').trim();
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length !== 11) return raw;
+  return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
+function normalizeStatus_(value) {
+  const text = normalize_(value);
+  if (!text) return '';
+  if (text.includes('concluido')) return 'Concluído';
+  if (text.includes('analise')) return 'Em análise';
+  if (text.includes('pendente')) return 'Pendente';
+  return String(value || '').trim();
+}
+
+function inferStatus_(employee) {
+  if (employee.company === 'Não informado') return 'Pendente';
+  if (needsDependentReview_(employee)) return 'Em análise';
+  return 'Pendente';
+}
+
+function pendingText_(employee) {
+  const issues = [];
+  if (employee.company === 'Não informado') issues.push('empresa não informada');
+  if (isHealthSelected_(employee) && employee.age === null) issues.push('idade do titular não identificada');
+  if (isHealthSelected_(employee) && !isMeaningful_(employee.healthPlan)) issues.push('plano de saúde não identificado');
+  if (employee.healthDependentChoice === 'Sim' && !isMeaningful_(employee.healthDependents)) issues.push('dados dos dependentes do plano de saúde não informados');
+  if (employee.dentalDependentChoice === 'Sim' && !isMeaningful_(employee.dentalDependents)) issues.push('dados dos dependentes odontológicos não informados');
+  if (employee.soccer === 'Sim' && !isMeaningful_(employee.soccerDetails)) issues.push('dados para Escola de Futebol não informados');
+  if (!isMeaningful_(employee.declaration)) issues.push('ciência e responsabilidade não registrada');
+  if (needsDependentReview_(employee)) issues.push('validar dependentes e documentação');
+  if (!employee.pdfUrl && employee.status === 'Concluído') issues.push('termo de adesão ainda não gerado');
+  if (!issues.length) issues.push('aguardando validação do RH');
+  return Array.from(new Set(issues)).join('; ');
+}
+
+function needsDependentReview_(employee) {
+  const choices = normalize_(employee.healthDependentChoice + ' ' + employee.dentalDependentChoice + ' ' + employee.soccer);
+  const dependents = normalize_(employee.healthDependents + ' ' + employee.dentalDependents + ' ' + employee.soccerDetails);
+  if (choices.includes('sim')) return true;
+  if (isMeaningful_(dependents)) return true;
+  return false;
+}
+
+function benefitLabels_() {
+  return {
+    health: 'Plano de saúde Amil', dental: 'Plano odontológico Dental Uni',
+    pharmacy: 'Convênio farmácia', totalpass: 'TotalPass', soccer: 'Escola de futebol'
+  };
+}
+
+function getNonSelectedBenefits_(employee) {
+  const items = [];
+  if (!isHealthSelected_(employee)) items.push('Plano de Saúde Amil');
+  if (employee.dental === 'Não') items.push('Plano Odontológico Dental Uni');
+  if (employee.pharmacy === 'Não') items.push('Convênio Farmácia');
+  if (normalize_(employee.totalpass) === 'nao') items.push('TotalPass');
+  if (employee.soccer === 'Não') items.push('Escola de Futebol');
+  return items;
+}
+
+function validateRowNumber_(rowNumber) {
+  const parsed = Number(rowNumber);
+  if (!Number.isInteger(parsed) || parsed < 2) throw new Error('Linha inválida para a operação.');
+  return parsed;
+}
+
+function displayValue_(value) { return isMeaningful_(value) ? String(value).trim() : 'Não informado'; }
+function displayCompact_(value) { return isMeaningful_(value) ? String(value).trim() : '-'; }
+function isMeaningful_(value) { const text = normalize_(value); return Boolean(text && text !== 'nao informado' && text !== '-'); }
+function buildProtocol_(rowNumber, date) { return 'BEN-' + Utilities.formatDate(date, CONFIG.timezone, 'yyyyMMdd-HHmmss') + '-L' + rowNumber; }
+function buildPdfBaseName_(employee, date) {
+  const safeName = sanitizeFileName_(employee.name || 'Colaborador');
+  const safeCompany = sanitizeFileName_(employee.company || 'Empresa');
+  const stamp = Utilities.formatDate(date, CONFIG.timezone, 'yyyyMMdd-HHmmss');
+  return 'Termo de Adesão aos Benefícios - ' + safeName + ' - ' + safeCompany + ' - ' + stamp;
+}
+function sanitizeFileName_(value) { return String(value || '').replace(/[\\/:*?"<>|#%{}~&]/g, '-').replace(/\s+/g, ' ').trim().substring(0, 100); }
+function formatDateTime_(date) { return Utilities.formatDate(date, CONFIG.timezone, 'dd/MM/yyyy HH:mm'); }

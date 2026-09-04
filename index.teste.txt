@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Portal de Benefícios</title>
+    <?!= include('styles'); ?>
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <div class="brand-mark">VD</div>
+          <div>
+            <strong>Benefícios</strong>
+            <span>Portal RH Via Dupla</span>
+          </div>
+        </div>
+
+        <nav>
+          <button class="nav-button active" data-view="dashboard">Painel</button>
+          <button class="nav-button" data-view="panorama">Panorama</button>
+          <button class="nav-button" data-view="employees">Colaboradores</button>
+          <button class="nav-button" data-view="pending">Pendências</button>
+          <button class="nav-button" data-view="settings">Benefícios</button>
+        </nav>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <button id="menuButton" class="icon-button" aria-label="Abrir menu">☰</button>
+
+          <div>
+            <p class="eyebrow">Visão RH</p>
+            <h1 id="pageTitle">Painel</h1>
+          </div>
+
+          <div class="top-actions">
+            <span id="syncStatus">Carregando...</span>
+            <button id="reloadButton" class="secondary">Atualizar</button>
+            <button id="exportButton" class="secondary">Exportar CSV</button>
+          </div>
+        </header>
+
+        <section id="dashboardView" class="view">
+          <div class="welcome-card">
+            <div>
+              <p class="eyebrow">Controle de adesão</p>
+              <h2>Portal de acompanhamento dos benefícios</h2>
+              <p>Valide solicitações, acompanhe pendências e gere o termo de adesão em PDF para encaminhamento à assinatura eletrônica pela ZapSign.</p>
+            </div>
+          </div>
+
+          <div class="metrics">
+            <article class="metric danger">
+              <span>⚠️ Pendentes</span>
+              <strong id="pendingMetric">0</strong>
+            </article>
+            <article class="metric success">
+              <span>✅ Concluídos</span>
+              <strong id="doneMetric">0</strong>
+            </article>
+            <article class="metric info">
+              <span>👨‍👩‍👧 Com dependentes</span>
+              <strong id="dependentMetric">0</strong>
+            </article>
+            <article class="metric warn">
+              <span>🏢 Empresas</span>
+              <strong id="companyMetric">0</strong>
+            </article>
+          </div>
+
+          <div class="grid two">
+            <section class="panel">
+              <div class="panel-head"><h2>Adesões por benefício</h2></div>
+              <div id="benefitBars" class="bars"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>Atenção do RH</h2></div>
+              <div id="attentionList" class="attention"></div>
+            </section>
+          </div>
+        </section>
+
+        <!-- PANORAMA -->
+        <section id="panoramaView" class="view hidden">
+          <div class="filters" style="grid-template-columns: 1fr 200px;">
+            <select id="panoramaCompanyFilter">
+              <option value="total">Visão Geral (Todas as Empresas)</option>
+            </select>
+            <input type="month" id="panoramaMonthFilter">
+          </div>
+
+          <div class="metrics">
+            <article class="metric info">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>👥 Colaboradores Base</span>
+                <button type="button" onclick="openHeadcountModal()" style="background: var(--accent); color: #111; border: 0; padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 900; cursor: pointer;">Ajustar Base</button>
+              </div>
+              <strong id="panTotalEmployees">0</strong>
+            </article>
+            <article class="metric success">
+              <span>🏢 Invest. da Empresa</span>
+              <strong id="panTotalCompany">R$ 0,00</strong>
+            </article>
+            <article class="metric warn">
+              <span>💳 Custo Colaboradores</span>
+              <strong id="panTotalEmployee">R$ 0,00</strong>
+            </article>
+            <article class="metric danger">
+              <span>💰 Custo Mensal Total</span>
+              <strong id="panTotalCost">R$ 0,00</strong>
+            </article>
+          </div>
+
+          <section class="panel table-panel" style="margin-top: 18px;">
+            <div class="panel-head" style="padding: 18px 18px 0;">
+              <div>
+                <h2>Detalhamento por Benefício</h2>
+                <p class="panel-description">Acompanhe a utilização e os valores investidos por categoria no mês selecionado.</p>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Benefício</th>
+                  <th>Titulares</th>
+                  <th>Vidas (Usuários)</th>
+                  <th>% Utilização</th>
+                  <th>Mensalidade Total</th>
+                  <th>Empresa Paga</th>
+                  <th>Colaborador Paga</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="panoramaBenefitsRows"></tbody>
+            </table>
+          </section>
+        </section>
+
+        <section id="employeesView" class="view hidden">
+          <div class="filters">
+            <input id="searchInput" type="search" placeholder="Buscar colaborador ou empresa">
+            <select id="statusFilter">
+              <option value="todos">Todos os status</option>
+              <option value="Pendente">Pendente</option>
+              <option value="Em análise">Em análise</option>
+              <option value="Concluído">Concluído</option>
+            </select>
+            <select id="companyFilter">
+              <option value="todas">Todas as empresas</option>
+            </select>
+          </div>
+
+          <section class="panel table-panel">
+            <table>
+              <thead>
+                <tr>
+                  <th>Colaborador</th>
+                  <th>Empresa</th>
+                  <th>Saúde</th>
+                  <th>Odonto</th>
+                  <th>Farmácia</th>
+                  <th>TotalPass</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="employeeRows"></tbody>
+            </table>
+          </section>
+        </section>
+
+        <section id="pendingView" class="view hidden">
+          <section class="panel">
+            <div class="panel-head"><h2>Pendências detectadas</h2></div>
+            <div id="pendingList" class="pending-list"></div>
+          </section>
+        </section>
+
+        <section id="settingsView" class="view hidden">
+          <section class="panel settings">
+            <h2>Benefícios controlados no portal</h2>
+            <p class="panel-description">Os termos são gerados com as respostas registradas na planilha e permanecem armazenados no Google Drive, sem compartilhamento público automático.</p>
+            <div class="benefit-grid" id="benefitCards"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <!-- DIALOG DETALHES COLABORADOR -->
+    <dialog id="detailDialog">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">Detalhe do colaborador</p>
+          <h2 id="detailName"></h2>
+        </div>
+        <button class="icon-button visible" id="closeDialog" aria-label="Fechar">×</button>
+      </div>
+      <div id="detailBody" class="detail-body"></div>
+    </dialog>
+
+    <!-- DIALOG AJUSTE RÁPIDO DO HEADCOUNT -->
+    <dialog id="headcountDialog">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">Efetivo de Funcionários</p>
+          <h2>Ajustar Colaboradores Base</h2>
+        </div>
+        <button class="icon-button visible" id="closeHcDialog" aria-label="Fechar">×</button>
+      </div>
+      <div class="detail-body">
+        <p class="panel-description">Defina o número total de colaboradores da empresa neste mês para cálculo do % de utilização.</p>
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+          <div class="form-field">
+            <label>Mês / Competência</label>
+            <input type="month" id="hcMonth">
+          </div>
+          <div class="form-field">
+            <label>Empresa</label>
+            <select id="hcCompany"></select>
+          </div>
+        </div>
+        <div class="form-field" style="margin-top: 12px;">
+          <label>Total de Colaboradores Base no Mês</label>
+          <input type="number" id="hcTotalCount" min="1" placeholder="Ex: 59">
+        </div>
+        <div class="dialog-actions" style="margin-top: 20px; display: flex; justify-content: flex-end;">
+          <button type="button" id="saveHcButton" class="primary-button" style="padding: 10px 20px;">Salvar Base</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- DIALOG EDIÇÃO DO PANORAMA MENSAL -->
+    <dialog id="panoramaEditDialog">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">Lançamento Mensal de Benefício</p>
+          <h2 id="panEditTitle">Editar Benefício</h2>
+        </div>
+        <button class="icon-button visible" id="closePanDialog" aria-label="Fechar">×</button>
+      </div>
+      <div class="detail-body">
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div class="form-field">
+            <label>Mês / Competência</label>
+            <input type="month" id="panEditMonth">
+          </div>
+          <div class="form-field">
+            <label>Empresa</label>
+            <select id="panEditCompany"></select>
+          </div>
+          <div class="form-field">
+            <label>Colaboradores Base Mês</label>
+            <input type="number" id="panEditCompanyEmployees" min="1" placeholder="Ex: 59">
+          </div>
+        </div>
+
+        <div class="form-grid" style="grid-template-columns: 2fr 1fr 1fr; margin-top: 12px;">
+          <div class="form-field">
+            <label>Benefício</label>
+            <input type="text" id="panEditBenefit" readonly style="background:#f7f7f5; font-weight: bold;">
+          </div>
+          <div class="form-field">
+            <label>Titulares Aderidos</label>
+            <input type="number" id="panEditHolders" min="0" placeholder="Ex: 32">
+          </div>
+          <div class="form-field">
+            <label>Vidas Totais (Usuários)</label>
+            <input type="number" id="panEditUsers" min="0" placeholder="Ex: 137">
+          </div>
+        </div>
+
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-top: 12px;">
+          <div class="form-field">
+            <label>Mensalidade Total (R$)</label>
+            <input type="number" step="0.01" id="panEditTotal" placeholder="0.00">
+          </div>
+          <div class="form-field">
+            <label>Empresa Paga (R$)</label>
+            <input type="number" step="0.01" id="panEditCompanyCost" placeholder="0.00">
+          </div>
+          <div class="form-field">
+            <label>Colaborador Paga (R$)</label>
+            <input type="number" step="0.01" id="panEditEmployeeCost" placeholder="0.00">
+          </div>
+        </div>
+
+        <div class="dialog-actions" style="margin-top: 20px; display: flex; justify-content: flex-end;">
+          <button type="button" id="savePanManualButton" class="primary-button" style="padding: 10px 20px;">Salvar Mês</button>
+        </div>
+      </div>
+    </dialog>
+
+    <?!= include('script'); ?>
+  </body>
+</html>
