@@ -59,6 +59,7 @@ function loadData() {
 
       syncStatus.textContent = data.updatedAt ? `Atualizado em ${data.updatedAt}` : 'Atualizado';
 
+      applyDefaultPanoramaMonth();
       renderCompanyFilter();
       renderPanoramaCompanyFilter();
       renderAll();
@@ -68,6 +69,19 @@ function loadData() {
       alert(error.message || error);
     })
     .getPortalData();
+}
+
+function applyDefaultPanoramaMonth() {
+  // Sempre que a página carrega (inclusive ao reabrir o link depois de um "Salvar"),
+  // o filtro de mês volta para o mês corrente. Se não houver nada lançado nesse mês,
+  // o painel aparecia "zerado" mesmo com dados salvos em meses anteriores. Aqui,
+  // se o mês atual não tiver histórico, mostramos o mês mais recente que tiver.
+  const monthInput = document.getElementById('panoramaMonthFilter');
+  if (!monthInput) return;
+  if (panoramaHistory && panoramaHistory[currentMonthStr]) return;
+
+  const months = getSortedHistoryMonths();
+  if (months.length) monthInput.value = months[months.length - 1];
 }
 
 function showView(view) {
