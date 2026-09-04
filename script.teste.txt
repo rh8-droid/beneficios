@@ -556,6 +556,13 @@ function saveHeadcountValue() {
       panoramaData = data.panorama || { companies: {}, total: {} };
       panoramaHistory = data.panoramaHistory || {};
 
+      // Sem isso, o painel continua mostrando o mês/empresa que estava selecionado
+      // antes de abrir o modal — mesmo quando o lançamento salvo é de outro mês —
+      // dando a impressão de que os valores "não salvaram" quando na verdade só
+      // não estavam sendo exibidos.
+      document.getElementById('panoramaMonthFilter').value = monthYear;
+      document.getElementById('panoramaCompanyFilter').value = company;
+
       syncStatus.textContent = 'Colaboradores Base Salvos!';
       headcountDialog.close();
       renderAll();
@@ -629,6 +636,11 @@ function savePanManualValues() {
       employees = data.employees || [];
       panoramaData = data.panorama || { companies: {}, total: {} };
       panoramaHistory = data.panoramaHistory || {};
+
+      // Mesma razão do saveHeadcountValue: mostra o mês/empresa que acabou de ser
+      // salvo, senão o painel parece "não ter salvo" quando só está olhando outro mês.
+      document.getElementById('panoramaMonthFilter').value = monthYear;
+      document.getElementById('panoramaCompanyFilter').value = company;
 
       syncStatus.textContent = 'Salvo com sucesso!';
       panoramaEditDialog.close();
