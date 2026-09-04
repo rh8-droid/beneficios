@@ -1,0 +1,588 @@
+<script>
+let employees = [];
+let benefits = {};
+let panoramaData = {};
+let panoramaHistory = {};
+let currentEmployee = null;
+
+const pageTitle = document.querySelector('#pageTitle');
+const sidebar = document.querySelector('.sidebar');
+const employeeRows = document.querySelector('#employeeRows');
+const companyFilter = document.querySelector('#companyFilter');
+const statusFilter = document.querySelector('#statusFilter');
+const searchInput = document.querySelector('#searchInput');
+const detailDialog = document.querySelector('#detailDialog');
+const panoramaEditDialog = document.querySelector('#panoramaEditDialog');
+const headcountDialog = document.querySelector('#headcountDialog');
+const syncStatus = document.querySelector('#syncStatus');
+
+document.querySelectorAll('.nav-button').forEach(button => {
+  button.addEventListener('click', () => showView(button.dataset.view));
+});
+
+document.querySelector('#menuButton').addEventListener('click', () => sidebar.classList.toggle('open'));
+document.querySelector('#closeDialog').addEventListener('click', () => detailDialog.close());
+document.querySelector('#closePanDialog').addEventListener('click', () => panoramaEditDialog.close());
+document.querySelector('#closeHcDialog').addEventListener('click', () => headcountDialog.close());
+document.querySelector('#exportButton').addEventListener('click', exportCsv);
+document.querySelector('#reloadButton').addEventListener('click', loadData);
+
+searchInput.addEventListener('input', renderEmployees);
+statusFilter.addEventListener('change', renderEmployees);
+companyFilter.addEventListener('change', renderEmployees);
+
+// Mês Padrão Inicial (Ano-Mês)
+const today = new Date();
+const currentMonthStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+document.querySelector('#panoramaMonthFilter').value = currentMonthStr;
+document.querySelector('#panoramaMonthFilter').addEventListener('change', renderPanorama);
+
+loadData();
+
+function loadData() {
+  syncStatus.textContent = 'Carregando planilha...';
+
+  google.script.run
+    .withSuccessHandler(data => {
+      employees = data.employees || [];
+      benefits = data.benefits || {};
+      panoramaData = data.panorama || { companies: {}, total: {} };
+      panoramaHistory = data.panoramaHistory || {};
+
+      syncStatus.textContent = data.updatedAt ? `Atualizado em ${data.updatedAt}` : 'Atualizado';
+      
+      renderCompanyFilter();
+      renderPanoramaCompanyFilter();
+      renderAll();
+    })
+    .withFailureHandler(error => {
+      syncStatus.textContent = 'Erro ao carregar';
+      alert(error.message || error);
+    })
+    .getPortalData();
+}
+
+function showView(view) {
+  const titles = {
+    dashboard: 'Painel',
+    panorama: 'Panorama',
+    employees: 'Colaboradores',
+    pending: 'Pendências',
+    settings: 'Benefícios'
+  };
+
+  document.querySelectorAll('.view').forEach(item => item.classList.add('hidden'));
+  document.querySelector(`#${view}View`).classList.remove('hidden');
+
+  document.querySelectorAll('.nav-button').forEach(item => {
+    item.classList.toggle('active', item.dataset.view === view);
+  });
+
+  pageTitle.textContent = titles[view];
+  sidebar.classList.remove('open');
+}
+
+function renderAll() {
+  renderDashboard();
+  renderEmployees();
+  renderPending();
+  renderBenefits();
+  renderPanorama();
+}
+
+/* =========================================================
+   PANORAMA FINANCEIRO E HISTÓRICO DE COLABORADORES BASE
+========================================================= */
+const baseBenefitsList = [
+  "Vale refeição",
+  "Vale transporte",
+  "Assistência médica (titular e dependentes)",
+  "Plano odontológico (titular e dependentes)",
+  "Coparticipação médica",
+  "Farmácia",
+  "Convênios Acqua Park",
+  "Convênio Total Pass",
+  "E-consignado",
+  "Vale combustível",
+  "Bolsa de estudos"
+];
+
+function renderPanoramaCompanyFilter() {
+  const select = document.getElementById('panoramaCompanyFilter');
+  const modalSelect = document.getElementById('panEditCompany');
+  const hcSelect = document.getElementById('hcCompany');
+  if(!select) return;
+
+  const current = select.value;
+  const companies = Object.keys(panoramaData.companies || {}).sort();
+
+  const options = '<option value="total">Visão Geral (Todas as Empresas)</option>' +
+    companies.map(c => `<option value="${escapeAttribute(c)}">${escapeHtml(c)}</option>`).join('');
+
+  select.innerHTML = options;
+  if (modalSelect) modalSelect.innerHTML = options;
+
+  const companyOnlyOptions = companies.map(c => `<option value="${escapeAttribute(c)}">${escapeHtml(c)}</option>`).join('');
+  if (hcSelect) hcSelect.innerHTML = companyOnlyOptions;
+
+  if ([...select.options].some(opt => opt.value === current)) select.value = current;
+  select.addEventListener('change', renderPanorama);
+}
+
+function renderPanorama() {
+  const companyFilter = document.getElementById('panoramaCompanyFilter').value;
+  const monthFilter = document.getElementById('panoramaMonthFilter').value;
+
+  let dataRef = JSON.parse(JSON.stringify(
+    companyFilter === 'total' ? panoramaData.total : (panoramaData.companies[companyFilter] || { employees: 0, benefitsData: {} })
+  ));
+
+  let monthTotalEmps = 0;
+
+  if (panoramaHistory && panoramaHistory[monthFilter]) {
+    const monthHist = panoramaHistory[monthFilter];
+
+    if (companyFilter === 'total') {
+      let totalEmpSum = 0;
+      const allCompanies = new Set([
+        ...Object.keys(panoramaData.companies || {}),
+        ...Object.keys(monthHist)
+      ]);
+
+      allCompanies.forEach(comp => {
+        if (comp === 'total') return;
+        if (monthHist[comp] && monthHist[comp].totalEmployees > 0) {
+          totalEmpSum += monthHist[comp].totalEmployees;
+        }
+      });
+
+      monthTotalEmps = totalEmpSum;
+
+      Object.keys(monthHist).forEach(comp => {
+        const compBenefits = monthHist[comp].benefits || {};
+        Object.keys(compBenefits).forEach(ben => {
+          if (!dataRef.benefitsData[ben]) dataRef.benefitsData[ben] = { users: 0, total: 0, company: 0, employee: 0, holders: 0 };
+          const h = compBenefits[ben];
+          dataRef.benefitsData[ben].users += Number(h.users) || 0;
+          dataRef.benefitsData[ben].holders += Number(h.holders) || 0;
+          dataRef.benefitsData[ben].total += Number(h.total) || 0;
+          dataRef.benefitsData[ben].company += Number(h.company) || 0;
+          dataRef.benefitsData[ben].employee += Number(h.employee) || 0;
+        });
+      });
+
+    } else if (monthHist[companyFilter]) {
+      const compHist = monthHist[companyFilter];
+      monthTotalEmps = compHist.totalEmployees || 0;
+
+      const compBenefits = compHist.benefits || {};
+      Object.keys(compBenefits).forEach(ben => {
+        dataRef.benefitsData[ben] = compBenefits[ben];
+      });
+    }
+  }
+
+  let calcTotalCost = 0;
+  let calcCompanyCost = 0;
+  let calcEmployeeCost = 0;
+
+  baseBenefitsList.forEach(ben => {
+    if (dataRef.benefitsData && dataRef.benefitsData[ben]) {
+      calcTotalCost += Number(dataRef.benefitsData[ben].total) || 0;
+      calcCompanyCost += Number(dataRef.benefitsData[ben].company) || 0;
+      calcEmployeeCost += Number(dataRef.benefitsData[ben].employee) || 0;
+    }
+  });
+
+  const tbody = document.getElementById('panoramaBenefitsRows');
+  if(!tbody) return;
+
+  tbody.innerHTML = baseBenefitsList.map(benefitName => {
+    const data = (dataRef.benefitsData && dataRef.benefitsData[benefitName]) || { users: 0, total: 0, company: 0, employee: 0, holders: 0 };
+    
+    const holdersCount = Number(data.holders) || Number(data.users) || 0;
+    const percent = monthTotalEmps > 0 ? ((holdersCount / monthTotalEmps) * 100).toFixed(1) : 0;
+    
+    return `
+      <tr>
+        <td><strong>${escapeHtml(benefitName)}</strong></td>
+        <td>${holdersCount}</td>
+        <td>${data.users}</td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 50px; background: #e8e8e5; height: 6px; border-radius: 3px;">
+              <div style="width: ${Math.min(percent, 100)}%; background: var(--accent); height: 100%; border-radius: 3px;"></div>
+            </div>
+            <span style="font-size: 11px; color: var(--muted);">${percent}%</span>
+          </div>
+        </td>
+        <td>${formatCurrency(data.total)}</td>
+        <td>${formatCurrency(data.company)}</td>
+        <td>${formatCurrency(data.employee)}</td>
+        <td>
+          <button class="secondary" style="padding: 6px 10px; font-size: 11px;" onclick="openPanEditModal('${escapeAttribute(benefitName)}')">Editar Valores</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  document.getElementById('panTotalEmployees').textContent = monthTotalEmps;
+  document.getElementById('panTotalCost').textContent = formatCurrency(calcTotalCost);
+  document.getElementById('panTotalCompany').textContent = formatCurrency(calcCompanyCost);
+  document.getElementById('panTotalEmployee').textContent = formatCurrency(calcEmployeeCost);
+}
+
+function openHeadcountModal() {
+  const monthFilter = document.getElementById('panoramaMonthFilter').value;
+  const companyFilter = document.getElementById('panoramaCompanyFilter').value;
+
+  document.getElementById('hcMonth').value = monthFilter;
+  if (companyFilter !== 'total') {
+    document.getElementById('hcCompany').value = companyFilter;
+  }
+
+  let currentHc = 0;
+  const currentComp = document.getElementById('hcCompany').value;
+  if (panoramaHistory && panoramaHistory[monthFilter] && panoramaHistory[monthFilter][currentComp]) {
+    currentHc = panoramaHistory[monthFilter][currentComp].totalEmployees || 0;
+  }
+  document.getElementById('hcTotalCount').value = currentHc || '';
+
+  document.getElementById('saveHcButton').onclick = saveHeadcountValue;
+  headcountDialog.showModal();
+}
+
+function saveHeadcountValue() {
+  const monthYear = document.getElementById('hcMonth').value;
+  const company = document.getElementById('hcCompany').value;
+  const totalEmployees = document.getElementById('hcTotalCount').value;
+
+  syncStatus.textContent = 'Salvando base...';
+
+  google.script.run
+    .withSuccessHandler(data => {
+      employees = data.employees || [];
+      panoramaData = data.panorama || { companies: {}, total: {} };
+      panoramaHistory = data.panoramaHistory || {};
+
+      syncStatus.textContent = 'Colaboradores Base Salvos!';
+      headcountDialog.close();
+      renderAll();
+    })
+    .withFailureHandler(error => {
+      syncStatus.textContent = 'Erro ao salvar';
+      alert(error.message || error);
+    })
+    .saveHeadcountDirect(monthYear, company, totalEmployees);
+}
+
+function openPanEditModal(benefitName) {
+  const monthFilter = document.getElementById('panoramaMonthFilter').value;
+  const companyFilter = document.getElementById('panoramaCompanyFilter').value;
+
+  document.getElementById('panEditTitle').textContent = 'Editar: ' + benefitName;
+  document.getElementById('panEditBenefit').value = benefitName;
+  document.getElementById('panEditMonth').value = monthFilter;
+  document.getElementById('panEditCompany').value = companyFilter;
+
+  let savedData = { users: 0, total: 0, company: 0, employee: 0, holders: 0 };
+  let savedTotalEmps = 0;
+
+  if (panoramaHistory && panoramaHistory[monthFilter] && panoramaHistory[monthFilter][companyFilter]) {
+    const compHist = panoramaHistory[monthFilter][companyFilter];
+    savedTotalEmps = compHist.totalEmployees || 0;
+    if (compHist.benefits && compHist.benefits[benefitName]) {
+      savedData = compHist.benefits[benefitName];
+    }
+  }
+
+  if (!savedData.users && panoramaData && panoramaData.companies[companyFilter] && panoramaData.companies[companyFilter].benefitsData[benefitName]) {
+    savedData = panoramaData.companies[companyFilter].benefitsData[benefitName];
+  }
+
+  document.getElementById('panEditCompanyEmployees').value = savedTotalEmps || '';
+  document.getElementById('panEditHolders').value = savedData.holders || savedData.users || 0;
+  document.getElementById('panEditUsers').value = savedData.users || 0;
+  document.getElementById('panEditTotal').value = savedData.total || 0;
+  document.getElementById('panEditCompanyCost').value = savedData.company || 0;
+  document.getElementById('panEditEmployeeCost').value = savedData.employee || 0;
+
+  document.getElementById('savePanManualButton').onclick = savePanManualValues;
+  panoramaEditDialog.showModal();
+}
+
+function savePanManualValues() {
+  const monthYear = document.getElementById('panEditMonth').value;
+  const company = document.getElementById('panEditCompany').value;
+  const benefitName = document.getElementById('panEditBenefit').value;
+  const users = document.getElementById('panEditUsers').value;
+  const holders = document.getElementById('panEditHolders').value;
+  const totalCost = document.getElementById('panEditTotal').value;
+  const companyCost = document.getElementById('panEditCompanyCost').value;
+  const employeeCost = document.getElementById('panEditEmployeeCost').value;
+  const companyTotalEmployees = document.getElementById('panEditCompanyEmployees').value;
+
+  syncStatus.textContent = 'Gravando no histórico...';
+
+  google.script.run
+    .withSuccessHandler(data => {
+      employees = data.employees || [];
+      panoramaData = data.panorama || { companies: {}, total: {} };
+      panoramaHistory = data.panoramaHistory || {};
+
+      syncStatus.textContent = 'Salvo com sucesso!';
+      panoramaEditDialog.close();
+      renderAll();
+    })
+    .withFailureHandler(error => {
+      syncStatus.textContent = 'Erro ao salvar';
+      alert(error.message || error);
+    })
+    .savePanoramaManualData(monthYear, company, benefitName, users, totalCost, companyCost, employeeCost, companyTotalEmployees, holders);
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+}
+
+/* =========================================================
+   RESTANTE DO CÓDIGO DO PORTAL
+========================================================= */
+function renderDashboard() {
+  const pending = employees.filter(item => item.status !== 'Concluído').length;
+  const done = employees.filter(item => item.status === 'Concluído').length;
+  const withDependents = employees.filter(item => item.hasDependents).length;
+  const companies = new Set(employees.map(item => item.company)).size;
+
+  document.querySelector('#pendingMetric').textContent = pending;
+  document.querySelector('#doneMetric').textContent = done;
+  document.querySelector('#dependentMetric').textContent = withDependents;
+  document.querySelector('#companyMetric').textContent = companies;
+
+  renderBars('#benefitBars', [
+    ['Saúde', countYes('health')],
+    ['Odonto', countYes('dental')],
+    ['Farmácia', countYes('pharmacy')],
+    ['TotalPass pago', employees.filter(item => item.totalpass === 'Pago' || item.totalpass === 'Plano pago').length],
+    ['Escola de futebol', countYes('soccer')]
+  ], Math.max(employees.length, 1));
+
+  document.querySelector('#attentionList').innerHTML = employees
+    .filter(item => item.status !== 'Concluído')
+    .slice(0, 8)
+    .map(item => `
+      <article class="attention-item">
+        <strong>${escapeHtml(item.name)}</strong>
+        <span>${escapeHtml(item.status)} — ${escapeHtml(item.pendingText)}</span>
+      </article>
+    `).join('') || `<article class="attention-item"><strong>Tudo certo</strong><span>Nenhuma pendência crítica encontrada.</span></article>`;
+}
+
+function renderBars(selector, rows, total) {
+  document.querySelector(selector).innerHTML = rows.map(([label, value]) => {
+    const percent = total > 0 ? (value / total) * 100 : 0;
+    return `
+      <div class="bar-row">
+        <div class="bar-label"><span>${escapeHtml(label)}</span><span>${value}/${total}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${percent}%"></div></div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderCompanyFilter() {
+  const current = companyFilter.value;
+  companyFilter.innerHTML = '<option value="todas">Todas as empresas</option>';
+  [...new Set(employees.map(item => item.company))].sort().forEach(company => {
+    const option = document.createElement('option');
+    option.value = company; option.textContent = company;
+    companyFilter.appendChild(option);
+  });
+  companyFilter.value = [...companyFilter.options].some(option => option.value === current) ? current : 'todas';
+}
+
+function renderEmployees() {
+  const term = normalizeText(searchInput.value.trim());
+  const status = statusFilter.value;
+  const company = companyFilter.value;
+
+  const filtered = employees.filter(item => {
+    const matchesText = normalizeText(`${item.name} ${item.company}`).includes(term);
+    const matchesStatus = status === 'todos' || item.status === status;
+    const matchesCompany = company === 'todas' || item.company === company;
+    return matchesText && matchesStatus && matchesCompany;
+  });
+
+  employeeRows.innerHTML = filtered.map(item => `
+    <tr>
+      <td>${escapeHtml(item.name)}</td>
+      <td>${escapeHtml(item.company)}</td>
+      <td>${pill(item.health)}</td>
+      <td>${pill(item.dental)}</td>
+      <td>${pill(item.pharmacy)}</td>
+      <td>${escapeHtml(item.totalpass)}</td>
+      <td>${statusPill(item.status)}</td>
+      <td><button class="link-action" data-row="${item.rowNumber}">Detalhe</button></td>
+    </tr>
+  `).join('');
+
+  if (!filtered.length) employeeRows.innerHTML = `<tr><td colspan="8">Nenhum colaborador encontrado para os filtros selecionados.</td></tr>`;
+  document.querySelectorAll('[data-row]').forEach(button => button.addEventListener('click', () => openDetail(Number(button.dataset.row))));
+}
+
+function renderPending() {
+  const pendingItems = employees.filter(item => item.status !== 'Concluído');
+  document.querySelector('#pendingList').innerHTML = pendingItems.map(item => `
+    <article class="pending-item">
+      <strong>${escapeHtml(item.name)}</strong>
+      <span>${escapeHtml(item.status)} — ${escapeHtml(item.pendingText)}</span>
+    </article>
+  `).join('') || `<article class="pending-item"><strong>Sem pendências</strong><span>Nada para revisar agora.</span></article>`;
+}
+
+function renderBenefits() {
+  document.querySelector('#benefitCards').innerHTML = Object.entries(benefits).map(([key, label]) => {
+    const value = key === 'totalpass' ? employees.filter(item => item.totalpass === 'Pago' || item.totalpass === 'Plano pago').length : countYes(key);
+    return `<article class="benefit-card"><strong>${escapeHtml(label)}</strong><span>${value} adesões identificadas na planilha.</span></article>`;
+  }).join('');
+}
+
+function openDetail(rowNumber) {
+  currentEmployee = employees.find(employee => employee.rowNumber === rowNumber);
+  if (!currentEmployee) return;
+
+  document.querySelector('#detailName').textContent = currentEmployee.name;
+
+  const pdfContent = currentEmployee.pdfUrl
+    ? `
+        <div>
+          <strong>Termo disponível</strong>
+          <span>Gerado em ${escapeHtml(currentEmployee.pdfGeneratedAt || 'data não informada')}</span>
+        </div>
+        <div class="pdf-actions">
+          <a class="secondary" href="${escapeAttribute(currentEmployee.pdfUrl)}" target="_blank" rel="noopener">Abrir PDF</a>
+          <button id="generatePdfButton" class="secondary">Gerar nova versão</button>
+        </div>
+      `
+    : `
+        <div>
+          <strong>Termo ainda não gerado</strong>
+          <span>O PDF será salvo no Drive e vinculado à linha deste colaborador.</span>
+        </div>
+        <div class="pdf-actions">
+          <button id="generatePdfButton" class="secondary">Gerar PDF para ZapSign</button>
+        </div>
+      `;
+
+  document.querySelector('#detailBody').innerHTML = `
+    <div class="detail-grid">
+      ${detailBox('Empresa', currentEmployee.company)}
+      ${detailBox('Status atual', currentEmployee.status)}
+      ${detailBox('Recebido em', currentEmployee.date || 'Sem data')}
+      ${detailBox('Pendência / orientação', currentEmployee.pendingText)}
+      ${detailBox('Plano de saúde', `${currentEmployee.health} - ${currentEmployee.healthPlan}`)}
+      ${detailBox('Dependentes saúde', currentEmployee.healthDependents || 'Sem dependentes informados')}
+      ${detailBox('Plano odontológico', currentEmployee.dental)}
+      ${detailBox('Dependentes odonto', currentEmployee.dentalDependents || 'Sem dependentes informados')}
+      ${detailBox('Convênio farmácia', currentEmployee.pharmacy)}
+      ${detailBox('TotalPass', currentEmployee.totalpass)}
+      ${detailBox('Escola de futebol', currentEmployee.soccer)}
+      ${detailBox('Última atualização RH', currentEmployee.rhUpdated || 'Ainda não atualizado pelo RH')}
+    </div>
+
+    <div class="pdf-box">
+      ${pdfContent}
+    </div>
+
+    <div class="status-editor">
+      <select id="rhStatus">
+        <option value="Pendente">Pendente</option>
+        <option value="Em análise">Em análise</option>
+        <option value="Concluído">Concluído</option>
+      </select>
+      <textarea id="rhNote" placeholder="Observação do RH">${escapeHtml(currentEmployee.rhNote || '')}</textarea>
+      <button class="secondary" id="saveStatusButton">Salvar status</button>
+    </div>
+  `;
+
+  document.querySelector('#rhStatus').value = currentEmployee.status;
+  document.querySelector('#saveStatusButton').addEventListener('click', saveCurrentStatus);
+  document.querySelector('#generatePdfButton').addEventListener('click', generatePdfForCurrentEmployee);
+
+  detailDialog.showModal();
+}
+
+function generatePdfForCurrentEmployee() {
+  if (!currentEmployee) return;
+  const rowNumber = currentEmployee.rowNumber;
+  const button = document.getElementById('generatePdfButton');
+  const openedTab = window.open('', '_blank');
+
+  if (openedTab) {
+    openedTab.document.write('<title>Gerando PDF...</title><p style="font-family:Arial;padding:24px">Gerando o termo em PDF...</p>');
+  }
+
+  button.disabled = true;
+  button.textContent = 'Gerando PDF...';
+
+  google.script.run
+    .withSuccessHandler(result => {
+      if (currentEmployee) {
+        currentEmployee.pdfUrl = result.url;
+        currentEmployee.pdfGeneratedAt = result.generatedAt;
+        currentEmployee.hasPdf = true;
+      }
+      renderAll();
+      if (currentEmployee) openDetail(rowNumber);
+      if (openedTab) openedTab.location.href = result.url;
+    })
+    .withFailureHandler(error => {
+      if (openedTab) openedTab.close();
+      button.disabled = false;
+      button.textContent = 'Gerar PDF para ZapSign';
+      alert('Erro ao gerar PDF: ' + (error.message || error));
+    })
+    .generateBenefitsPdf(rowNumber);
+}
+
+function saveCurrentStatus() {
+  if (!currentEmployee) return;
+  const status = document.querySelector('#rhStatus').value;
+  const note = document.querySelector('#rhNote').value;
+  syncStatus.textContent = 'Salvando...';
+
+  google.script.run
+    .withSuccessHandler(data => {
+      employees = data.employees || [];
+      panoramaData = data.panorama || { companies: {}, total: {} };
+      panoramaHistory = data.panoramaHistory || {};
+      syncStatus.textContent = data.updatedAt ? `Atualizado em ${data.updatedAt}` : 'Atualizado';
+      detailDialog.close();
+      renderCompanyFilter();
+      renderAll();
+    })
+    .withFailureHandler(error => {
+      syncStatus.textContent = 'Erro ao salvar';
+      alert(error.message || error);
+    })
+    .updateEmployeeStatus(currentEmployee.rowNumber, status, note);
+}
+
+function detailBox(label, value) { return `<div class="detail-box"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`; }
+function pill(value) { return value === 'Sim' ? '<span class="pill">Sim</span>' : `<span class="pill no">${escapeHtml(value || 'Não')}</span>`; }
+function statusPill(status) { const klass = status === 'Concluído' ? '' : status === 'Em análise' ? 'review' : 'pending'; return `<span class="pill ${klass}">${escapeHtml(status)}</span>`; }
+function countYes(key) { return employees.filter(item => item[key] === 'Sim').length; }
+
+function exportCsv() {
+  const header = ['Nome', 'Empresa', 'Saúde', 'Plano', 'Dependentes saúde', 'Odonto', 'Dependentes odonto', 'Farmácia', 'TotalPass', 'Futebol', 'Status', 'Observação RH', 'Atualizado RH'];
+  const rows = employees.map(item => [item.name, item.company, item.health, item.healthPlan, item.healthDependents, item.dental, item.dentalDependents, item.pharmacy, item.totalpass, item.soccer, item.status, item.rhNote, item.rhUpdated]);
+  const csv = '\ufeff' + [header, ...rows].map(row => row.map(cell => `"${String(cell || '').replaceAll('"', '""')}"`).join(';')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a'); link.href = url; link.download = 'portal-beneficios.csv'; link.click(); URL.revokeObjectURL(url);
+}
+
+function normalizeText(value) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+function escapeHtml(value) { return String(value || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;'); }
+function escapeAttribute(value) { return escapeHtml(value); }
+</script>
