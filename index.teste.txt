@@ -19,17 +19,17 @@
         </div>
 
         <nav>
-          <button class="nav-button active" data-view="dashboard">Painel</button>
-          <button class="nav-button" data-view="panorama">Panorama</button>
-          <button class="nav-button" data-view="employees">Colaboradores</button>
-          <button class="nav-button" data-view="pending">Pendências</button>
-          <button class="nav-button" data-view="settings">Benefícios</button>
+          <button type="button" class="nav-button active" data-view="dashboard">Painel</button>
+          <button type="button" class="nav-button" data-view="panorama">Panorama</button>
+          <button type="button" class="nav-button" data-view="employees">Colaboradores</button>
+          <button type="button" class="nav-button" data-view="pending">Pendências</button>
+          <button type="button" class="nav-button" data-view="settings">Benefícios</button>
         </nav>
       </aside>
 
       <main>
         <header class="topbar">
-          <button id="menuButton" class="icon-button" aria-label="Abrir menu">☰</button>
+          <button type="button" id="menuButton" class="icon-button" aria-label="Abrir menu" aria-controls="sidebar" aria-expanded="false">☰</button>
 
           <div>
             <p class="eyebrow">Visão RH</p>
@@ -38,8 +38,8 @@
 
           <div class="top-actions">
             <span id="syncStatus">Carregando...</span>
-            <button id="reloadButton" class="secondary">Atualizar</button>
-            <button id="exportButton" class="secondary">Exportar CSV</button>
+            <button type="button" id="reloadButton" class="secondary">Atualizar</button>
+            <button type="button" id="exportButton" class="secondary">Exportar CSV</button>
           </div>
         </header>
 
@@ -94,9 +94,9 @@
 
           <div class="metrics">
             <article class="metric info">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div class="metric-head">
                 <span>👥 Colaboradores Base</span>
-                <button type="button" onclick="openHeadcountModal()" style="background: var(--accent); color: #111; border: 0; padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 900; cursor: pointer;">Ajustar Base</button>
+                <button type="button" id="adjustBaseButton" class="secondary accent-button small">Ajustar base</button>
               </div>
               <strong id="panTotalEmployees">0</strong>
             </article>
@@ -196,7 +196,7 @@
           <p class="eyebrow">Detalhe do colaborador</p>
           <h2 id="detailName"></h2>
         </div>
-        <button class="icon-button visible" id="closeDialog" aria-label="Fechar">×</button>
+        <button type="button" class="icon-button visible" id="closeDialog" aria-label="Fechar">×</button>
       </div>
       <div id="detailBody" class="detail-body"></div>
     </dialog>
@@ -208,7 +208,7 @@
           <p class="eyebrow">Efetivo de Funcionários</p>
           <h2>Ajustar Colaboradores Base</h2>
         </div>
-        <button class="icon-button visible" id="closeHcDialog" aria-label="Fechar">×</button>
+        <button type="button" class="icon-button visible" id="closeHcDialog" aria-label="Fechar">×</button>
       </div>
       <div class="detail-body">
         <p class="panel-description">Defina o número total de colaboradores da empresa neste mês para cálculo do % de utilização.</p>
@@ -226,8 +226,9 @@
           <label>Total de Colaboradores Base no Mês</label>
           <input type="number" id="hcTotalCount" min="1" placeholder="Ex: 59">
         </div>
-        <div class="dialog-actions" style="margin-top: 20px; display: flex; justify-content: flex-end;">
-          <button type="button" id="saveHcButton" class="primary-button" style="padding: 10px 20px;">Salvar Base</button>
+        <div class="dialog-actions">
+          <button type="button" class="secondary" data-close-dialog="headcountDialog">Cancelar</button>
+          <button type="button" id="saveHcButton" class="primary-button">Salvar base</button>
         </div>
       </div>
     </dialog>
@@ -239,7 +240,7 @@
           <p class="eyebrow">Lançamento Mensal de Benefício</p>
           <h2 id="panEditTitle">Editar Benefício</h2>
         </div>
-        <button class="icon-button visible" id="closePanDialog" aria-label="Fechar">×</button>
+        <button type="button" class="icon-button visible" id="closePanDialog" aria-label="Fechar">×</button>
       </div>
       <div class="detail-body">
         <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
@@ -287,8 +288,9 @@
           </div>
         </div>
 
-        <div class="dialog-actions" style="margin-top: 20px; display: flex; justify-content: flex-end;">
-          <button type="button" id="savePanManualButton" class="primary-button" style="padding: 10px 20px;">Salvar Mês</button>
+        <div class="dialog-actions">
+          <button type="button" class="secondary" data-close-dialog="panoramaEditDialog">Cancelar</button>
+          <button type="button" id="savePanManualButton" class="primary-button">Salvar mês</button>
         </div>
       </div>
     </dialog>

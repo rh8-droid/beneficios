@@ -20,12 +20,39 @@ document.querySelectorAll('.nav-button').forEach(button => {
   button.addEventListener('click', () => showView(button.dataset.view));
 });
 
-document.querySelector('#menuButton').addEventListener('click', () => sidebar.classList.toggle('open'));
+const menuButton = document.querySelector('#menuButton');
+menuButton.addEventListener('click', () => {
+  const isOpen = sidebar.classList.toggle('open');
+  menuButton.setAttribute('aria-expanded', String(isOpen));
+});
 document.querySelector('#closeDialog').addEventListener('click', () => detailDialog.close());
 document.querySelector('#closePanDialog').addEventListener('click', () => panoramaEditDialog.close());
 document.querySelector('#closeHcDialog').addEventListener('click', () => headcountDialog.close());
+document.querySelectorAll('[data-close-dialog]').forEach(button => {
+  button.addEventListener('click', () => document.getElementById(button.dataset.closeDialog).close());
+});
 document.querySelector('#exportButton').addEventListener('click', exportCsv);
 document.querySelector('#reloadButton').addEventListener('click', loadData);
+
+// Panorama: listeners registrados uma única vez
+document.querySelector('#adjustBaseButton').addEventListener('click', openHeadcountModal);
+document.querySelector('#saveHcButton').addEventListener('click', saveHeadcountValue);
+document.querySelector('#savePanManualButton').addEventListener('click', savePanManualValues);
+document.querySelector('#panoramaCompanyFilter').addEventListener('change', renderPanorama);
+document.querySelector('#hcCompany').addEventListener('change', fillHeadcountValue);
+document.querySelector('#hcMonth').addEventListener('change', fillHeadcountValue);
+document.querySelector('#panEditCompany').addEventListener('change', fillPanEditValues);
+document.querySelector('#panEditMonth').addEventListener('change', fillPanEditValues);
+
+document.querySelector('#panoramaBenefitsRows').addEventListener('click', event => {
+  const button = event.target.closest('[data-benefit]');
+  if (button) openPanEditModal(button.dataset.benefit);
+});
+
+employeeRows.addEventListener('click', event => {
+  const button = event.target.closest('[data-row]');
+  if (button) openDetail(Number(button.dataset.row));
+});
 
 searchInput.addEventListener('input', renderEmployees);
 statusFilter.addEventListener('change', renderEmployees);
@@ -39,11 +66,30 @@ document.querySelector('#panoramaMonthFilter').addEventListener('change', render
 
 loadData();
 
+/**
+ * Coloca o botão em estado de carregamento (desabilitado + spinner)
+ * e devolve uma função que restaura o estado original.
+ */
+function setBusy(button, busyText) {
+  if (!button) return () => {};
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.classList.add('is-busy');
+  if (busyText) button.textContent = busyText;
+  return () => {
+    button.disabled = false;
+    button.classList.remove('is-busy');
+    button.textContent = originalText;
+  };
+}
+
 function loadData() {
   syncStatus.textContent = 'Carregando planilha...';
+  const done = setBusy(document.querySelector('#reloadButton'), 'Atualizando...');
 
   google.script.run
     .withSuccessHandler(data => {
+      done();
       employees = data.employees || [];
       benefits = data.benefits || {};
       panoramaData = data.panorama || { companies: {}, total: {} };
@@ -56,6 +102,7 @@ function loadData() {
       renderAll();
     })
     .withFailureHandler(error => {
+      done();
       syncStatus.textContent = 'Erro ao carregar';
       alert(error.message || error);
     })
@@ -120,13 +167,13 @@ function renderPanoramaCompanyFilter() {
     companies.map(c => `<option value="${escapeAttribute(c)}">${escapeHtml(c)}</option>`).join('');
 
   select.innerHTML = options;
-  if (modalSelect) modalSelect.innerHTML = options;
 
+  // Nos modais só faz sentido escolher uma empresa específica (nunca "total")
   const companyOnlyOptions = companies.map(c => `<option value="${escapeAttribute(c)}">${escapeHtml(c)}</option>`).join('');
+  if (modalSelect) modalSelect.innerHTML = companyOnlyOptions;
   if (hcSelect) hcSelect.innerHTML = companyOnlyOptions;
 
   if ([...select.options].some(opt => opt.value === current)) select.value = current;
-  select.addEventListener('change', renderPanorama);
 }
 
 function renderPanorama() {
@@ -220,7 +267,7 @@ function renderPanorama() {
         <td>${formatCurrency(data.company)}</td>
         <td>${formatCurrency(data.employee)}</td>
         <td>
-          <button class="secondary" style="padding: 6px 10px; font-size: 11px;" onclick="openPanEditModal('${escapeAttribute(benefitName)}')">Editar Valores</button>
+          <button type="button" class="secondary small" data-benefit="${escapeAttribute(benefitName)}">Editar valores</button>
         </td>
       </tr>
     `;
@@ -235,21 +282,25 @@ function renderPanorama() {
 function openHeadcountModal() {
   const monthFilter = document.getElementById('panoramaMonthFilter').value;
   const companyFilter = document.getElementById('panoramaCompanyFilter').value;
+  const hcCompany = document.getElementById('hcCompany');
+
+  if (!hcCompany.options.length) {
+    alert('Nenhuma empresa encontrada na planilha para ajustar a base.');
+    return;
+  }
 
   document.getElementById('hcMonth').value = monthFilter;
-  if (companyFilter !== 'total') {
-    document.getElementById('hcCompany').value = companyFilter;
-  }
+  if (companyFilter !== 'total') hcCompany.value = companyFilter;
 
-  let currentHc = 0;
-  const currentComp = document.getElementById('hcCompany').value;
-  if (panoramaHistory && panoramaHistory[monthFilter] && panoramaHistory[monthFilter][currentComp]) {
-    currentHc = panoramaHistory[monthFilter][currentComp].totalEmployees || 0;
-  }
-  document.getElementById('hcTotalCount').value = currentHc || '';
-
-  document.getElementById('saveHcButton').onclick = saveHeadcountValue;
+  fillHeadcountValue();
   headcountDialog.showModal();
+}
+
+function fillHeadcountValue() {
+  const month = document.getElementById('hcMonth').value;
+  const company = document.getElementById('hcCompany').value;
+  const hist = panoramaHistory && panoramaHistory[month] && panoramaHistory[month][company];
+  document.getElementById('hcTotalCount').value = (hist && hist.totalEmployees) || '';
 }
 
 function saveHeadcountValue() {
@@ -257,19 +308,25 @@ function saveHeadcountValue() {
   const company = document.getElementById('hcCompany').value;
   const totalEmployees = document.getElementById('hcTotalCount').value;
 
+  if (!monthYear || !company) return alert('Selecione o mês e a empresa.');
+  if (!(Number(totalEmployees) > 0)) return alert('Informe um total de colaboradores maior que zero.');
+
   syncStatus.textContent = 'Salvando base...';
+  const done = setBusy(document.getElementById('saveHcButton'), 'Salvando...');
 
   google.script.run
     .withSuccessHandler(data => {
+      done();
       employees = data.employees || [];
       panoramaData = data.panorama || { companies: {}, total: {} };
       panoramaHistory = data.panoramaHistory || {};
 
-      syncStatus.textContent = 'Colaboradores Base Salvos!';
+      syncStatus.textContent = 'Colaboradores base salvos!';
       headcountDialog.close();
       renderAll();
     })
     .withFailureHandler(error => {
+      done();
       syncStatus.textContent = 'Erro ao salvar';
       alert(error.message || error);
     })
@@ -279,26 +336,40 @@ function saveHeadcountValue() {
 function openPanEditModal(benefitName) {
   const monthFilter = document.getElementById('panoramaMonthFilter').value;
   const companyFilter = document.getElementById('panoramaCompanyFilter').value;
+  const panEditCompany = document.getElementById('panEditCompany');
+
+  if (!panEditCompany.options.length) {
+    alert('Nenhuma empresa encontrada na planilha para lançar valores.');
+    return;
+  }
 
   document.getElementById('panEditTitle').textContent = 'Editar: ' + benefitName;
   document.getElementById('panEditBenefit').value = benefitName;
   document.getElementById('panEditMonth').value = monthFilter;
-  document.getElementById('panEditCompany').value = companyFilter;
+  // Na "Visão Geral" o usuário escolhe a empresa dentro do modal
+  if (companyFilter !== 'total') panEditCompany.value = companyFilter;
+
+  fillPanEditValues();
+  panoramaEditDialog.showModal();
+}
+
+function fillPanEditValues() {
+  const month = document.getElementById('panEditMonth').value;
+  const company = document.getElementById('panEditCompany').value;
+  const benefitName = document.getElementById('panEditBenefit').value;
 
   let savedData = { users: 0, total: 0, company: 0, employee: 0, holders: 0 };
   let savedTotalEmps = 0;
 
-  if (panoramaHistory && panoramaHistory[monthFilter] && panoramaHistory[monthFilter][companyFilter]) {
-    const compHist = panoramaHistory[monthFilter][companyFilter];
+  const compHist = panoramaHistory && panoramaHistory[month] && panoramaHistory[month][company];
+  if (compHist) {
     savedTotalEmps = compHist.totalEmployees || 0;
-    if (compHist.benefits && compHist.benefits[benefitName]) {
-      savedData = compHist.benefits[benefitName];
-    }
+    if (compHist.benefits && compHist.benefits[benefitName]) savedData = compHist.benefits[benefitName];
   }
 
-  if (!savedData.users && panoramaData && panoramaData.companies[companyFilter] && panoramaData.companies[companyFilter].benefitsData[benefitName]) {
-    savedData = panoramaData.companies[companyFilter].benefitsData[benefitName];
-  }
+  const sheetData = panoramaData && panoramaData.companies && panoramaData.companies[company]
+    && panoramaData.companies[company].benefitsData && panoramaData.companies[company].benefitsData[benefitName];
+  if (!savedData.users && sheetData) savedData = sheetData;
 
   document.getElementById('panEditCompanyEmployees').value = savedTotalEmps || '';
   document.getElementById('panEditHolders').value = savedData.holders || savedData.users || 0;
@@ -306,9 +377,6 @@ function openPanEditModal(benefitName) {
   document.getElementById('panEditTotal').value = savedData.total || 0;
   document.getElementById('panEditCompanyCost').value = savedData.company || 0;
   document.getElementById('panEditEmployeeCost').value = savedData.employee || 0;
-
-  document.getElementById('savePanManualButton').onclick = savePanManualValues;
-  panoramaEditDialog.showModal();
 }
 
 function savePanManualValues() {
@@ -322,10 +390,14 @@ function savePanManualValues() {
   const employeeCost = document.getElementById('panEditEmployeeCost').value;
   const companyTotalEmployees = document.getElementById('panEditCompanyEmployees').value;
 
+  if (!monthYear || !company) return alert('Selecione o mês e a empresa.');
+
   syncStatus.textContent = 'Gravando no histórico...';
+  const done = setBusy(document.getElementById('savePanManualButton'), 'Salvando...');
 
   google.script.run
     .withSuccessHandler(data => {
+      done();
       employees = data.employees || [];
       panoramaData = data.panorama || { companies: {}, total: {} };
       panoramaHistory = data.panoramaHistory || {};
@@ -335,6 +407,7 @@ function savePanManualValues() {
       renderAll();
     })
     .withFailureHandler(error => {
+      done();
       syncStatus.textContent = 'Erro ao salvar';
       alert(error.message || error);
     })
@@ -422,12 +495,11 @@ function renderEmployees() {
       <td>${pill(item.pharmacy)}</td>
       <td>${escapeHtml(item.totalpass)}</td>
       <td>${statusPill(item.status)}</td>
-      <td><button class="link-action" data-row="${item.rowNumber}">Detalhe</button></td>
+      <td><button type="button" class="link-action" data-row="${item.rowNumber}">Detalhe</button></td>
     </tr>
   `).join('');
 
   if (!filtered.length) employeeRows.innerHTML = `<tr><td colspan="8">Nenhum colaborador encontrado para os filtros selecionados.</td></tr>`;
-  document.querySelectorAll('[data-row]').forEach(button => button.addEventListener('click', () => openDetail(Number(button.dataset.row))));
 }
 
 function renderPending() {
@@ -460,8 +532,8 @@ function openDetail(rowNumber) {
           <span>Gerado em ${escapeHtml(currentEmployee.pdfGeneratedAt || 'data não informada')}</span>
         </div>
         <div class="pdf-actions">
-          <a class="secondary" href="${escapeAttribute(currentEmployee.pdfUrl)}" target="_blank" rel="noopener">Abrir PDF</a>
-          <button id="generatePdfButton" class="secondary">Gerar nova versão</button>
+          <a class="secondary accent-button" href="${escapeAttribute(currentEmployee.pdfUrl)}" target="_blank" rel="noopener">Abrir PDF</a>
+          <button type="button" id="generatePdfButton" class="secondary">Gerar nova versão</button>
         </div>
       `
     : `
@@ -470,7 +542,7 @@ function openDetail(rowNumber) {
           <span>O PDF será salvo no Drive e vinculado à linha deste colaborador.</span>
         </div>
         <div class="pdf-actions">
-          <button id="generatePdfButton" class="secondary">Gerar PDF para ZapSign</button>
+          <button type="button" id="generatePdfButton" class="secondary accent-button">Gerar PDF para ZapSign</button>
         </div>
       `;
 
@@ -501,7 +573,7 @@ function openDetail(rowNumber) {
         <option value="Concluído">Concluído</option>
       </select>
       <textarea id="rhNote" placeholder="Observação do RH">${escapeHtml(currentEmployee.rhNote || '')}</textarea>
-      <button class="secondary" id="saveStatusButton">Salvar status</button>
+      <button type="button" class="primary-button" id="saveStatusButton">Salvar status</button>
     </div>
   `;
 
@@ -509,7 +581,7 @@ function openDetail(rowNumber) {
   document.querySelector('#saveStatusButton').addEventListener('click', saveCurrentStatus);
   document.querySelector('#generatePdfButton').addEventListener('click', generatePdfForCurrentEmployee);
 
-  detailDialog.showModal();
+  if (!detailDialog.open) detailDialog.showModal();
 }
 
 function generatePdfForCurrentEmployee() {
@@ -522,8 +594,7 @@ function generatePdfForCurrentEmployee() {
     openedTab.document.write('<title>Gerando PDF...</title><p style="font-family:Arial;padding:24px">Gerando o termo em PDF...</p>');
   }
 
-  button.disabled = true;
-  button.textContent = 'Gerando PDF...';
+  const done = setBusy(button, 'Gerando PDF...');
 
   google.script.run
     .withSuccessHandler(result => {
@@ -538,8 +609,7 @@ function generatePdfForCurrentEmployee() {
     })
     .withFailureHandler(error => {
       if (openedTab) openedTab.close();
-      button.disabled = false;
-      button.textContent = 'Gerar PDF para ZapSign';
+      done();
       alert('Erro ao gerar PDF: ' + (error.message || error));
     })
     .generateBenefitsPdf(rowNumber);
@@ -550,18 +620,21 @@ function saveCurrentStatus() {
   const status = document.querySelector('#rhStatus').value;
   const note = document.querySelector('#rhNote').value;
   syncStatus.textContent = 'Salvando...';
+  const done = setBusy(document.querySelector('#saveStatusButton'), 'Salvando...');
 
   google.script.run
     .withSuccessHandler(data => {
       employees = data.employees || [];
       panoramaData = data.panorama || { companies: {}, total: {} };
       panoramaHistory = data.panoramaHistory || {};
+      done();
       syncStatus.textContent = data.updatedAt ? `Atualizado em ${data.updatedAt}` : 'Atualizado';
       detailDialog.close();
       renderCompanyFilter();
       renderAll();
     })
     .withFailureHandler(error => {
+      done();
       syncStatus.textContent = 'Erro ao salvar';
       alert(error.message || error);
     })

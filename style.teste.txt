@@ -91,18 +91,58 @@ main { min-width: 0; padding: 0 34px 42px; }
 .top-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 #syncStatus { color: var(--muted); font-size: 12px; font-weight: 700; }
 
-.secondary, .primary-button, .icon-button {
-  border: 0; border-radius: 11px; font-weight: 800; transition: 0.18s ease;
+/* ---------- BOTÕES ---------- */
+.secondary, .primary-button, .icon-button, .link-action {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 40px; border: 1px solid transparent; border-radius: 11px;
+  font-weight: 800; font-size: 13px; line-height: 1; white-space: nowrap;
+  text-decoration: none; transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
-.secondary { color: var(--primary); background: var(--surface); border: 1px solid var(--border); padding: 10px 14px; text-decoration: none; }
-.secondary:hover { transform: translateY(-1px); filter: brightness(0.98); }
+.secondary { color: var(--primary); background: var(--surface); border-color: var(--border); padding: 0 14px; }
+.secondary:hover { border-color: #c4c4be; background: var(--surface-soft); transform: translateY(-1px); }
 
-.primary-button { color: #fff; background: var(--primary); padding: 10px 14px; }
-.primary-button:hover { transform: translateY(-1px); filter: brightness(1.1); }
+.primary-button { color: #fff; background: var(--primary); padding: 0 18px; }
+.primary-button:hover { background: var(--primary-2); transform: translateY(-1px); }
 
-.icon-button { width: 40px; height: 40px; display: none; place-items: center; background: var(--surface); box-shadow: var(--shadow); font-size: 20px; }
-.icon-button.visible { display: grid; }
+.accent-button { color: #111; background: var(--accent); border-color: var(--accent); }
+.accent-button:hover { background: #f0cb24; border-color: #f0cb24; }
+
+.link-action { min-height: 32px; padding: 0 12px; color: var(--primary); background: var(--accent-soft); border-color: rgba(226, 189, 25, 0.45); font-size: 12px; }
+.link-action:hover { background: var(--accent); border-color: var(--accent); }
+
+.small { min-height: 30px; padding: 0 10px; font-size: 11px; border-radius: 9px; }
+
+.secondary:active, .primary-button:active, .link-action:active, .icon-button:active { transform: translateY(0) scale(0.98); }
+
+.secondary:focus-visible, .primary-button:focus-visible, .link-action:focus-visible,
+.icon-button:focus-visible, .nav-button:focus-visible {
+  outline: none; box-shadow: 0 0 0 3px rgba(226, 189, 25, 0.55);
+}
+
+button:disabled, button:disabled:hover {
+  cursor: not-allowed; opacity: 0.55; transform: none; filter: none;
+}
+
+button.is-busy { cursor: progress; }
+button.is-busy::before {
+  content: ""; width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent; animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* botões sobre fundo escuro (caixa do PDF) */
+.pdf-box .secondary { color: #fff; background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.28); }
+.pdf-box .secondary:hover { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.45); }
+.pdf-box .accent-button { color: #111; background: var(--accent); border-color: var(--accent); }
+.pdf-box .accent-button:hover { background: #f0cb24; }
+
+.icon-button { width: 40px; height: 40px; min-height: 40px; padding: 0; display: none; color: var(--primary); background: var(--surface); border-color: var(--border); font-size: 20px; }
+.icon-button:hover { background: var(--surface-soft); }
+.icon-button.visible { display: inline-flex; }
+
+.metric-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
 .view { animation: fade 0.2s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
@@ -145,6 +185,8 @@ main { min-width: 0; padding: 0 34px 42px; }
 
 .bars, .attention, .pending-list { display: grid; gap: 13px; }
 .bar-row { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(120px, 2fr) 42px; align-items: center; gap: 10px; font-size: 13px; }
+.bar-label { display: flex; justify-content: space-between; gap: 8px; }
+.bar-label span:last-child { color: var(--muted); font-weight: 700; }
 .bar-track { height: 9px; border-radius: 999px; background: #e8e8e5; overflow: hidden; }
 .bar-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--primary), var(--accent)); }
 
@@ -210,6 +252,8 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(4px); 
 .detail-box { padding: 15px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-soft); }
 .detail-box span { display: block; color: var(--muted); font-size: 11px; font-weight: 900; text-transform: uppercase; margin-bottom: 5px; }
 .form-grid { display: grid; gap: 12px; }
+.status-editor { display: grid; gap: 12px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+.status-editor .primary-button { justify-self: end; }
 .form-field label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 11px; font-weight: 900; text-transform: uppercase; }
 
 @media (max-width: 900px) {
@@ -217,7 +261,14 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(4px); 
   .sidebar { position: fixed; left: 0; transform: translateX(-102%); width: 260px; box-shadow: 30px 0 80px rgba(0, 0, 0, 0.22); transition: transform 0.22s ease; }
   .sidebar.open { transform: translateX(0); }
   main { padding: 0 20px 34px; }
-  .icon-button { display: grid; }
+  .icon-button { display: inline-flex; }
+  .topbar { flex-wrap: wrap; padding: 14px 0; }
+  .top-actions { width: 100%; margin-left: 0; flex-wrap: wrap; }
+  #syncStatus { flex: 1 1 100%; }
+  .top-actions .secondary { flex: 1; }
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .form-grid { grid-template-columns: 1fr !important; }
+  .status-editor .primary-button, .dialog-actions .primary-button { width: 100%; }
   .grid.two, .filters, .detail-grid { grid-template-columns: 1fr; }
   .pdf-box { flex-direction: column; align-items: flex-start; }
 }
