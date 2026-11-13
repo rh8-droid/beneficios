@@ -38,13 +38,14 @@
       parts.push(`<label class="field">Categoria<select data-f="categoria"><option value="">Todas</option>${Object.entries(AJ.config.CATEGORIAS).map(([k, v]) => `<option value="${k}" ${f.categoria === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>`);
     if (has('tipo')) parts.push(`<label class="field">Tipo de inconformidade<select data-f="tipo" style="max-width:260px"><option value="">Todos</option>${tipos.map(([k, t]) => `<option value="${k}" ${f.tipo === k ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}</select></label>`);
     if (has('gravidade'))
-      parts.push(`<label class="field">Criticidade<select data-f="gravidade"><option value="">Todas</option>${AJ.config.CRITICIDADES.map((g) => `<option ${f.gravidade === g ? 'selected' : ''}>${g}</option>`).join('')}${fields.includes('semAjuste') ? `<option value="SEM_AJUSTE" ${f.gravidade === 'SEM_AJUSTE' ? 'selected' : ''}>Sem ajuste (dif. ≤ ${S().audit.cfg.toleranciaDiaria} min)</option>` : ''}</select></label>`);
+      parts.push(`<label class="field">Criticidade<select data-f="gravidade"><option value="">Todas</option>${AJ.config.CRITICIDADES.map((g) => `<option ${f.gravidade === g ? 'selected' : ''}>${g}</option>`).join('')}${fields.includes('semAjuste') ? `<option value="SEM_AJUSTE" ${f.gravidade === 'SEM_AJUSTE' ? 'selected' : ''}>Sem ajuste (jornadas 100% corretas)</option>` : ''}</select></label>`);
     const tratOpts = has('tratFechadas') ? AJ.app.TRAT_FECHADOS : has('tratAbertas') ? AJ.app.TRAT_ABERTOS : ui.TRAT_STATUS;
     if (has('trat')) parts.push(`<label class="field">Tratativa<select data-f="trat"><option value="">Todas</option>${tratOpts.map((g) => `<option ${f.trat === g ? 'selected' : ''}>${g}</option>`).join('')}</select></label>`);
-    parts.push(`<button class="btn ghost" data-clear>Limpar filtros</button>`);
+    const ativos = activeFilters(fields);
+    parts.push(`<button class="btn ${ativos.length ? 'primary' : 'ghost'}" data-clear>Limpar filtros</button>`);
     const el = document.createElement('div');
-    el.className = 'filters';
-    el.innerHTML = parts.join('');
+    el.className = 'filters' + (ativos.length ? ' filters-on' : '');
+    el.innerHTML = (ativos.length ? `<div class="filter-banner">⚠ <b>Filtro ativo</b> — os números desta tela consideram apenas: ${ativos.map((x) => `<span class="chip">${esc(x)}</span>`).join(' ')}. Clique em <b>Limpar filtros</b> para ver tudo.</div>` : '') + parts.join('');
     c.appendChild(el);
     let t = null;
     el.querySelectorAll('[data-f]').forEach((inp) => {
@@ -62,6 +63,22 @@
     return el;
   }
   V.filterBar = filterBar;
+
+  function activeFilters(fields) {
+    const f = S().filters;
+    const has = (k) => fields.includes(k);
+    const out = [];
+    if (has('periodo') && (f.ini || f.fim)) out.push(`Período ${f.ini ? U.fmtDate(f.ini) : 'início'} a ${f.fim ? U.fmtDate(f.fim) : 'fim'}`);
+    if (has('q') && f.q) out.push(`Motorista: ${f.q}`);
+    if (has('matricula') && f.matricula) out.push(`Matrícula: ${f.matricula}`);
+    if (has('empresa') && f.empresa) out.push(`Empresa: ${f.empresa.replace(/ - [\d./-]+$/, '')}`);
+    if (has('status') && f.status) out.push(`Status: ${ui.STATUS[f.status].label}`);
+    if (has('categoria') && f.categoria) out.push(`Categoria: ${AJ.config.CATEGORIAS[f.categoria]}`);
+    if (has('tipo') && f.tipo) out.push(`Tipo: ${AJ.config.TIPOS[f.tipo].nome}`);
+    if (has('gravidade') && f.gravidade) out.push(`Criticidade: ${f.gravidade === 'SEM_AJUSTE' ? 'Sem ajuste (jornadas 100% corretas)' : f.gravidade}`);
+    if (has('trat') && f.trat) out.push(`Tratativa: ${f.trat}`);
+    return out;
+  }
 
   // =====================================================================
   // IMPORTAÇÃO
@@ -268,24 +285,33 @@
       const ignMT = a.ignoradosSomenteMT && a.ignoradosSomenteMT.length ? `<div class="alert info">${a.ignoradosSomenteMT.length} motorista(s) presentes <b>somente no MaxTrack</b> (agregados) foram desconsiderados nesta auditoria (${a.ignoradosSomenteMT.reduce((s2, m) => s2 + m.jornadas, 0)} jornadas). Para incluí-los, desative a opção em <b>Parâmetros e regras → Escopo</b>.</div>` : '';
       const cmp = a.comparativo && !S().filters.ini ? `<div class="alert info">Comparado com a auditoria anterior do mesmo período (${new Date(a.comparativo.anteriorEm).toLocaleString('pt-BR')}): <b>${a.comparativo.novas}</b> ocorrência(s) nova(s), <b>${a.comparativo.recorrentes}</b> recorrente(s), <b>${a.comparativo.naoMaisPresentes}</b> não aparecem mais (possivelmente corrigidas).</div>` : '';
       body.innerHTML = `${ignMT}${cmp}
+        <h3 class="sec-title">Resultado final das jornadas <span class="muted small">— horas conferem entre os sistemas <b>e</b> nenhuma regra de jornada foi descumprida</span></h3>
         <div class="kpis">
-          ${tile('Motoristas auditados', ui.num(k.motoristas), `${a.kpis.motoristasCadastro} cadastros nos dois sistemas`, 'info', { view: 'motoristas' })}
-          ${tile('Jornadas analisadas', ui.num(k.jornadas), `${ui.num(k.pares)} presentes nos dois sistemas`, 'info', { view: 'conciliacao' })}
-          ${tile('Jornadas conciliadas', ui.num(k.conciliadas), `${ui.pct(k.percConciliacao)} das jornadas`, 'ok', { view: 'conciliacao', status: '' })}
-          ${tile('Jornadas divergentes', ui.num(k.divergentes), `+ ${ui.num(k.conferencia)} para conferência`, 'bad', { view: 'conciliacao' })}
-          ${tile('Horas divergentes', D(k.horasDivergentes), 'soma das diferenças de horas trabalhadas', 'bad', { view: 'conciliacao' })}
+          ${tile('Jornadas analisadas', ui.num(k.jornadas), `${ui.num(k.motoristas)} motoristas com jornada no período`, 'info', { view: 'conciliacao' })}
+          ${tile('Jornadas 100% corretas', ui.num(k.audConciliado), `${ui.pct(k.percConformidade)} das jornadas · sem nenhum ajuste`, 'ok', { view: 'conciliacao', gravidade: 'SEM_AJUSTE' })}
+          ${tile('Jornadas para conferir', ui.num(k.audConferencia), 'pequenas diferenças (3 a 15 min) ou detalhes', 'warn', { view: 'conciliacao', status: 'conferencia' })}
+          ${tile('Jornadas com problema', ui.num(k.audDivergente), 'divergência de horas e/ou inconformidade', 'bad', { view: 'conciliacao', status: 'divergente' })}
+        </div>
+        <h3 class="sec-title">1. Horas: MaxTrack × RasterJor <span class="muted small">— só compara as horas entre os dois sistemas (sem regras legais)</span></h3>
+        <div class="kpis">
+          ${tile('Horas iguais nos dois sistemas', ui.num(k.conciliadas), `${ui.pct(k.percConciliacao)} das ${ui.num(k.jornadas)} jornadas (dif. ≤ ${a.cfg.toleranciaDiaria} min)`, 'ok', { view: 'conciliacao' })}
+          ${tile('Horas com pequena diferença', ui.num(k.conferencia), `entre ${a.cfg.toleranciaDiaria + 1} e ${a.cfg.limiteConferencia} min`, 'warn', { view: 'conciliacao' })}
+          ${tile('Horas divergentes', ui.num(k.divergentes), `${ui.num(k.ausentesRJ)} não chegaram ao RasterJor · total ${D(k.horasDivergentes)}`, 'bad', { view: 'conciliacao' })}
           ${tile('HE 50% divergentes', D(k.he50Divergentes), `${D(folha.totais.he50NaoComputada)} não computadas no RasterJor`, 'warn', { view: 'folha' })}
           ${tile('HE 100% divergentes', D(k.he100Divergentes), `${D(folha.totais.he100NaoComputada)} não computadas no RasterJor`, 'warn', { view: 'folha' })}
-          ${tile('Falhas de integração', ui.num(k.falhasIntegracao), `${ui.num(k.ausentesRJ)} jornadas do MaxTrack sem apuração`, 'bad', { view: 'ocorrencias', categoria: 'INTEGRACAO' })}
-          ${tile('Inconformidades', ui.num(k.inconformidades), `${ui.num(k.infracoes)} infrações · ${ui.num(k.operacionais)} operacionais · ${ui.num(k.registros)} de registro`, 'bad', { view: 'ocorrencias' })}
+          ${tile('Integração MaxTrack → RasterJor', ui.pct(integ), `${ui.num(k.pares)} de ${ui.num(k.pares + k.ausentesRJ)} jornadas do MaxTrack chegaram ao RasterJor`, integ > 0.98 ? 'ok' : integ > 0.9 ? 'warn' : 'bad')}
+        </div>
+        <h3 class="sec-title">2. Ocorrências <span class="muted small">— itens para o RH analisar (uma jornada pode ter várias)</span></h3>
+        <div class="kpis">
+          ${tile('Ocorrências no total', ui.num(os.length), 'todas as categorias', 'info', { view: 'ocorrencias' })}
+          ${tile('Falhas de integração', ui.num(k.falhasIntegracao), 'jornada/motorista/situação não integrados', 'bad', { view: 'ocorrencias', categoria: 'INTEGRACAO' })}
+          ${tile('Inconformidades de jornada', ui.num(k.inconformidades), `${ui.num(k.infracoes)} infrações · ${ui.num(k.operacionais)} operacionais · ${ui.num(k.registros)} de registro`, 'bad', { view: 'ocorrencias' })}
           ${tile('Diárias divergentes', ui.num(os.filter((o) => o.catKey === 'DIARIA').length), `${ui.num(os.filter((o) => o.tipo === 'DIARIA_SEM_JORNADA').length)} sem jornada · ${ui.num(os.filter((o) => o.tipo === 'DIARIA_NAO_GERADA').length)} não geradas`, 'bad', { view: 'diarias' })}
-          ${tile('Conformidade', ui.pct(k.percConformidade), 'jornadas conciliadas e sem inconformidade', k.percConformidade > 0.9 ? 'ok' : k.percConformidade > 0.7 ? 'warn' : 'bad')}
-          ${tile('Integração MaxTrack → RasterJor', ui.pct(integ), 'jornadas do MaxTrack encontradas no RasterJor', integ > 0.98 ? 'ok' : integ > 0.9 ? 'warn' : 'bad')}
         </div>
         <div class="card"><div class="card-head"><div><h3>Ocorrências por criticidade</h3><p>Crítica = impacto direto no pagamento (jornada/diária não integrada, diferença ≥ ${a.cfg.limiteCritico} min). Diferenças de até ${a.cfg.toleranciaDiaria} min não exigem ajuste. Clique para filtrar.</p></div></div>
           <div class="crit-tiles">${AJ.config.CRITICIDADES.map((c) => `<div class="crit-tile" data-crit="${c}"><span class="sev ${c}">${c}</span><b>${ui.num(os.filter((o) => o.gravidade === c).length)}</b><span class="small">ocorrências</span></div>`).join('')}
-          <div class="crit-tile" data-crit="SEM_AJUSTE" data-nav-view="conciliacao"><span class="badge ok"><span class="dot"></span>Sem ajuste</span><b>${ui.num(gs.filter((g) => g.criticidade === 'SEM_AJUSTE').length)}</b><span class="small">jornadas com dif. ≤ ${a.cfg.toleranciaDiaria} min</span></div></div></div>
-        <div class="card"><div class="card-head"><div><h3>Status das jornadas</h3><p>Resultado combinado da conciliação e das regras de jornada</p></div></div><div id="stack"></div></div>
+          <div class="crit-tile" data-crit="SEM_AJUSTE" data-nav-view="conciliacao"><span class="badge ok"><span class="dot"></span>Sem ajuste</span><b>${ui.num(gs.filter((g) => g.criticidade === 'SEM_AJUSTE').length)}</b><span class="small">jornadas 100% corretas</span></div></div></div>
+        <div class="card"><div class="card-head"><div><h3>Resultado final das jornadas</h3><p>Mesmos números dos indicadores "Resultado final" acima</p></div></div><div id="stack"></div></div>
         <div class="grid c2">
           <div class="card"><div class="card-head"><div><h3>Jornadas por dia</h3><p>Quantidade de jornadas por status, pela data de início</p></div></div><div id="perDay"></div></div>
           <div class="card"><div class="card-head"><div><h3>Ocorrências por categoria</h3><p>Clique para abrir a gestão de ocorrências filtrada</p></div></div><div id="perCat"></div></div>
@@ -304,6 +330,8 @@
         el.addEventListener('click', () => {
           const n = JSON.parse(el.dataset.nav);
           if (n.categoria !== undefined) S().filters.categoria = n.categoria;
+          if (n.status !== undefined) S().filters.status = n.status;
+          if (n.gravidade !== undefined) S().filters.gravidade = n.gravidade;
           AJ.app.go(n.view);
         })
       );

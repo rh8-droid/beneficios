@@ -384,3 +384,9 @@ details summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var
 .crit-tile:hover { border-color: var(--border-strong); background: var(--surface-2); }
 .crit-tile b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; margin-top: 4px; }
 .crit-tile span.small { color: var(--text-3); }
+
+.filters-on { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
+.filter-banner { flex-basis: 100%; background: var(--warn-soft); color: var(--warn-text); border-radius: 7px; padding: 8px 12px; font-size: 13px; line-height: 1.5; }
+.filter-banner .chip { display: inline-block; background: var(--surface); color: var(--text); border: 1px solid var(--warn); border-radius: 999px; padding: 0 8px; font-size: 12px; margin: 1px 0; }
+.filters select:has(option:checked:not([value=""])), .filters input[data-f]:not([value=""]) { border-color: var(--warn); }
+.sec-title { font-size: 14px; margin: 4px 0 -6px; color: var(--text); }
