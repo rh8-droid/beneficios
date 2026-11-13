@@ -63,7 +63,7 @@
         <div class="kpis">
           ${tile('', 'Diárias geradas (RasterJor)', r.geradas, `${ui.num(r.inteiras)} inteiras · ${ui.num(r.meias)} meias`, 'info')}
           ${tile('OK', 'Corretas', r.ok, 'diária em dia com jornada', 'ok')}
-          ${tile('SEM_JORNADA', 'Indevidas – dia sem jornada', r.semJornada, vd ? 'simulação ' + ui.money(soma('SEM_JORNADA')) : 'possível pagamento indevido', 'bad')}
+          ${tile('SEM_JORNADA', 'Indevidas – dia de folga', r.semJornada, vd ? 'simulação ' + ui.money(soma('SEM_JORNADA')) : 'possível pagamento indevido', 'bad')}
           ${tile('NAO_GERADA', 'Não geradas – dia com jornada', r.naoGeradas, (vd ? 'simulação ' + ui.money(soma('NAO_GERADA')) + ' · ' : '') + `${ui.num(all.filter((l) => l.resultado === 'NAO_GERADA' && !l.motoristaNoRJ).length)} de motoristas sem cadastro no RasterJor`, 'bad')}
           ${tile('CONTINUACAO', 'Para conferência – viagem/continuação', r.continuacao, 'jornada do dia anterior atravessa o dia', 'warn')}
           ${r.soRJ ? tile('SO_RJ', 'Jornada só no RasterJor', r.soRJ, 'confirmar jornada antes de pagar', 'warn') : ''}

@@ -21,7 +21,7 @@
     OK: 'Correta (dia com jornada)',
     SO_RJ: 'Jornada só no RasterJor',
     CONTINUACAO: 'Sem início de jornada no dia (continuação/viagem)',
-    SEM_JORNADA: 'Indevida – dia sem jornada',
+    SEM_JORNADA: 'Indevida – dia de folga (sem jornada)',
     NAO_GERADA: 'Não gerada – dia com jornada',
   };
 
@@ -101,7 +101,7 @@
         if (res === 'SEM_JORNADA') {
           newOc('DIARIA_SEM_JORNADA', mot, {
             date: k, chave: 'd' + k, sistema: 'RasterJor', minutos: null,
-            descricao: `Diária "${d}" gerada em ${U.fmtDate(k, true)}${rot}, sem jornada iniciada ou em andamento no MaxTrack nem no RasterJor. Verificar se o motorista estava em viagem (pernoite fora da base); caso contrário, diária indevida.`,
+            descricao: `Diária "${d}" gerada em dia de folga: ${U.fmtDate(k, true)}${rot}, sem jornada iniciada ou em andamento no MaxTrack nem no RasterJor. Verificar se o motorista estava em viagem (pernoite fora da base); caso contrário, diária indevida.`,
           });
         } else if (res === 'CONTINUACAO') {
           const j = mtTouch[0] || rjTouch[0];

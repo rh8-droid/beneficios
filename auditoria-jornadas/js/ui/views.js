@@ -420,8 +420,16 @@
     card.className = 'card';
     card.innerHTML = `<div class="card-head"><div><h3>Comparativo MaxTrack × RasterJor por jornada</h3><p>Diferença = MaxTrack − RasterJor. Positivo (vermelho): registrado e não apurado. Negativo (azul): apurado a maior no RasterJor. Clique na linha para o detalhe.</p></div></div><div id="tbl"></div>`;
     c.appendChild(card);
+    const avisoDiaria = document.createElement('div');
+    card.parentNode.insertBefore(avisoDiaria, card);
     draw();
     function draw(reset) {
+      const dFolga = V.filteredDiarias ? V.filteredDiarias('SEM_JORNADA') : [];
+      avisoDiaria.innerHTML = dFolga.length
+        ? `<div class="alert bad">⚠ <b>${dFolga.length} diária(s) em dia de folga</b> (sem jornada) — esses dias não aparecem nesta tabela porque não houve jornada. <a href="#" id="verDiarias">Ver em Conciliação de diárias</a>.</div>`
+        : '';
+      const lk = avisoDiaria.querySelector('#verDiarias');
+      if (lk) lk.onclick = (e) => (e.preventDefault(), AJ.app.go('diarias'));
       const mm = AJ.app.motMap();
       const rows = AJ.app.filteredGrupos();
       AJ.state.lastRows = { view: 'conciliacao', rows };

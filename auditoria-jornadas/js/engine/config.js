@@ -127,7 +127,7 @@
     SEQUENCIA_INVALIDA: { cat: 'REGISTRO', grav: 'Média', nome: 'Sequência de eventos inconsistente' },
     SEM_DIRECAO: { cat: 'REGISTRO', grav: 'Baixa', nome: 'Jornada sem tempo de direção registrado' },
     // Diárias
-    DIARIA_SEM_JORNADA: { cat: 'DIARIA', grav: 'Alta', nome: 'Diária gerada em dia sem jornada' },
+    DIARIA_SEM_JORNADA: { cat: 'DIARIA', grav: 'Alta', nome: 'Diária em dia de folga (sem jornada)' },
     DIARIA_CONTINUACAO: { cat: 'DIARIA', grav: 'Média', nome: 'Diária em dia sem início de jornada (continuação/viagem)' },
     DIARIA_NAO_GERADA: { cat: 'DIARIA', grav: 'Alta', nome: 'Dia com jornada sem diária gerada' },
     DIARIA_SO_RJ: { cat: 'DIARIA', grav: 'Média', nome: 'Diária em jornada sem registro no MaxTrack' },

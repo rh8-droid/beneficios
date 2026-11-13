@@ -89,7 +89,9 @@
     const dayRows = dias
       .map(({ k, g, dm, dr }) => {
         if (!g.length) {
-          return `<tr><td class="nowrap">${U.fmtDate(k, true)}</td><td colspan="2" class="muted">${esc(dm ? dm.rotulo : 'Sem registro')}</td><td colspan="2" class="muted">${esc(dr ? dr.rotulo || 'Sem jornada' : 'Sem registro')}</td><td></td><td>${diariaCell(k)}</td><td colspan="4"></td><td></td></tr>`;
+          const dl = dLin[k];
+          const alerta = dl && (dl.resultado === 'SEM_JORNADA' || dl.resultado === 'CONTINUACAO');
+          return `<tr class="${alerta ? 'row-alert' : ''}"><td class="nowrap">${U.fmtDate(k, true)}</td><td colspan="2" class="muted">${esc(dm ? (dm.rotulo === 'DSR' ? 'Sem jornada' : dm.rotulo) : 'Sem registro')}</td><td colspan="2" class="muted">${esc(dr ? dr.rotulo || 'Sem jornada' : 'Sem registro')}</td><td></td><td>${diariaCell(k)}</td><td colspan="4"></td><td>${alerta ? `<span class="badge ${dl.resultado === 'SEM_JORNADA' ? 'bad' : 'warn'}"><span class="dot"></span>${dl.resultado === 'SEM_JORNADA' ? 'Diária em dia de folga' : 'Diária – conferir viagem'}</span>` : ''}</td></tr>`;
         }
         return g
           .map((x) => {
