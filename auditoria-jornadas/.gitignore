@@ -1,0 +1,8 @@
+# Nunca versionar relatórios reais (dados pessoais de motoristas – LGPD)
+*.xlsx
+*.xls
+*.csv
+*.pdf
+*.json
+!package.json
+node_modules/

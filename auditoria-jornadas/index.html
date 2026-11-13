@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Auditoria de Jornadas</title>
+    <link rel="stylesheet" href="css/app.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <div class="brand-mark">AJ</div>
+          <div>
+            <strong>Auditoria de Jornadas</strong>
+            <span>MaxTrack × RasterJor</span>
+          </div>
+        </div>
+        <nav class="nav" id="nav">
+          <div class="nav-label">Processo</div>
+          <button data-view="importar"><span class="ico">⇪</span>Importar e executar</button>
+          <div class="nav-label">Resultados</div>
+          <button data-view="painel"><span class="ico">▦</span>Painel gerencial</button>
+          <button data-view="conciliacao"><span class="ico">⇄</span>Conciliação de jornadas</button>
+          <button data-view="motoristas"><span class="ico">☺</span>Motoristas</button>
+          <button data-view="ocorrencias"><span class="ico">⚑</span>Gestão de ocorrências<span class="count" id="navCount"></span></button>
+          <button data-view="folha"><span class="ico">$</span>Impacto na folha</button>
+          <div class="nav-label">Administração</div>
+          <button data-view="historico"><span class="ico">↺</span>Histórico de auditorias</button>
+          <button data-view="parametros"><span class="ico">⚙</span>Parâmetros e regras</button>
+          <button data-view="metodologia"><span class="ico">?</span>Metodologia</button>
+        </nav>
+        <div class="sidebar-foot">
+          Processamento 100% local no navegador. Nenhum dado é enviado para servidores.<br />
+          <span id="userFoot"></span>
+        </div>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <button class="btn ghost menu-btn" id="menuBtn" aria-label="Abrir menu">☰</button>
+          <div class="title">
+            <div class="eyebrow" id="auditInfo">Nenhuma auditoria carregada</div>
+            <h1 id="pageTitle">Importar e executar</h1>
+          </div>
+          <div class="top-actions">
+            <select id="auditSelect" title="Auditoria exibida" aria-label="Auditoria exibida"></select>
+            <button class="btn" id="btnExcel" title="Exportar a visão atual (com filtros) para Excel">⬇ Excel</button>
+            <button class="btn" id="btnPdf" title="Exportar a visão atual (com filtros) para PDF">⬇ PDF</button>
+            <button class="btn ghost" id="btnTheme" title="Alternar tema claro/escuro" aria-label="Alternar tema">◑ Tema</button>
+          </div>
+        </header>
+        <div class="content" id="content"></div>
+      </main>
+    </div>
+
+    <div id="tooltip" class="tooltip hidden"></div>
+
+    <script src="js/vendor/xlsx.full.min.js"></script>
+    <script src="js/vendor/jspdf.umd.min.js"></script>
+    <script src="js/vendor/jspdf.plugin.autotable.min.js"></script>
+    <script src="js/engine/util.js"></script>
+    <script src="js/engine/config.js"></script>
+    <script src="js/engine/parsers.js"></script>
+    <script src="js/engine/reconcile.js"></script>
+    <script src="js/engine/rules.js"></script>
+    <script src="js/engine/payroll.js"></script>
+    <script src="js/engine/audit.js"></script>
+    <script src="js/ui/store.js"></script>
+    <script src="js/ui/common.js"></script>
+    <script src="js/ui/export.js"></script>
+    <script src="js/ui/views.js"></script>
+    <script src="js/ui/views-admin.js"></script>
+    <script src="js/ui/metodologia.js"></script>
+    <script src="js/ui/app.js"></script>
+  </body>
+</html>
