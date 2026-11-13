@@ -161,7 +161,7 @@
     };
   }
 
-  AJ.VERSION = '1.1.0';
+  AJ.VERSION = '1.2.0';
   AJ.audit = { runAudit, computeKpis, STATUS_LABEL };
   if (typeof module !== 'undefined' && module.exports) module.exports = AJ;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

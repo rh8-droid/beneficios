@@ -44,7 +44,8 @@
 
     // ---------- Diárias ----------
     conciliarDiarias: true,
-    diariaEmTodoDiaTrabalhado: true, // espera diária em todo dia com jornada iniciada
+    diariaEmTodoDiaTrabalhado: true,
+    diariaMinContinuacao: 240, // min: jornada que vira a meia-noite só justifica diária no dia seguinte se tiver ao menos isso no dia (e o dia não for DSR/feriado) // espera diária em todo dia com jornada iniciada
     valorDiaria: 0, // R$ – diária inteira (0 = não simula)
     valorMeiaDiaria: 0, // R$ – meia diária
 

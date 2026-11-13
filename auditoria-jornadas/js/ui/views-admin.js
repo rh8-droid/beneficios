@@ -499,11 +499,9 @@
   };
 
   async function reprocess(id) {
-    const inputs = await AJ.store.get('inputs', id);
-    if (!inputs) return ui.toast('Dados de entrada desta auditoria não estão disponíveis (backup restaurado sem entradas). Importe os arquivos novamente.', 6000);
-    const old = S().index.find((x) => x.id === id);
-    const a = await AJ.app.executeAudit(inputs.mt, inputs.rj, { arquivos: old && old.arquivos, origem: `Reprocessada a partir da auditoria de ${old ? new Date(old.criadoEm).toLocaleString('pt-BR') : id}` });
-    ui.toast(`Auditoria reprocessada com os parâmetros atuais: ${a.ocorrencias.length} ocorrências.`);
+    const ok = await AJ.app.reprocessar(id);
+    if (!ok) return ui.toast('Dados de entrada desta auditoria não estão disponíveis (backup restaurado sem entradas). Importe os arquivos novamente.', 6000);
+    ui.toast(`Auditoria reprocessada com os parâmetros atuais: ${S().audit.ocorrencias.length} ocorrências.`);
     AJ.app.go('painel');
   }
   V.reprocess = reprocess;

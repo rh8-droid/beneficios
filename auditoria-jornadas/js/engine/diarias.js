@@ -68,7 +68,15 @@
         let res = null;
         if (d) {
           if (rjIni.length) res = 'OK';
-          else if (rjTouch.length) res = 'CONTINUACAO'; // jornada do dia anterior atravessa a meia-noite
+          else if (rjTouch.length) {
+            // Jornada do dia anterior atravessa a meia-noite. Só justifica a diária se houve
+            // trabalho relevante no dia e o dia não é folga (DSR/feriado) no RasterJor.
+            const j0 = rjTouch[0];
+            const fimJ = j0.fim !== null ? j0.fim : j0.inicio;
+            const minDia = Math.min(fimJ, t + 1440) - Math.max(j0.inicio, t);
+            const folga = /dsr|feriado|folga/i.test(rotulo[k] || '');
+            res = folga || minDia < (cfg.diariaMinContinuacao || 240) ? 'SEM_JORNADA' : 'CONTINUACAO';
+          }
           else res = 'SEM_JORNADA'; // diária em dia sem jornada no RasterJor (folga)
         } else if (rjIni.length && cfg.diariaEmTodoDiaTrabalhado !== false) {
           res = 'NAO_GERADA';
@@ -89,6 +97,7 @@
           jornadaMT: mtIni.length ? `${U.fmtDateTime(mtIni[0].inicio)} → ${U.fmtDateTime(mtIni[0].fim)}` : mtTouch.length ? `(continua) ${U.fmtDateTime(mtTouch[0].inicio)} → ${U.fmtDateTime(mtTouch[0].fim)}` : '',
           jornadaRJ: rjIni.length ? `${U.fmtDateTime(rjIni[0].inicio)} → ${U.fmtDateTime(rjIni[0].fim)}` : rjTouch.length ? `(continua) ${U.fmtDateTime(rjTouch[0].inicio)} → ${U.fmtDateTime(rjTouch[0].fim)}` : '',
           trabalhoMT: mtIni.reduce((a, j) => a + U.nz(j.trabalho), 0) || null,
+          continuaDe: !rjIni.length && rjTouch.length ? `${U.fmtDateTime(rjTouch[0].inicio)} → ${U.fmtDateTime(rjTouch[0].fim)}` : '',
           trabalhoRJ: rjIni.reduce((a, j) => a + U.nz(j.trabalho), 0) || null,
           grupo: jRef ? jRef.grupo : null,
           motoristaNoRJ: temRJ,
@@ -101,7 +110,7 @@
         if (res === 'SEM_JORNADA') {
           newOc('DIARIA_SEM_JORNADA', mot, {
             date: k, chave: 'd' + k, sistema: 'RasterJor', minutos: null,
-            descricao: `Diária "${d}" gerada em dia de folga: ${U.fmtDate(k, true)}${rot}, sem jornada no espelho do RasterJor.` + (mtIni.length ? ` Atenção: o MaxTrack registra jornada nesse dia (${linha.jornadaMT}) que não foi integrada ao RasterJor.` : ' Verificar se o motorista estava em viagem (pernoite fora da base); caso contrário, diária indevida.'),
+            descricao: `Diária "${d}" gerada em dia de folga: ${U.fmtDate(k, true)}${rot}, sem jornada no espelho do RasterJor.` + (linha.continuaDe ? ` A jornada ${linha.continuaDe} termina neste dia, mas isso não caracteriza dia trabalhado.` : '') + (mtIni.length ? ` Atenção: o MaxTrack registra jornada nesse dia (${linha.jornadaMT}) que não foi integrada ao RasterJor.` : ' Verificar se o motorista estava em viagem (pernoite fora da base); caso contrário, diária indevida.'),
           });
         } else if (res === 'CONTINUACAO') {
           const j = rjTouch[0];

@@ -241,7 +241,7 @@
         };
       }
     }
-    await saveAudit(audit, { mt: mtList, rj: rjList });
+    await saveAudit(audit, { mt: mtList, rj: rjList, files: (extra && extra.files) || null });
     state.audit = audit;
     await AJ.store.put('settings', 'ultimaAuditoria', audit.id);
     renderHeader();
@@ -250,6 +250,28 @@
   }
 
   // ---------------- cabeçalho / navegação ----------------
+  /** Refaz uma auditoria salva com as regras e parâmetros atuais (relê os arquivos originais quando disponíveis). */
+  async function reprocessar(id, origem) {
+    const inputs = await AJ.store.get('inputs', id);
+    if (!inputs) return false;
+    const old = state.index.find((x) => x.id === id);
+    let mt = inputs.mt;
+    let rj = inputs.rj;
+    if (inputs.files && inputs.files.length) {
+      const parse = (f) => {
+        const mapping = {};
+        mapping[f.sistema] = f.mapping || {};
+        const r = AJ.parsers.parseFile(f.buf, f.name, { forceSystem: f.sistema, mapping });
+        r.hash = f.hash;
+        return r;
+      };
+      mt = inputs.files.filter((f) => f.sistema === 'maxtrack').map(parse);
+      rj = inputs.files.filter((f) => f.sistema === 'rasterjor').map(parse);
+    }
+    await executeAudit(mt, rj, { arquivos: old && old.arquivos, origem: origem || `Reprocessada a partir da auditoria de ${old ? new Date(old.criadoEm).toLocaleString('pt-BR') : id}`, files: inputs.files || null });
+    return true;
+  }
+
   function renderHeader() {
     const sel = document.getElementById('auditSelect');
     sel.innerHTML = state.index.length
@@ -336,7 +358,18 @@
     applyTheme(theme || 'dark'); // padrão: tema escuro (alterável pelo botão Tema)
     for (const { key, value } of await AJ.store.all('tratativas')) state.trat[key] = value;
     const last = await AJ.store.get('settings', 'ultimaAuditoria');
-    if (last && state.index.some((x) => x.id === last)) await loadAudit(last);
+    if (last && state.index.some((x) => x.id === last)) {
+      await loadAudit(last);
+      // Auditoria feita por versão anterior: refaz automaticamente com as regras atuais
+      if (state.audit && state.audit.versaoMotor !== AJ.VERSION) {
+        try {
+          const ok = await reprocessar(state.audit.id, `Atualizada automaticamente para as regras da versão ${AJ.VERSION}`);
+          if (ok) setTimeout(() => ui.toast(`Auditoria refeita automaticamente com as regras da nova versão (${AJ.VERSION}).`, 6000), 300);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
     renderHeader();
     updateNavCount();
 
@@ -364,7 +397,7 @@
   }
 
   Object.assign(AJ, {
-    app: { TRAT_ABERTOS, TRAT_FECHADOS, go, refresh, filteredGrupos, filteredOcorrencias, filteredMotoristas, motMap, tratOf, saveTrat, loadAudit, saveAudit, deleteAudit, executeAudit, renderHeader, askUser, updateNavCount, TITLES },
+    app: { reprocessar, TRAT_ABERTOS, TRAT_FECHADOS, go, refresh, filteredGrupos, filteredOcorrencias, filteredMotoristas, motMap, tratOf, saveTrat, loadAudit, saveAudit, deleteAudit, executeAudit, renderHeader, askUser, updateNavCount, TITLES },
   });
 
   document.addEventListener('DOMContentLoaded', init);

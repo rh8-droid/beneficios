@@ -113,7 +113,8 @@
         const mt = st.pending.mt.filter((x) => x.res).map((x) => x.res);
         const rj = st.pending.rj.filter((x) => x.res).map((x) => x.res);
         const t0 = performance.now();
-        const a = await AJ.app.executeAudit(mt, rj);
+        const arquivosOrig = [...st.pending.mt.filter((x) => x.res).map((x) => ({ sistema: 'maxtrack', name: x.name, buf: x.buf, mapping: x.mapping, hash: x.hash })), ...st.pending.rj.filter((x) => x.res).map((x) => ({ sistema: 'rasterjor', name: x.name, buf: x.buf, mapping: x.mapping, hash: x.hash }))];
+        const a = await AJ.app.executeAudit(mt, rj, { files: arquivosOrig });
         ui.toast(`Auditoria concluída em ${((performance.now() - t0) / 1000).toFixed(1)}s: ${a.kpis.jornadas} jornadas, ${a.ocorrencias.length} ocorrências.`);
         AJ.app.go('painel');
       } catch (e) {
