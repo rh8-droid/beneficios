@@ -367,20 +367,17 @@
         }
       }
 
-      // --- Dias consecutivos sem DSR
-      const refsMT = refs.filter((r) => r.src === 'MaxTrack').map((r) => r.j);
+      // --- Dias consecutivos sem DSR (contados pelo espelho do RasterJor)
       let run = null;
       const runs = [];
-      const days = [...new Set(refs.map((r) => r.j.date))].sort();
+      const days = [...new Set(mot.jornadasRJ.filter((j) => j.inicio !== null).map((j) => j.dataLinha || j.date))].sort();
       for (const d of days) {
-        const jm = refsMT.find((x) => x.date === d);
-        const cons = jm && jm.consecutivas ? jm.consecutivas : null;
         if (run && U.keyToMin(d) - U.keyToMin(run.fim) === 1440) {
           run.fim = d;
-          run.n = Math.max(run.n + 1, cons || 0);
+          run.n++;
         } else {
           if (run) runs.push(run);
-          run = { ini: d, fim: d, n: cons || 1 };
+          run = { ini: d, fim: d, n: 1 };
         }
       }
       if (run) runs.push(run);
@@ -390,7 +387,8 @@
             date: r.fim,
             chave: r.ini,
             minutos: null,
-            descricao: `${r.n} dias consecutivos de trabalho sem descanso semanal (limite ${cfg.maxDiasConsecutivos}); sequência no relatório: ${U.fmtDate(r.ini)} a ${U.fmtDate(r.fim)}` + (r.n > days.length ? ' (inclui dias anteriores ao período, conforme contador do MaxTrack).' : '.'),
+            sistema: 'RasterJor',
+            descricao: `${r.n} dias consecutivos com jornada no RasterJor sem descanso semanal (limite ${cfg.maxDiasConsecutivos}): ${U.fmtDate(r.ini)} a ${U.fmtDate(r.fim)}. Dias anteriores ao início do relatório não são considerados.`,
           });
         }
       }

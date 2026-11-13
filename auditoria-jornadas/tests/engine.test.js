@@ -33,7 +33,7 @@ function rjRow(o) {
   const first = `${o.d}/26\n${wd}${o.tag ? '\n' + o.tag : ''}`;
   if (o.allTag) return [first, ...Array(22).fill(o.allTag)];
   if (!o.ini) return [first, DASH, '', '', ...Array(18).fill(DASH), o.diaria || ''];
-  return [first, o.placa || 'ABC1D23', o.ini, o.fim || '', o.hn || DASH, DASH, o.he50 || DASH, DASH, o.he100 || DASH, DASH, DASH, DASH, o.ref || DASH, DASH, DASH, DASH, DASH, DASH, DASH, DASH, o.falta || DASH, o.ativ || DASH, 'Inteira'];
+  return [first, o.placa || 'ABC1D23', o.ini, o.fim || '', o.hn || DASH, DASH, o.he50 || DASH, DASH, o.he100 || DASH, DASH, DASH, DASH, o.ref || DASH, DASH, DASH, DASH, DASH, DASH, DASH, DASH, o.falta || DASH, o.ativ || DASH, o.semDiaria ? '' : 'Inteira'];
 }
 function rjBook(drivers) {
   const wb = XLSX.utils.book_new();
@@ -67,7 +67,7 @@ const rj = rjBook([
       { d: '01/11', tag: 'DSR', allTag: 'DSR' },
       { d: '02/11', tag: 'Feriado', ini: '02/11 06:00', fim: '02/11 15:00', he100: '08:00', ref: '01:00', ativ: '08:00' },
       { d: '03/11', ini: '03/11 06:00', fim: '03/11 17:00', hn: '08:00', he50: '02:00', ref: '01:00', ativ: '10:00' },
-      { d: '04/11', ini: '04/11 02:00', fim: '04/11 10:00', hn: '08:00', ativ: '08:00', falta: '02:00' },
+      { d: '04/11', ini: '04/11 02:00', fim: '04/11 10:00', hn: '08:00', ativ: '08:00', falta: '02:00', semDiaria: true },
       { d: '05/11' },
       { d: '06/11', diaria: 'Inteira' },
     ],
@@ -219,10 +219,22 @@ test('diária gerada em dia sem jornada é indevida (Crítica)', () => {
   assert.strictEqual(o[0].date, '2026-11-06');
   assert.strictEqual(o[0].gravidade, 'Crítica');
 });
-test('dia com jornada sem diária é apontado', () => {
+test('dia com jornada no RasterJor sem diária é apontado', () => {
   const o = ocs('ALFA', 'DIARIA_NAO_GERADA');
   assert.strictEqual(o.length, 1);
-  assert.strictEqual(o[0].date, '2026-11-05');
+  assert.strictEqual(o[0].date, '2026-11-04');
+});
+test('jornada só no MaxTrack não gera "diária não gerada" (conferência pelo RasterJor)', () => {
+  assert.ok(!audit.diarias.linhas.some((l) => l.nome.includes('ALFA') && l.date === '2026-11-05'));
+});
+test('dias consecutivos contados pelo RasterJor', () => {
+  const rows = [];
+  for (let d = 2; d <= 10; d++) rows.push({ d: String(d).padStart(2, '0') + '/11', ini: `${String(d).padStart(2, '0')}/11 06:00`, fim: `${String(d).padStart(2, '0')}/11 14:00`, hn: '08:00', ativ: '08:00' });
+  const r2 = AJ.parsers.parseFile(toBuf(rjBook([{ nome: 'MOTORISTA ALFA', cpf: '111.111.111-11', reg: '7', rows }])), 'rj2.xlsx');
+  const a4 = AJ.audit.runAudit({ mt: [mtRes], rj: [r2], cfg: {} });
+  const o = a4.ocorrencias.filter((x) => x.nome.includes('ALFA') && x.tipo === 'DIAS_CONSECUTIVOS');
+  assert.strictEqual(o.length, 1);
+  assert.ok(/^9 dias consecutivos/.test(o[0].descricao));
 });
 test('diária em dia com jornada fica correta', () => {
   const l = audit.diarias.linhas.find((x) => x.nome.includes('ALFA') && x.date === '2026-11-03');

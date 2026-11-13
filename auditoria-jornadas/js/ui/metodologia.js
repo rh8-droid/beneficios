@@ -51,12 +51,12 @@
 </table>
 
 <h3>Conciliação de diárias</h3>
-<p>A coluna <b>Diária</b> do RasterJor é comparada com os dias em que o motorista teve jornada no MaxTrack:</p>
+<p>A conferência é feita <b>pelo espelho do RasterJor</b> (sistema que gera a diária): a coluna <b>Diária</b> é comparada com as jornadas do próprio RasterJor.</p>
 <ul>
-<li><b>Correta</b>: diária em dia com jornada iniciada (ou em dia em que o RasterJor dividiu uma jornada confirmada pelo MaxTrack).</li>
-<li><b>Indevida</b>: diária em dia sem jornada iniciada ou em andamento em nenhum dos sistemas. Verificar se o motorista estava em viagem (pernoite fora da base).</li>
+<li><b>Correta</b>: diária em dia com jornada no RasterJor.</li>
+<li><b>Indevida – dia de folga</b>: diária em dia sem jornada no RasterJor (DSR, feriado, folga). Se o MaxTrack tiver jornada nesse dia, o sistema avisa que ela não foi integrada.</li>
 <li><b>Para conferência</b>: diária em dia sem início de jornada, mas com jornada do dia anterior atravessando a meia-noite.</li>
-<li><b>Não gerada</b>: jornada iniciada no MaxTrack sem diária no RasterJor (inclusive quando a jornada nem foi integrada).</li>
+<li><b>Não gerada</b>: jornada no RasterJor sem diária.</li>
 </ul>
 <p>O relatório não informa a regra de concessão de diária inteira × meia diária; a ferramenta mostra o tipo para análise.</p>
 
@@ -68,7 +68,7 @@
 <tr><td>Jornada &gt; 6h sem refeição registrada</td><td>Sem macro de refeição</td><td>Ausência de registro (não presume supressão)</td><td>CLT art. 71</td></tr>
 <tr><td>Direção contínua</td><td>Maior trecho contínuo &gt; 5h30</td><td>Infração (CTB)</td><td>CTB art. 67-C</td></tr>
 <tr><td>Excesso de jornada</td><td>Trabalho &gt; 8h + HE máximas (padrão 4h, CCT)</td><td>Infração trabalhista</td><td>CLT art. 235-C</td></tr>
-<tr><td>Dias consecutivos</td><td>&gt; 6 dias seguidos com jornada (usa o contador do MaxTrack)</td><td>Infração trabalhista</td><td>CLT art. 67; Lei 605/49</td></tr>
+<tr><td>Dias consecutivos</td><td>&gt; 6 dias seguidos com jornada no <b>RasterJor</b> (dentro do período do relatório)</td><td>Infração trabalhista</td><td>CLT art. 67; Lei 605/49</td></tr>
 <tr><td>Pausa interna longa</td><td>Pausa ≥ 4h dentro da mesma jornada (possível repouso não encerrado)</td><td>Inconformidade operacional</td><td>Controle de jornada</td></tr>
 <tr><td>Limite semanal / direção diária / tempo até refeição</td><td>Parâmetros internos (ex.: valores configurados no MaxTrack)</td><td>Inconformidade operacional</td><td>Regra interna</td></tr>
 <tr><td>Jornada sem encerramento</td><td>Início sem fim</td><td>Ausência de registro</td><td>CLT art. 74 §2º</td></tr>

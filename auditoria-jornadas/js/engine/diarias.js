@@ -18,11 +18,11 @@
   const U = AJ.util;
 
   const RESULT = {
-    OK: 'Correta (dia com jornada)',
+    OK: 'Correta (dia com jornada no RasterJor)',
     SO_RJ: 'Jornada só no RasterJor',
     CONTINUACAO: 'Sem início de jornada no dia (continuação/viagem)',
     SEM_JORNADA: 'Indevida – dia de folga (sem jornada)',
-    NAO_GERADA: 'Não gerada – dia com jornada',
+    NAO_GERADA: 'Não gerada – dia com jornada no RasterJor',
   };
 
   function touches(j, dayMin) {
@@ -64,18 +64,17 @@
         const rjIni = mot.jornadasRJ.filter((j) => (j.dataLinha || j.date) === k && j.inicio !== null);
         const mtTouch = mot.jornadasMT.filter((j) => touches(j, t));
         const rjTouch = mot.jornadasRJ.filter((j) => touches(j, t));
+        // Conferência pelo espelho do RasterJor (sistema que gera a diária)
         let res = null;
         if (d) {
-          if (mtIni.length) res = 'OK';
-          else if (rjIni.length && mtTouch.length) res = 'OK'; // RasterJor dividiu a jornada; MaxTrack confirma trabalho no dia
-          else if (rjIni.length) res = 'SO_RJ';
-          else if (mtTouch.length || rjTouch.length) res = 'CONTINUACAO';
-          else res = 'SEM_JORNADA';
-        } else if (mtIni.length && cfg.diariaEmTodoDiaTrabalhado !== false) {
+          if (rjIni.length) res = 'OK';
+          else if (rjTouch.length) res = 'CONTINUACAO'; // jornada do dia anterior atravessa a meia-noite
+          else res = 'SEM_JORNADA'; // diária em dia sem jornada no RasterJor (folga)
+        } else if (rjIni.length && cfg.diariaEmTodoDiaTrabalhado !== false) {
           res = 'NAO_GERADA';
         }
         if (!res) continue;
-        const jRef = mtIni[0] || rjIni[0] || mtTouch[0] || rjTouch[0] || null;
+        const jRef = rjIni[0] || rjTouch[0] || mtIni[0] || null;
         const linha = {
           motorista: mot.key,
           nome: mot.nome,
@@ -90,6 +89,7 @@
           jornadaMT: mtIni.length ? `${U.fmtDateTime(mtIni[0].inicio)} → ${U.fmtDateTime(mtIni[0].fim)}` : mtTouch.length ? `(continua) ${U.fmtDateTime(mtTouch[0].inicio)} → ${U.fmtDateTime(mtTouch[0].fim)}` : '',
           jornadaRJ: rjIni.length ? `${U.fmtDateTime(rjIni[0].inicio)} → ${U.fmtDateTime(rjIni[0].fim)}` : rjTouch.length ? `(continua) ${U.fmtDateTime(rjTouch[0].inicio)} → ${U.fmtDateTime(rjTouch[0].fim)}` : '',
           trabalhoMT: mtIni.reduce((a, j) => a + U.nz(j.trabalho), 0) || null,
+          trabalhoRJ: rjIni.reduce((a, j) => a + U.nz(j.trabalho), 0) || null,
           grupo: jRef ? jRef.grupo : null,
           motoristaNoRJ: temRJ,
           linhaNoRJ: temRegistroRJ.has(k),
@@ -101,10 +101,10 @@
         if (res === 'SEM_JORNADA') {
           newOc('DIARIA_SEM_JORNADA', mot, {
             date: k, chave: 'd' + k, sistema: 'RasterJor', minutos: null,
-            descricao: `Diária "${d}" gerada em dia de folga: ${U.fmtDate(k, true)}${rot}, sem jornada iniciada ou em andamento no MaxTrack nem no RasterJor. Verificar se o motorista estava em viagem (pernoite fora da base); caso contrário, diária indevida.`,
+            descricao: `Diária "${d}" gerada em dia de folga: ${U.fmtDate(k, true)}${rot}, sem jornada no espelho do RasterJor.` + (mtIni.length ? ` Atenção: o MaxTrack registra jornada nesse dia (${linha.jornadaMT}) que não foi integrada ao RasterJor.` : ' Verificar se o motorista estava em viagem (pernoite fora da base); caso contrário, diária indevida.'),
           });
         } else if (res === 'CONTINUACAO') {
-          const j = mtTouch[0] || rjTouch[0];
+          const j = rjTouch[0];
           newOc('DIARIA_CONTINUACAO', mot, {
             date: k, chave: 'd' + k, grupo: j.grupo, sistema: 'RasterJor',
             descricao: `Diária "${d}" em ${U.fmtDate(k, true)}${rot}: nenhuma jornada iniciada no dia, mas a jornada ${U.fmtDateTime(j.inicio)} → ${U.fmtDateTime(j.fim)} atravessa este dia. Conferir a regra de diária para viagens que passam da meia-noite.`,
@@ -114,12 +114,10 @@
             date: k, chave: 'd' + k, grupo: rjIni[0].grupo, sistema: 'RasterJor',
             descricao: `Diária "${d}" em ${U.fmtDate(k, true)} vinculada a jornada que existe apenas no RasterJor (${linha.jornadaRJ}). Confirmar a jornada antes de pagar a diária.`,
           });
-        } else if (res === 'NAO_GERADA' && temRJ) {
-          const g = gruposById[mtIni[0].grupo];
-          const motivo = g && g.tipo === 'AUSENTE_RJ' ? ' A jornada também não foi integrada ao RasterJor.' : linha.linhaNoRJ ? '' : ' Não há linha deste dia no espelho do RasterJor.';
+        } else if (res === 'NAO_GERADA') {
           newOc('DIARIA_NAO_GERADA', mot, {
-            date: k, chave: 'd' + k, grupo: mtIni[0].grupo, sistema: 'Integração', minutos: null,
-            descricao: `Jornada ${linha.jornadaMT} (${U.fmtDur(linha.trabalhoMT)} trabalhadas) registrada no MaxTrack em ${U.fmtDate(k, true)}${rot} sem diária gerada no RasterJor.${motivo}`,
+            date: k, chave: 'd' + k, grupo: rjIni[0].grupo, sistema: 'RasterJor', minutos: null,
+            descricao: `Jornada ${linha.jornadaRJ} no espelho do RasterJor em ${U.fmtDate(k, true)}${rot} sem diária gerada.`,
           });
         }
       }

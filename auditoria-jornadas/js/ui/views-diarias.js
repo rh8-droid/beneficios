@@ -59,7 +59,7 @@
       const soma = (res) => all.filter((l) => l.resultado === res).reduce((acc, l) => acc + AJ.diarias.valor(l, cfg), 0);
       const tile = (res, label, v, sub, cls) => `<div class="kpi ${cls} clickable ${resFiltro === res ? 'sel' : ''}" data-res="${res}" style="${resFiltro === res ? 'outline:2px solid var(--brand-2)' : ''}"><div class="k-label">${label}</div><div class="k-value">${ui.num(v)}</div><div class="k-sub">${sub}</div></div>`;
       body.innerHTML = `
-        <div class="alert info">Compara a coluna <b>Diária</b> do RasterJor com os dias em que o motorista teve jornada no MaxTrack. <b>Indevida</b>: diária em dia sem jornada em nenhum sistema. <b>Não gerada</b>: dia com jornada sem diária. Diárias em dias de viagem que passam da meia-noite ficam para conferência. O RasterJor não informa a regra de inteira × meia; confira o tipo na tabela.</div>
+        <div class="alert info">Conferência feita <b>pelo espelho do RasterJor</b>: a coluna <b>Diária</b> é comparada com as jornadas do próprio RasterJor. <b>Indevida</b>: diária em dia sem jornada em nenhum sistema. <b>Não gerada</b>: dia com jornada sem diária. Diárias em dias de viagem que passam da meia-noite ficam para conferência. O RasterJor não informa a regra de inteira × meia; confira o tipo na tabela.</div>
         <div class="kpis">
           ${tile('', 'Diárias geradas (RasterJor)', r.geradas, `${ui.num(r.inteiras)} inteiras · ${ui.num(r.meias)} meias`, 'info')}
           ${tile('OK', 'Corretas', r.ok, 'diária em dia com jornada', 'ok')}
@@ -95,7 +95,7 @@
           { key: 'diaria', label: 'Diária (RasterJor)', render: (l) => (l.diaria ? `<b>${esc(l.diaria)}</b>` : '<span class="muted">não gerada</span>') },
           { key: 'jornadaMT', label: 'Jornada MaxTrack', render: (l) => esc(l.jornadaMT || '—'), cls: 'mono' },
           { key: 'jornadaRJ', label: 'Jornada RasterJor', render: (l) => esc(l.jornadaRJ || '—'), cls: 'mono' },
-          { key: 'trabalhoMT', label: 'Trab. MT', num: true, render: (l) => U.fmtDur(l.trabalhoMT) },
+          { key: 'trabalhoRJ', label: 'Trab. RasterJor', num: true, render: (l) => U.fmtDur(l.trabalhoRJ) },
           { key: 'obs', label: 'Observação', cls: 'wrap', render: (l) => `<span class="small">${!l.motoristaNoRJ ? 'Motorista não encontrado no RasterJor' : l.resultado === 'NAO_GERADA' && !l.linhaNoRJ ? 'Dia ausente no espelho do RasterJor' : ''}</span>` },
         ],
         onRowClick: (l) => (l.grupo ? V.grupoDetail(l.grupo) : V.motoristaDetail(l.motorista)),
