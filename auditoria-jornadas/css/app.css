@@ -392,3 +392,10 @@ details summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var
 .sec-title { font-size: 14px; margin: 4px 0 -6px; color: var(--text); }
 
 table.data tr.row-alert td { background: var(--bad-soft); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-btn { border: 1px solid var(--border-strong); background: var(--surface); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; }
+.chip-btn:hover { background: var(--surface-2); }
+.chip-btn.on { background: var(--brand-2); border-color: var(--brand-2); color: #fff; font-weight: 600; }
+
+.nav .count:empty { display: none; }

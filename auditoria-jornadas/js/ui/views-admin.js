@@ -147,27 +147,74 @@
   V.tratadas = function (c) {
     V.ocorrencias(c, { tratadas: true });
   };
+  V.ajustes = function (c) {
+    V.ocorrencias(c, { natureza: 'ajuste' });
+  };
+  V.inconformidades = function (c) {
+    V.ocorrencias(c, { natureza: 'jornada' });
+  };
+
+  // Atalhos (chips) da página de inconformidades
+  const CHIPS_JORNADA = [
+    ['', 'Todas'],
+    ['INTERJORNADA', 'Interjornada inferior a 11h'],
+    ['REFEICAO', 'Refeição menor que 1 hora'],
+    ['EXCESSO_JORNADA', 'Jornada acima do limite'],
+    ['DIRECAO_CONTINUA', 'Direção contínua > 5h30'],
+    ['DIAS_CONSECUTIVOS', 'Dias seguidos sem DSR'],
+  ];
+  const chipMatch = (chip, o) => !chip || (chip === 'REFEICAO' ? o.tipo === 'INTRAJORNADA' || o.tipo === 'SEM_REFEICAO' : o.tipo === chip);
+  let chipAtual = '';
+  let naturezaTratadas = '';
+  V.setChip = (c) => (chipAtual = c);
+
+  const hoje = () => new Date().toLocaleDateString('sv-SE'); // AAAA-MM-DD local
 
   V.ocorrencias = function (c, opts) {
     if (needAudit(c)) return;
-    const tratadas = !!(opts && opts.tratadas);
+    opts = opts || {};
+    const tratadas = !!opts.tratadas;
+    const nat = opts.natureza || '';
+    if (nat !== 'jornada') chipAtual = '';
     const permitidos = tratadas ? AJ.app.TRAT_FECHADOS : AJ.app.TRAT_ABERTOS;
     if (S().filters.trat && !permitidos.includes(S().filters.trat)) S().filters.trat = '';
+    if (S().filters.categoria && nat && AJ.config.natureza({ catKey: S().filters.categoria }) !== nat) S().filters.categoria = '';
     V.filterBar(c, ['periodo', 'q', 'matricula', 'empresa', 'categoria', 'tipo', 'gravidade', 'trat', tratadas ? 'tratFechadas' : 'tratAbertas'], () => draw(true));
     const card = document.createElement('div');
     card.className = 'card';
-    card.innerHTML = `<div class="card-head"><div>${tratadas
-      ? `<h3>Ocorrências tratadas</h3><p>Ocorrências com status <b>Corrigido</b>, <b>Justificado</b> ou <b>Encerrado</b>. Para reabrir, mude o status para "Em análise" (ela volta para a Gestão de ocorrências).</p>`
-      : `<h3>Ocorrências em aberto</h3><p>Ao marcar uma ocorrência como <b>Corrigido</b>, <b>Justificado</b> ou <b>Encerrado</b>, ela sai desta lista e vai para <a href="#" id="goTrat">Ocorrências tratadas</a>.</p><p>Distinção: <b>infração trabalhista</b> (regra legal) · <b>inconformidade operacional</b> (parâmetro interno) · <b>falha de integração</b> (MaxTrack → RasterJor) · <b>divergência de apuração</b> · <b>registro</b> · <b>cadastro</b>.</p>`}</div></div>
+    const fechar = `Ao marcar como <b>Corrigido</b>, <b>Justificado</b> ou <b>Encerrado</b>, o item sai desta lista e vai para <a href="#" id="goTrat">Ocorrências tratadas</a>.`;
+    const head = tratadas
+      ? `<h3>Ocorrências tratadas</h3><p>Itens com status <b>Corrigido</b>, <b>Justificado</b> ou <b>Encerrado</b>. Para reabrir, mude o status para "Em análise".</p>
+         <div style="margin-top:8px"><label class="field" style="display:inline-flex">Natureza<select id="natSel"><option value="">Todas</option><option value="ajuste" ${naturezaTratadas === 'ajuste' ? 'selected' : ''}>Divergência entre sistemas (ajuste)</option><option value="jornada" ${naturezaTratadas === 'jornada' ? 'selected' : ''}>Inconformidade na jornada</option></select></label></div>`
+      : nat === 'ajuste'
+      ? `<h3>Divergências entre sistemas — precisam de ajuste</h3><p>Diferenças entre <b>MaxTrack</b> e <b>RasterJor</b>: jornada que não chegou ao RasterJor, horas/HE diferentes, diária indevida ou não gerada, cadastro divergente. <b>Ação: corrigir o sistema/lançamento.</b> ${fechar}</p>`
+      : nat === 'jornada'
+      ? `<h3>Inconformidades na jornada do motorista</h3><p>Regras de jornada descumpridas (o registro pode estar igual nos dois sistemas): interjornada inferior a 11h, refeição menor que 1 hora, excesso de jornada, direção contínua, falta de DSR. <b>Ação: orientar o motorista/gestor e avaliar pagamento devido.</b> ${fechar}</p>
+         <div class="chips" style="margin-top:10px">${CHIPS_JORNADA.map(([k, l]) => `<button class="chip-btn ${chipAtual === k ? 'on' : ''}" data-chip="${k}">${l}</button>`).join('')}</div>`
+      : `<h3>Todas as ocorrências em aberto</h3><p>${fechar}</p>`;
+    card.innerHTML = `<div class="card-head"><div>${head}</div></div>
       <div class="filters" style="box-shadow:none;margin-bottom:12px">
         <span class="small"><b id="selCount">0</b> selecionada(s)</span>
         <button class="btn" id="selAll">Selecionar todas do filtro</button><button class="btn ghost" id="selNone">Limpar seleção</button>
         <label class="field">Novo status<select id="bulkStatus"><option value="">—</option>${ui.TRAT_STATUS.map((s) => `<option>${s}</option>`).join('')}</select></label>
-        <label class="field">Responsável<input type="text" id="bulkResp" placeholder="Nome"></label>
+        <label class="field">Responsável<input type="text" id="bulkResp" value="${esc(S().user || '')}" placeholder="Nome"></label>
+        <label class="field">Data<input type="date" id="bulkData" value="${hoje()}"></label>
         <label class="field grow">Observação<input type="text" id="bulkObs" placeholder="Justificativa / providência"></label>
         <button class="btn primary" id="bulkApply">Aplicar às selecionadas</button>
       </div><div id="tbl"></div>`;
     c.appendChild(card);
+    card.querySelectorAll('[data-chip]').forEach((b) =>
+      b.addEventListener('click', () => {
+        chipAtual = b.dataset.chip;
+        card.querySelectorAll('[data-chip]').forEach((x) => x.classList.toggle('on', x === b));
+        draw(true);
+      })
+    );
+    if (card.querySelector('#natSel'))
+      card.querySelector('#natSel').onchange = (e) => {
+        naturezaTratadas = e.target.value;
+        draw(true);
+      };
     if (card.querySelector('#goTrat'))
       card.querySelector('#goTrat').onclick = (e) => {
         e.preventDefault();
@@ -192,17 +239,24 @@
       const ob = card.querySelector('#bulkObs').value.trim();
       if (st) ch.status = st;
       if (rp) ch.responsavel = rp;
+      const dt = card.querySelector('#bulkData').value;
+      if (dt) ch.dataResolucao = dt;
       if (!st && !rp && !ob) return ui.toast('Informe status, responsável ou observação.');
       for (const id of sel) await AJ.app.saveTrat(id, ch, ob || null);
       const mov = st && (AJ.app.TRAT_FECHADOS.includes(st) !== tratadas);
-      ui.toast(`${sel.size} ocorrência(s) atualizada(s)` + (mov ? (tratadas ? ' e devolvida(s) para a Gestão de ocorrências.' : ' e movida(s) para Ocorrências tratadas.') : '.'), 5000);
+      ui.toast(`${sel.size} ocorrência(s) atualizada(s)` + (mov ? (tratadas ? ' e devolvida(s) para as pendências.' : ' e movida(s) para Ocorrências tratadas.') : '.'), 5000);
       sel.clear();
       draw();
     };
     draw();
     function draw(reset) {
-      current = AJ.app.filteredOcorrencias().filter((o) => AJ.app.TRAT_FECHADOS.includes(AJ.app.tratOf(o.id).status) === tratadas);
-      S().lastRows = { view: tratadas ? 'tratadas' : 'ocorrencias', rows: current };
+      const natF = tratadas ? naturezaTratadas : nat;
+      current = AJ.app
+        .filteredOcorrencias()
+        .filter((o) => AJ.app.TRAT_FECHADOS.includes(AJ.app.tratOf(o.id).status) === tratadas)
+        .filter((o) => !natF || AJ.config.natureza(o) === natF)
+        .filter((o) => nat !== 'jornada' || chipMatch(chipAtual, o));
+      S().lastRows = { view: S().view, rows: current };
       updSel();
       ui.table(card.querySelector('#tbl'), {
         id: 'ocs',
@@ -212,6 +266,7 @@
           { key: 'sel', label: '✓', sort: (o) => (sel.has(o.id) ? 0 : 1), render: (o) => `<input type="checkbox" data-sel="${o.id}" ${sel.has(o.id) ? 'checked' : ''} aria-label="Selecionar">` },
           { key: 'gravidade', label: 'Criticidade', sort: (o) => -AJ.config.GRAV_ORDEM[o.gravidade], render: (o) => `<span class="sev ${o.gravidade}">${o.gravidade}</span>` },
           { key: 'nomeTipo', label: 'Ocorrência', render: (o) => `<b>${esc(o.nomeTipo)}</b><div class="small muted">${esc(o.categoria)}</div>` },
+          ...(nat ? [] : [{ key: 'nat', label: 'Natureza', sort: (o) => AJ.config.natureza(o), render: (o) => (AJ.config.natureza(o) === 'ajuste' ? '<span class="badge brand">Ajuste entre sistemas</span>' : '<span class="badge warn"><span class="dot"></span>Jornada</span>') }]),
           { key: 'nome', label: 'Motorista', render: (o) => `${esc(o.nome)}<div class="small muted">${esc(o.matricula || '')}</div>` },
           { key: 'date', label: 'Data', render: (o) => (o.date ? U.fmtDate(o.date) : '—'), cls: 'nowrap' },
           { key: 'sistema', label: 'Origem' },
@@ -220,7 +275,7 @@
           { key: 'resp', label: 'Responsável', sort: (o) => AJ.app.tratOf(o.id).responsavel, render: (o) => esc(AJ.app.tratOf(o.id).responsavel || '—') },
           ...(tratadas
             ? [
-                { key: 'dres', label: 'Resolvida em', sort: (o) => AJ.app.tratOf(o.id).dataResolucao, render: (o) => (AJ.app.tratOf(o.id).dataResolucao ? U.fmtDate(AJ.app.tratOf(o.id).dataResolucao) : '—'), cls: 'nowrap' },
+                { key: 'dres', label: 'Data da tratativa', sort: (o) => AJ.app.tratOf(o.id).dataResolucao, render: (o) => (AJ.app.tratOf(o.id).dataResolucao ? U.fmtDate(AJ.app.tratOf(o.id).dataResolucao) : '—'), cls: 'nowrap' },
                 { key: 'obs', label: 'Justificativa', sort: (o) => AJ.app.tratOf(o.id).observacoes, cls: 'wrap', render: (o) => `<div class="desc small">${esc(AJ.app.tratOf(o.id).observacoes || '—')}</div>` },
               ]
             : []),
@@ -245,7 +300,7 @@
     if (!o) return;
     const t = AJ.app.tratOf(id);
     const fechadaAntes = AJ.app.TRAT_FECHADOS.includes(t.status);
-    const LBL = { status: 'Status', responsavel: 'Responsável', observacoes: 'Observações', dataResolucao: 'Data da resolução', nota: 'Anotação' };
+    const LBL = { status: 'Status', responsavel: 'Responsável', observacoes: 'Observações', dataResolucao: 'Data da tratativa', nota: 'Anotação' };
     const html = `
       <div class="drawer-head"><div><div class="muted small">${esc(o.categoria)} · criticidade <span class="sev ${o.gravidade}">${o.gravidade}</span> · ID ${esc(o.id)}</div><h2>${esc(o.nomeTipo)}</h2><div class="small" style="margin-top:4px">${esc(o.nome)} · matrícula ${esc(o.matricula || '—')} · ${o.date ? U.fmtDate(o.date, true) : 'período'} · origem: ${esc(o.sistema)}</div></div><button class="btn" data-close>Fechar ✕</button></div>
       <div class="drawer-body">
@@ -253,8 +308,8 @@
         <div class="card"><div class="card-head"><h3>Tratativa</h3>${ui.tratBadge(t.status)}</div>
           <div class="grid c2">
             <label class="field">Status<select id="tStatus">${ui.TRAT_STATUS.map((s) => `<option ${t.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
-            <label class="field">Responsável pela análise<input type="text" id="tResp" value="${esc(t.responsavel)}"></label>
-            <label class="field">Data da resolução<input type="date" id="tData" value="${esc(t.dataResolucao)}"></label>
+            <label class="field">Responsável pela análise<input type="text" id="tResp" value="${esc(t.responsavel || S().user || '')}"></label>
+            <label class="field">Data da tratativa<input type="date" id="tData" value="${esc(t.dataResolucao || new Date().toLocaleDateString('sv-SE'))}"></label>
           </div>
           <label class="field" style="margin-top:10px">Observações / justificativa<textarea id="tObs">${esc(t.observacoes)}</textarea></label>
           <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn primary" id="tSave">Salvar tratativa</button></div>
@@ -274,10 +329,10 @@
           observacoes: dr.querySelector('#tObs').value.trim(),
         });
         const fechada = AJ.app.TRAT_FECHADOS.includes(dr.querySelector('#tStatus').value);
-        ui.toast(fechada !== fechadaAntes ? (fechada ? 'Tratativa salva. A ocorrência foi movida para "Ocorrências tratadas".' : 'Tratativa salva. A ocorrência voltou para a "Gestão de ocorrências".') : 'Tratativa salva.', 5000);
+        ui.toast(fechada !== fechadaAntes ? (fechada ? 'Tratativa salva. A ocorrência foi movida para "Ocorrências tratadas".' : 'Tratativa salva. A ocorrência voltou para as pendências.') : 'Tratativa salva.', 5000);
         close();
         if (onSave) onSave();
-        else if (S().view === 'ocorrencias' || S().view === 'tratadas') AJ.app.refresh();
+        else if (['ocorrencias', 'tratadas', 'ajustes', 'inconformidades'].includes(S().view)) AJ.app.refresh();
       };
     });
   };

@@ -110,8 +110,8 @@
     CPF_DIVERGENTE: { cat: 'CADASTRO', grav: 'Média', nome: 'CPF divergente entre sistemas' },
     MATRICULA_DIVERGENTE: { cat: 'CADASTRO', grav: 'Baixa', nome: 'Matrícula MaxTrack ≠ Nº Registro RasterJor' },
     // Infrações
-    INTERJORNADA: { cat: 'INFRACAO', grav: 'Alta', nome: 'Descanso entre jornadas inferior a 11h' },
-    INTRAJORNADA: { cat: 'INFRACAO', grav: 'Alta', nome: 'Intervalo intrajornada inferior ao mínimo' },
+    INTERJORNADA: { cat: 'INFRACAO', grav: 'Alta', nome: 'Interjornada inferior a 11h' },
+    INTRAJORNADA: { cat: 'INFRACAO', grav: 'Alta', nome: 'Refeição/intervalo menor que o mínimo (1h)' },
     DIRECAO_CONTINUA: { cat: 'INFRACAO', grav: 'Alta', nome: 'Direção contínua acima de 5h30' },
     EXCESSO_JORNADA: { cat: 'INFRACAO', grav: 'Alta', nome: 'Jornada acima do limite diário' },
     DIAS_CONSECUTIVOS: { cat: 'INFRACAO', grav: 'Alta', nome: 'Dias consecutivos sem DSR' },
@@ -147,6 +147,17 @@
     return o.gravidade;
   }
 
-  AJ.config = { DEFAULTS, clone, merge, CATEGORIAS, TIPOS, GRAV_ORDEM, CRITICIDADES, criticidade };
+  // Natureza da ocorrência:
+  //  'ajuste'  → divergência entre MaxTrack e RasterJor (precisa de ajuste/correção em sistema)
+  //  'jornada' → inconformidade na jornada do motorista (interjornada, refeição, excesso...)
+  const NATUREZA_AJUSTE = new Set(['INTEGRACAO', 'DIVERGENCIA', 'DIARIA', 'CADASTRO']);
+  function natureza(o) {
+    if (NATUREZA_AJUSTE.has(o.catKey)) return 'ajuste';
+    if (o.tipo === 'JORNADA_ABERTA' && o.sistema === 'RasterJor') return 'ajuste';
+    return 'jornada';
+  }
+  const NATUREZA_LABEL = { ajuste: 'Divergência entre sistemas (ajuste)', jornada: 'Inconformidade na jornada' };
+
+  AJ.config = { natureza, NATUREZA_LABEL, DEFAULTS, clone, merge, CATEGORIAS, TIPOS, GRAV_ORDEM, CRITICIDADES, criticidade };
   if (typeof module !== 'undefined' && module.exports) module.exports = AJ;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

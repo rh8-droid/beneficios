@@ -280,6 +280,8 @@
       const ms = AJ.app.filteredMotoristas().filter((m) => m.qtdJornadas > 0);
       const folha = AJ.payroll.compute({ motoristas: a.motoristas, grupos: gs }, os, a.cfg);
       const k = AJ.audit.computeKpis(gs, os, ms, folha);
+      const osAj = os.filter((o) => AJ.config.natureza(o) === 'ajuste');
+      const osJo = os.filter((o) => AJ.config.natureza(o) === 'jornada');
       const integ = k.pares + k.ausentesRJ ? k.pares / (k.pares + k.ausentesRJ) : null;
       const tile = (label, value, sub, cls, nav) => `<div class="kpi ${cls || ''} ${nav ? 'clickable' : ''}" ${nav ? `data-nav='${JSON.stringify(nav)}'` : ''}><div class="k-label">${label}</div><div class="k-value">${value}</div>${sub ? `<div class="k-sub">${sub}</div>` : ''}</div>`;
       const ignMT = '';
@@ -301,12 +303,18 @@
           ${tile('HE 100% divergentes', D(k.he100Divergentes), `${D(folha.totais.he100NaoComputada)} não computadas no RasterJor`, 'warn', { view: 'folha' })}
           ${tile('Integração MaxTrack → RasterJor', ui.pct(integ), `${ui.num(k.pares)} de ${ui.num(k.pares + k.ausentesRJ)} jornadas do MaxTrack chegaram ao RasterJor`, integ > 0.98 ? 'ok' : integ > 0.9 ? 'warn' : 'bad')}
         </div>
-        <h3 class="sec-title">2. Ocorrências <span class="muted small">— itens para o RH analisar (uma jornada pode ter várias)</span></h3>
+        <h3 class="sec-title">2. Divergências entre sistemas <span class="muted small">— MaxTrack × RasterJor diferentes: <b>precisam de ajuste</b></span></h3>
         <div class="kpis">
-          ${tile('Ocorrências no total', ui.num(os.length), 'todas as categorias', 'info', { view: 'ocorrencias' })}
-          ${tile('Falhas de integração', ui.num(k.falhasIntegracao), 'jornada/motorista/situação não integrados', 'bad', { view: 'ocorrencias', categoria: 'INTEGRACAO' })}
-          ${tile('Inconformidades de jornada', ui.num(k.inconformidades), `${ui.num(k.infracoes)} infrações · ${ui.num(k.operacionais)} operacionais · ${ui.num(k.registros)} de registro`, 'bad', { view: 'ocorrencias' })}
-          ${tile('Diárias divergentes', ui.num(os.filter((o) => o.catKey === 'DIARIA').length), `${ui.num(os.filter((o) => o.tipo === 'DIARIA_SEM_JORNADA').length)} sem jornada · ${ui.num(os.filter((o) => o.tipo === 'DIARIA_NAO_GERADA').length)} não geradas`, 'bad', { view: 'diarias' })}
+          ${tile('Divergências para ajustar', ui.num(osAj.length), `${ui.num(osAj.filter((o) => o.catKey === 'INTEGRACAO').length)} integração · ${ui.num(osAj.filter((o) => o.catKey === 'DIVERGENCIA').length)} horas/HE · ${ui.num(osAj.filter((o) => o.catKey === 'DIARIA').length)} diárias · ${ui.num(osAj.filter((o) => o.catKey === 'CADASTRO').length)} cadastro`, 'bad', { view: 'ajustes' })}
+          ${tile('Jornadas que não chegaram ao RasterJor', ui.num(k.ausentesRJ), 'registradas só no MaxTrack', 'bad', { view: 'ajustes', tipo: 'JORNADA_AUSENTE_RJ' })}
+          ${tile('Diárias divergentes', ui.num(os.filter((o) => o.catKey === 'DIARIA').length), `${ui.num(os.filter((o) => o.tipo === 'DIARIA_SEM_JORNADA').length)} em dia de folga · ${ui.num(os.filter((o) => o.tipo === 'DIARIA_NAO_GERADA').length)} não geradas`, 'bad', { view: 'diarias' })}
+        </div>
+        <h3 class="sec-title">3. Inconformidades na jornada <span class="muted small">— regras de jornada descumpridas pelo motorista (independe de os sistemas baterem)</span></h3>
+        <div class="kpis">
+          ${tile('Inconformidades na jornada', ui.num(osJo.length), `${ui.num(k.infracoes)} infrações legais · ${ui.num(osJo.length - k.infracoes)} operacionais/registro`, 'warn', { view: 'inconformidades', chip: '' })}
+          ${tile('Interjornada inferior a 11h', ui.num(os.filter((o) => o.tipo === 'INTERJORNADA').length), 'descanso entre jornadas', 'warn', { view: 'inconformidades', chip: 'INTERJORNADA' })}
+          ${tile('Refeição menor que 1 hora', ui.num(os.filter((o) => o.tipo === 'INTRAJORNADA' || o.tipo === 'SEM_REFEICAO').length), `${ui.num(os.filter((o) => o.tipo === 'SEM_REFEICAO').length)} sem registro de refeição`, 'warn', { view: 'inconformidades', chip: 'REFEICAO' })}
+          ${tile('Jornada acima do limite', ui.num(os.filter((o) => o.tipo === 'EXCESSO_JORNADA').length), `acima de ${D(a.cfg.jornadaBaseLegal + a.cfg.heMaxDiaria)} de trabalho`, 'warn', { view: 'inconformidades', chip: 'EXCESSO_JORNADA' })}
         </div>
         <div class="card"><div class="card-head"><div><h3>Ocorrências por criticidade</h3><p>Crítica = impacto direto no pagamento (jornada/diária não integrada, diferença ≥ ${a.cfg.limiteCritico} min). Diferenças de até ${a.cfg.toleranciaDiaria} min não exigem ajuste. Clique para filtrar.</p></div></div>
           <div class="crit-tiles">${AJ.config.CRITICIDADES.map((c) => `<div class="crit-tile" data-crit="${c}"><span class="sev ${c}">${c}</span><b>${ui.num(os.filter((o) => o.gravidade === c).length)}</b><span class="small">ocorrências</span></div>`).join('')}
@@ -332,6 +340,8 @@
           if (n.categoria !== undefined) S().filters.categoria = n.categoria;
           if (n.status !== undefined) S().filters.status = n.status;
           if (n.gravidade !== undefined) S().filters.gravidade = n.gravidade;
+          if (n.tipo !== undefined) S().filters.tipo = n.tipo;
+          if (n.chip !== undefined) V.setChip(n.chip);
           AJ.app.go(n.view);
         })
       );
@@ -418,7 +428,7 @@
     filterBar(c, ['periodo', 'q', 'matricula', 'empresa', 'gravidade', 'semAjuste', 'status', 'tipo'], () => draw(true));
     const card = document.createElement('div');
     card.className = 'card';
-    card.innerHTML = `<div class="card-head"><div><h3>Comparativo MaxTrack × RasterJor por jornada</h3><p>Diferença = MaxTrack − RasterJor. Positivo (vermelho): registrado e não apurado. Negativo (azul): apurado a maior no RasterJor. Clique na linha para o detalhe.</p></div></div><div id="tbl"></div>`;
+    card.innerHTML = `<div class="card-head"><div><h3>Comparativo MaxTrack × RasterJor por jornada</h3><p><b>Sistemas</b>: se as horas do MaxTrack e do RasterJor batem (precisa ajuste?). <b>Jornada do motorista</b>: regras descumpridas (interjornada, refeição...). Diferença = MaxTrack − RasterJor. Positivo (vermelho): registrado e não apurado. Negativo (azul): apurado a maior no RasterJor. Clique na linha para o detalhe.</p></div></div><div id="tbl"></div>`;
     c.appendChild(card);
     const avisoDiaria = document.createElement('div');
     card.parentNode.insertBefore(avisoDiaria, card);
@@ -440,6 +450,8 @@
         defaultSort: 'nome',
         columns: [
           { key: 'statusAuditoria', label: 'Status', render: (g) => ui.badge(g.statusAuditoria) },
+          { key: 'sist', label: 'Sistemas (MT × RJ)', sort: (g) => g.status, render: (g) => ({ conciliado: '<span class="badge ok"><span class="dot"></span>Iguais</span>', conferencia: '<span class="badge warn"><span class="dot"></span>Conferir</span>', divergente: '<span class="badge bad"><span class="dot"></span>Ajustar</span>', nao_validado: '<span class="badge nv"><span class="dot"></span>Não validado</span>' }[g.status]) },
+          { key: 'jorn', label: 'Jornada do motorista', sort: (g) => jornadaProblemas(g).length, cls: 'wrap', render: (g) => { const p = jornadaProblemas(g); return p.length ? p.map((x) => `<span class="badge warn" style="margin:1px 2px 1px 0"><span class="dot"></span>${esc(x)}</span>`).join('') : '<span class="badge ok"><span class="dot"></span>Conforme</span>'; } },
           { key: 'criticidade', label: 'Criticidade', sort: (g) => -(AJ.config.GRAV_ORDEM[g.criticidade] || 0), render: (g) => (g.criticidade === 'SEM_AJUSTE' ? '<span class="small muted">Sem ajuste</span>' : `<span class="sev ${g.criticidade}">${g.criticidade}</span>`) },
           { key: 'nome', label: 'Motorista', render: (g) => `<b>${esc(g.nome)}</b><div class="small muted">${esc(mm[g.motorista].matriculaMT || mm[g.motorista].matriculaRJ || '')}</div>` },
           { key: 'date', label: 'Data', render: (g) => U.fmtDate(g.date, true), cls: 'nowrap' },
@@ -459,6 +471,19 @@
       });
     }
   };
+
+  const CURTO = { INTERJORNADA: 'Interjornada < 11h', INTRAJORNADA: 'Refeição < 1h', SEM_REFEICAO: 'Sem refeição', EXCESSO_JORNADA: 'Jornada acima do limite', DIRECAO_CONTINUA: 'Direção > 5h30', DIAS_CONSECUTIVOS: 'Sem DSR', PAUSA_INTERNA_LONGA: 'Pausa longa', DIRECAO_DIARIA: 'Direção diária', LIMITE_SEMANAL: 'Limite semanal', SEM_DIRECAO: 'Sem direção', INTERJORNADA_FRACIONADA: 'Interjornada fracionada', JORNADA_ABERTA: 'Sem encerramento', TEMPO_ATE_REFEICAO: 'Refeição tardia', SEQUENCIA_INVALIDA: 'Sequência inválida' };
+  let _ocIdx = null;
+  let _ocFor = null;
+  function jornadaProblemas(g) {
+    const a = S().audit;
+    if (_ocFor !== a) {
+      _ocIdx = {};
+      for (const o of a.ocorrencias) _ocIdx[o.id] = o;
+      _ocFor = a;
+    }
+    return [...new Set((g.ocorrencias || []).map((id) => _ocIdx[id]).filter((o) => o && AJ.config.natureza(o) === 'jornada').map((o) => CURTO[o.tipo] || o.nomeTipo))];
+  }
 
   function diff(g, k) {
     if (!g.mt && !g.rj) return null;

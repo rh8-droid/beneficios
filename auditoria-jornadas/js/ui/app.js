@@ -10,7 +10,9 @@
     painel: 'Painel gerencial',
     conciliacao: 'Conciliação de jornadas',
     motoristas: 'Motoristas',
-    ocorrencias: 'Gestão de ocorrências',
+    ocorrencias: 'Todas as ocorrências em aberto',
+    ajustes: 'Divergências entre sistemas',
+    inconformidades: 'Inconformidades na jornada',
     tratadas: 'Ocorrências tratadas',
     folha: 'Impacto na folha',
     diarias: 'Conciliação de diárias',
@@ -170,11 +172,15 @@
   function updateNavCount() {
     const el = document.getElementById('navCount');
     const el2 = document.getElementById('navCountTrat');
-    if (!state.audit) return (el.textContent = el2.textContent = '');
-    const pend = state.audit.ocorrencias.filter((o) => TRAT_ABERTOS.includes(tratOf(o.id).status)).length;
+    if (!state.audit) return (el.textContent = el2.textContent = document.getElementById('navCountAj').textContent = '');
+    const abertas = state.audit.ocorrencias.filter((o) => TRAT_ABERTOS.includes(tratOf(o.id).status));
+    const pend = abertas.length;
     const trat = state.audit.ocorrencias.length - pend;
-    el.textContent = pend ? ui.num(pend) : '';
-    el.title = pend + ' ocorrência(s) em aberto';
+    const aj = abertas.filter((o) => AJ.config.natureza(o) === 'ajuste').length;
+    const elA = document.getElementById('navCountAj');
+    elA.textContent = aj ? ui.num(aj) : '';
+    el.textContent = pend - aj ? ui.num(pend - aj) : '';
+    el.title = pend - aj + ' inconformidade(s) em aberto';
     el2.textContent = trat ? ui.num(trat) : '';
     el2.title = trat + ' ocorrência(s) tratada(s)';
   }

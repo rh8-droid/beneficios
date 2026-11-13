@@ -15,7 +15,8 @@ Ferramenta do RH/DP para conferir, **antes do fechamento da folha**, se as jorna
 | Painel gerencial | Indicadores, status das jornadas, ocorrências por categoria e por motorista, com filtros por período, motorista, matrícula, empresa, tipo e status |
 | Conciliação de jornadas | Comparativo MaxTrack × RasterJor por jornada: início, fim, horas, HE 50%, HE 100% e motivo de cada diferença |
 | Motoristas | Relatório individual com cadastro, jornada dia a dia, validações e ocorrências, exportável em PDF/Excel |
-| Gestão de ocorrências | Ocorrências em aberto: tratativa (status, responsável, observações, data de resolução), atualização em lote e histórico de alterações |
+| Divergências entre sistemas | Diferenças MaxTrack × RasterJor que **precisam de ajuste** (integração, horas/HE, diárias, cadastro), com tratativa e atualização em lote |
+| Inconformidades na jornada | Regras de jornada descumpridas (interjornada < 11h, refeição < 1h, excesso, direção contínua, DSR), com atalhos por tipo |
 | Ocorrências tratadas | Ocorrências marcadas como Corrigido, Justificado ou Encerrado saem da gestão e vão para esta página; podem ser reabertas |
 | Conciliação de diárias | Diária do RasterJor × dias com jornada: diárias indevidas (dia sem jornada), não geradas (dia com jornada) e casos de viagem para conferência |
 | Impacto na folha | HE não computadas, HE computadas a maior, horas normais não apuradas, indenizações potenciais e simulação em R$. **Não altera a folha** |

@@ -79,6 +79,7 @@
       return {
         ID: o.id,
         Criticidade: o.gravidade,
+        Natureza: AJ.config.NATUREZA_LABEL[AJ.config.natureza(o)],
         Categoria: o.categoria,
         Ocorrência: o.nomeTipo,
         Motorista: o.nome,
@@ -93,7 +94,7 @@
         'Status da tratativa': t.status,
         Responsável: t.responsavel,
         Observações: t.observacoes,
-        'Data da resolução': t.dataResolucao ? U.fmtDate(t.dataResolucao) : '',
+        'Data da tratativa': t.dataResolucao ? U.fmtDate(t.dataResolucao) : '',
         'Última alteração': t.atualizadoEm ? new Date(t.atualizadoEm).toLocaleString('pt-BR') : '',
         Histórico: (t.historico || []).map((h) => `${new Date(h.em).toLocaleString('pt-BR')} ${h.por}: ${h.campo} ${h.de ? h.de + ' -> ' : ''}${h.para}`).join(' | '),
       };
@@ -246,7 +247,9 @@
     XLSX.utils.book_append_sheet(wb, sheet(rowsConciliacao(gs), { Motivos: 80, Motorista: 32, Empresa: 30 }), 'Conciliação');
     const fech = (o) => AJ.app.TRAT_FECHADOS.includes(AJ.app.tratOf(o.id).status);
     const wOc = { Descrição: 90, Motorista: 32, 'Base legal / referência': 50, Histórico: 60, Ocorrência: 40, Observações: 50 };
-    XLSX.utils.book_append_sheet(wb, sheet(rowsOcorrencias(os.filter((o) => !fech(o))), wOc), 'Ocorrências em aberto');
+    const nat = (o) => AJ.config.natureza(o);
+    XLSX.utils.book_append_sheet(wb, sheet(rowsOcorrencias(os.filter((o) => !fech(o) && nat(o) === 'ajuste')), wOc), 'Divergências sistemas');
+    XLSX.utils.book_append_sheet(wb, sheet(rowsOcorrencias(os.filter((o) => !fech(o) && nat(o) === 'jornada')), wOc), 'Inconformidades jornada');
     XLSX.utils.book_append_sheet(wb, sheet(rowsOcorrencias(os.filter(fech)), wOc), 'Ocorrências tratadas');
     XLSX.utils.book_append_sheet(wb, sheet(rowsFolha(F), { Motorista: 32, Empresa: 30 }), 'Impacto folha');
     XLSX.utils.book_append_sheet(wb, sheet(rowsFolhaLinhas(F), { 'Causa provável': 90, Motorista: 32 }), 'Impacto folha - jornadas');
@@ -348,10 +351,11 @@
       doc.text(pdfTxt('Valores apenas indicativos. Nenhum ajuste foi realizado na folha; validar com RH/DP antes de qualquer lançamento.'), 36, y);
     } else {
       const fech = (o) => AJ.app.TRAT_FECHADOS.includes(AJ.app.tratOf(o.id).status);
-      title(view === 'ocorrencias' ? 'Ocorrências em aberto' : view === 'tratadas' ? 'Ocorrências tratadas' : 'Ocorrências críticas e de criticidade alta');
-      const rows = view === 'ocorrencias' ? os.filter((o) => !fech(o)) : view === 'tratadas' ? os.filter(fech) : os.filter((o) => o.gravidade === 'Crítica' || o.gravidade === 'Alta');
+      const TT = { ocorrencias: 'Ocorrências em aberto', tratadas: 'Ocorrências tratadas', ajustes: 'Divergências entre sistemas – precisam de ajuste', inconformidades: 'Inconformidades na jornada' };
+      title(TT[view] || 'Ocorrências críticas e de criticidade alta');
+      const rows = (view === 'ajustes' || view === 'inconformidades') && S().lastRows && S().lastRows.view === view ? S().lastRows.rows : view === 'ocorrencias' ? os.filter((o) => !fech(o)) : view === 'tratadas' ? os.filter(fech) : os.filter((o) => o.gravidade === 'Crítica' || o.gravidade === 'Alta');
       if (view === 'tratadas') {
-        doc.autoTable(tblOpts(y, ['Criticidade', 'Ocorrência', 'Motorista', 'Data', 'Descrição', 'Status', 'Responsável', 'Resolvida em', 'Justificativa'], rows.map((o) => { const t = AJ.app.tratOf(o.id); return [o.gravidade, o.nomeTipo, o.nome, o.date ? U.fmtDate(o.date) : '', o.descricao, t.status, t.responsavel, t.dataResolucao ? U.fmtDate(t.dataResolucao) : '', t.observacoes]; }), { columnStyles: { 4: { cellWidth: 220 }, 8: { cellWidth: 140 } } }));
+        doc.autoTable(tblOpts(y, ['Criticidade', 'Ocorrência', 'Motorista', 'Data', 'Descrição', 'Status', 'Responsável', 'Data da tratativa', 'Justificativa'], rows.map((o) => { const t = AJ.app.tratOf(o.id); return [o.gravidade, o.nomeTipo, o.nome, o.date ? U.fmtDate(o.date) : '', o.descricao, t.status, t.responsavel, t.dataResolucao ? U.fmtDate(t.dataResolucao) : '', t.observacoes]; }), { columnStyles: { 4: { cellWidth: 220 }, 8: { cellWidth: 140 } } }));
         footer(doc);
         return doc.save(`auditoria-jornadas-tratadas-${stamp()}.pdf`);
       }
