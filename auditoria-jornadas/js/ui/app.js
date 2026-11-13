@@ -333,7 +333,7 @@
     state.user = (await AJ.store.get('settings', 'user')) || '';
     state.index = (await AJ.store.get('settings', 'auditIndex')) || [];
     const theme = await AJ.store.get('settings', 'theme');
-    applyTheme(theme);
+    applyTheme(theme || 'dark'); // padrão: tema escuro (alterável pelo botão Tema)
     for (const { key, value } of await AJ.store.all('tratativas')) state.trat[key] = value;
     const last = await AJ.store.get('settings', 'ultimaAuditoria');
     if (last && state.index.some((x) => x.id === last)) await loadAudit(last);
@@ -351,7 +351,7 @@
     document.getElementById('btnPdf').onclick = () => AJ.exporter.pdf(state.view);
     document.getElementById('btnTheme').onclick = async () => {
       const cur = document.documentElement.getAttribute('data-theme');
-      const dark = cur ? cur === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const dark = cur === 'dark';
       const next = dark ? 'light' : 'dark';
       applyTheme(next);
       await AJ.store.put('settings', 'theme', next);
