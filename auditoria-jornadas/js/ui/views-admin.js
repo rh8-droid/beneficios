@@ -142,12 +142,21 @@
   // =====================================================================
   // OCORRÊNCIAS (gestão / tratativa)
   // =====================================================================
-  V.ocorrencias = function (c) {
+  V.tratadas = function (c) {
+    V.ocorrencias(c, { tratadas: true });
+  };
+
+  V.ocorrencias = function (c, opts) {
     if (needAudit(c)) return;
-    V.filterBar(c, ['periodo', 'q', 'matricula', 'empresa', 'categoria', 'tipo', 'gravidade', 'trat'], () => draw(true));
+    const tratadas = !!(opts && opts.tratadas);
+    const permitidos = tratadas ? AJ.app.TRAT_FECHADOS : AJ.app.TRAT_ABERTOS;
+    if (S().filters.trat && !permitidos.includes(S().filters.trat)) S().filters.trat = '';
+    V.filterBar(c, ['periodo', 'q', 'matricula', 'empresa', 'categoria', 'tipo', 'gravidade', 'trat', tratadas ? 'tratFechadas' : 'tratAbertas'], () => draw(true));
     const card = document.createElement('div');
     card.className = 'card';
-    card.innerHTML = `<div class="card-head"><div><h3>Ocorrências</h3><p>Distinção: <b>infração trabalhista</b> (regra legal) · <b>inconformidade operacional</b> (parâmetro interno) · <b>falha de integração</b> (MaxTrack → RasterJor) · <b>divergência de apuração</b> · <b>registro</b> · <b>cadastro</b>.</p></div></div>
+    card.innerHTML = `<div class="card-head"><div>${tratadas
+      ? `<h3>Ocorrências tratadas</h3><p>Ocorrências com status <b>Corrigido</b>, <b>Justificado</b> ou <b>Encerrado</b>. Para reabrir, mude o status para "Em análise" (ela volta para a Gestão de ocorrências).</p>`
+      : `<h3>Ocorrências em aberto</h3><p>Ao marcar uma ocorrência como <b>Corrigido</b>, <b>Justificado</b> ou <b>Encerrado</b>, ela sai desta lista e vai para <a href="#" id="goTrat">Ocorrências tratadas</a>.</p><p>Distinção: <b>infração trabalhista</b> (regra legal) · <b>inconformidade operacional</b> (parâmetro interno) · <b>falha de integração</b> (MaxTrack → RasterJor) · <b>divergência de apuração</b> · <b>registro</b> · <b>cadastro</b>.</p>`}</div></div>
       <div class="filters" style="box-shadow:none;margin-bottom:12px">
         <span class="small"><b id="selCount">0</b> selecionada(s)</span>
         <button class="btn" id="selAll">Selecionar todas do filtro</button><button class="btn ghost" id="selNone">Limpar seleção</button>
@@ -157,6 +166,11 @@
         <button class="btn primary" id="bulkApply">Aplicar às selecionadas</button>
       </div><div id="tbl"></div>`;
     c.appendChild(card);
+    if (card.querySelector('#goTrat'))
+      card.querySelector('#goTrat').onclick = (e) => {
+        e.preventDefault();
+        AJ.app.go('tratadas');
+      };
     const sel = new Set();
     let current = [];
     const updSel = () => (card.querySelector('#selCount').textContent = sel.size);
@@ -178,14 +192,15 @@
       if (rp) ch.responsavel = rp;
       if (!st && !rp && !ob) return ui.toast('Informe status, responsável ou observação.');
       for (const id of sel) await AJ.app.saveTrat(id, ch, ob || null);
-      ui.toast(`${sel.size} ocorrência(s) atualizada(s).`);
+      const mov = st && (AJ.app.TRAT_FECHADOS.includes(st) !== tratadas);
+      ui.toast(`${sel.size} ocorrência(s) atualizada(s)` + (mov ? (tratadas ? ' e devolvida(s) para a Gestão de ocorrências.' : ' e movida(s) para Ocorrências tratadas.') : '.'), 5000);
       sel.clear();
       draw();
     };
     draw();
     function draw(reset) {
-      current = AJ.app.filteredOcorrencias();
-      S().lastRows = { view: 'ocorrencias', rows: current };
+      current = AJ.app.filteredOcorrencias().filter((o) => AJ.app.TRAT_FECHADOS.includes(AJ.app.tratOf(o.id).status) === tratadas);
+      S().lastRows = { view: tratadas ? 'tratadas' : 'ocorrencias', rows: current };
       updSel();
       ui.table(card.querySelector('#tbl'), {
         id: 'ocs',
@@ -201,6 +216,12 @@
           { key: 'descricao', label: 'Descrição', cls: 'wrap', render: (o) => `<div class="desc small">${esc(o.descricao)}</div>` },
           { key: 'trat', label: 'Tratativa', sort: (o) => AJ.app.tratOf(o.id).status, render: (o) => ui.tratBadge(AJ.app.tratOf(o.id).status) },
           { key: 'resp', label: 'Responsável', sort: (o) => AJ.app.tratOf(o.id).responsavel, render: (o) => esc(AJ.app.tratOf(o.id).responsavel || '—') },
+          ...(tratadas
+            ? [
+                { key: 'dres', label: 'Resolvida em', sort: (o) => AJ.app.tratOf(o.id).dataResolucao, render: (o) => (AJ.app.tratOf(o.id).dataResolucao ? U.fmtDate(AJ.app.tratOf(o.id).dataResolucao) : '—'), cls: 'nowrap' },
+                { key: 'obs', label: 'Justificativa', sort: (o) => AJ.app.tratOf(o.id).observacoes, cls: 'wrap', render: (o) => `<div class="desc small">${esc(AJ.app.tratOf(o.id).observacoes || '—')}</div>` },
+              ]
+            : []),
         ],
         onRowClick: (o) => V.ocorrenciaDetail(o.id, () => draw()),
         after: (el) => {
@@ -221,6 +242,7 @@
     const o = a.ocorrencias.find((x) => x.id === id);
     if (!o) return;
     const t = AJ.app.tratOf(id);
+    const fechadaAntes = AJ.app.TRAT_FECHADOS.includes(t.status);
     const LBL = { status: 'Status', responsavel: 'Responsável', observacoes: 'Observações', dataResolucao: 'Data da resolução', nota: 'Anotação' };
     const html = `
       <div class="drawer-head"><div><div class="muted small">${esc(o.categoria)} · criticidade <span class="sev ${o.gravidade}">${o.gravidade}</span> · ID ${esc(o.id)}</div><h2>${esc(o.nomeTipo)}</h2><div class="small" style="margin-top:4px">${esc(o.nome)} · matrícula ${esc(o.matricula || '—')} · ${o.date ? U.fmtDate(o.date, true) : 'período'} · origem: ${esc(o.sistema)}</div></div><button class="btn" data-close>Fechar ✕</button></div>
@@ -249,10 +271,11 @@
           dataResolucao: dr.querySelector('#tData').value,
           observacoes: dr.querySelector('#tObs').value.trim(),
         });
-        ui.toast('Tratativa salva.');
+        const fechada = AJ.app.TRAT_FECHADOS.includes(dr.querySelector('#tStatus').value);
+        ui.toast(fechada !== fechadaAntes ? (fechada ? 'Tratativa salva. A ocorrência foi movida para "Ocorrências tratadas".' : 'Tratativa salva. A ocorrência voltou para a "Gestão de ocorrências".') : 'Tratativa salva.', 5000);
         close();
         if (onSave) onSave();
-        else if (S().view === 'ocorrencias') AJ.app.refresh();
+        else if (S().view === 'ocorrencias' || S().view === 'tratadas') AJ.app.refresh();
       };
     });
   };

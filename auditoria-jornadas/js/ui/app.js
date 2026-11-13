@@ -11,6 +11,7 @@
     conciliacao: 'Conciliação de jornadas',
     motoristas: 'Motoristas',
     ocorrencias: 'Gestão de ocorrências',
+    tratadas: 'Ocorrências tratadas',
     folha: 'Impacto na folha',
     diarias: 'Conciliação de diárias',
     historico: 'Histórico de auditorias',
@@ -163,12 +164,19 @@
     return cur;
   }
 
+  const TRAT_ABERTOS = ['Pendente de análise', 'Em análise', 'Aguardando correção'];
+  const TRAT_FECHADOS = ['Corrigido', 'Justificado', 'Encerrado'];
+
   function updateNavCount() {
     const el = document.getElementById('navCount');
-    if (!state.audit) return (el.textContent = '');
-    const pend = state.audit.ocorrencias.filter((o) => ['Pendente de análise', 'Em análise', 'Aguardando correção'].includes(tratOf(o.id).status)).length;
+    const el2 = document.getElementById('navCountTrat');
+    if (!state.audit) return (el.textContent = el2.textContent = '');
+    const pend = state.audit.ocorrencias.filter((o) => TRAT_ABERTOS.includes(tratOf(o.id).status)).length;
+    const trat = state.audit.ocorrencias.length - pend;
     el.textContent = pend ? ui.num(pend) : '';
     el.title = pend + ' ocorrência(s) em aberto';
+    el2.textContent = trat ? ui.num(trat) : '';
+    el2.title = trat + ' ocorrência(s) tratada(s)';
   }
 
   // ---------------- auditorias ----------------
@@ -350,7 +358,7 @@
   }
 
   Object.assign(AJ, {
-    app: { go, refresh, filteredGrupos, filteredOcorrencias, filteredMotoristas, motMap, tratOf, saveTrat, loadAudit, saveAudit, deleteAudit, executeAudit, renderHeader, askUser, updateNavCount, TITLES },
+    app: { TRAT_ABERTOS, TRAT_FECHADOS, go, refresh, filteredGrupos, filteredOcorrencias, filteredMotoristas, motMap, tratOf, saveTrat, loadAudit, saveAudit, deleteAudit, executeAudit, renderHeader, askUser, updateNavCount, TITLES },
   });
 
   document.addEventListener('DOMContentLoaded', init);

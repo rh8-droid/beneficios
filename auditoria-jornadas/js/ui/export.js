@@ -244,7 +244,10 @@
     r['!cols'] = [{ wch: 44 }, { wch: 90 }];
     XLSX.utils.book_append_sheet(wb, r, 'Resumo');
     XLSX.utils.book_append_sheet(wb, sheet(rowsConciliacao(gs), { Motivos: 80, Motorista: 32, Empresa: 30 }), 'Conciliação');
-    XLSX.utils.book_append_sheet(wb, sheet(rowsOcorrencias(os), { Descrição: 90, Motorista: 32, 'Base legal / referência': 50, Histórico: 60, Ocorrência: 40 }), 'Ocorrências');
+    const fech = (o) => AJ.app.TRAT_FECHADOS.includes(AJ.app.tratOf(o.id).status);
+    const wOc = { Descrição: 90, Motorista: 32, 'Base legal / referência': 50, Histórico: 60, Ocorrência: 40, Observações: 50 };
+    XLSX.utils.book_append_sheet(wb, sheet(rowsOcorrencias(os.filter((o) => !fech(o))), wOc), 'Ocorrências em aberto');
+    XLSX.utils.book_append_sheet(wb, sheet(rowsOcorrencias(os.filter(fech)), wOc), 'Ocorrências tratadas');
     XLSX.utils.book_append_sheet(wb, sheet(rowsFolha(F), { Motorista: 32, Empresa: 30 }), 'Impacto folha');
     XLSX.utils.book_append_sheet(wb, sheet(rowsFolhaLinhas(F), { 'Causa provável': 90, Motorista: 32 }), 'Impacto folha - jornadas');
     XLSX.utils.book_append_sheet(wb, sheet(rowsDiarias(), { Motorista: 32, Resultado: 40, 'Jornada MaxTrack': 30, 'Jornada RasterJor': 30 }), 'Diárias');
@@ -344,8 +347,14 @@
       doc.setFontSize(8);
       doc.text(pdfTxt('Valores apenas indicativos. Nenhum ajuste foi realizado na folha; validar com RH/DP antes de qualquer lançamento.'), 36, y);
     } else {
-      title(view === 'ocorrencias' ? 'Ocorrências' : 'Ocorrências de gravidade alta');
-      const rows = view === 'ocorrencias' ? os : os.filter((o) => o.gravidade === 'Alta');
+      const fech = (o) => AJ.app.TRAT_FECHADOS.includes(AJ.app.tratOf(o.id).status);
+      title(view === 'ocorrencias' ? 'Ocorrências em aberto' : view === 'tratadas' ? 'Ocorrências tratadas' : 'Ocorrências críticas e de criticidade alta');
+      const rows = view === 'ocorrencias' ? os.filter((o) => !fech(o)) : view === 'tratadas' ? os.filter(fech) : os.filter((o) => o.gravidade === 'Crítica' || o.gravidade === 'Alta');
+      if (view === 'tratadas') {
+        doc.autoTable(tblOpts(y, ['Criticidade', 'Ocorrência', 'Motorista', 'Data', 'Descrição', 'Status', 'Responsável', 'Resolvida em', 'Justificativa'], rows.map((o) => { const t = AJ.app.tratOf(o.id); return [o.gravidade, o.nomeTipo, o.nome, o.date ? U.fmtDate(o.date) : '', o.descricao, t.status, t.responsavel, t.dataResolucao ? U.fmtDate(t.dataResolucao) : '', t.observacoes]; }), { columnStyles: { 4: { cellWidth: 220 }, 8: { cellWidth: 140 } } }));
+        footer(doc);
+        return doc.save(`auditoria-jornadas-tratadas-${stamp()}.pdf`);
+      }
       doc.autoTable(tblOpts(y, ['Criticidade', 'Categoria', 'Ocorrência', 'Motorista', 'Data', 'Origem', 'Descrição', 'Tratativa'], rows.map((o) => [o.gravidade, o.categoria, o.nomeTipo, o.nome, o.date ? U.fmtDate(o.date) : '', o.sistema, o.descricao, AJ.app.tratOf(o.id).status]), { columnStyles: { 6: { cellWidth: 300 } } }));
     }
     footer(doc);

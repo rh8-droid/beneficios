@@ -39,7 +39,8 @@
     if (has('tipo')) parts.push(`<label class="field">Tipo de inconformidade<select data-f="tipo" style="max-width:260px"><option value="">Todos</option>${tipos.map(([k, t]) => `<option value="${k}" ${f.tipo === k ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}</select></label>`);
     if (has('gravidade'))
       parts.push(`<label class="field">Criticidade<select data-f="gravidade"><option value="">Todas</option>${AJ.config.CRITICIDADES.map((g) => `<option ${f.gravidade === g ? 'selected' : ''}>${g}</option>`).join('')}${fields.includes('semAjuste') ? `<option value="SEM_AJUSTE" ${f.gravidade === 'SEM_AJUSTE' ? 'selected' : ''}>Sem ajuste (dif. ≤ ${S().audit.cfg.toleranciaDiaria} min)</option>` : ''}</select></label>`);
-    if (has('trat')) parts.push(`<label class="field">Tratativa<select data-f="trat"><option value="">Todas</option>${ui.TRAT_STATUS.map((g) => `<option ${f.trat === g ? 'selected' : ''}>${g}</option>`).join('')}</select></label>`);
+    const tratOpts = has('tratFechadas') ? AJ.app.TRAT_FECHADOS : has('tratAbertas') ? AJ.app.TRAT_ABERTOS : ui.TRAT_STATUS;
+    if (has('trat')) parts.push(`<label class="field">Tratativa<select data-f="trat"><option value="">Todas</option>${tratOpts.map((g) => `<option ${f.trat === g ? 'selected' : ''}>${g}</option>`).join('')}</select></label>`);
     parts.push(`<button class="btn ghost" data-clear>Limpar filtros</button>`);
     const el = document.createElement('div');
     el.className = 'filters';
