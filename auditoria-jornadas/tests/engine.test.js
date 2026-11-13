@@ -32,7 +32,7 @@ function rjRow(o) {
   const wd = W[new Date(Date.UTC(2026, +o.d.slice(3, 5) - 1, +o.d.slice(0, 2))).getUTCDay()];
   const first = `${o.d}/26\n${wd}${o.tag ? '\n' + o.tag : ''}`;
   if (o.allTag) return [first, ...Array(22).fill(o.allTag)];
-  if (!o.ini) return [first, DASH, '', '', ...Array(18).fill(DASH), ''];
+  if (!o.ini) return [first, DASH, '', '', ...Array(18).fill(DASH), o.diaria || ''];
   return [first, o.placa || 'ABC1D23', o.ini, o.fim || '', o.hn || DASH, DASH, o.he50 || DASH, DASH, o.he100 || DASH, DASH, DASH, DASH, o.ref || DASH, DASH, DASH, DASH, DASH, DASH, DASH, DASH, o.falta || DASH, o.ativ || DASH, 'Inteira'];
 }
 function rjBook(drivers) {
@@ -69,7 +69,7 @@ const rj = rjBook([
       { d: '03/11', ini: '03/11 06:00', fim: '03/11 17:00', hn: '08:00', he50: '02:00', ref: '01:00', ativ: '10:00' },
       { d: '04/11', ini: '04/11 02:00', fim: '04/11 10:00', hn: '08:00', ativ: '08:00', falta: '02:00' },
       { d: '05/11' },
-      { d: '06/11' },
+      { d: '06/11', diaria: 'Inteira' },
     ],
   },
   {
@@ -186,6 +186,38 @@ test('simulação financeira com valor hora', () => {
   const F = AJ.payroll.compute({ motoristas: audit.motoristas, grupos: audit.grupos }, audit.ocorrencias, AJ.config.merge(AJ.config.DEFAULTS, { valorHoraPadrao: 20 }));
   const p = F.resumo.find((x) => x.nome.includes('GAMA'));
   assert.ok(Math.abs(p.valorIndevido - (p.he50Indevida / 60) * 20 * 1.5) < 0.01);
+});
+
+console.log('Tolerância e criticidade');
+const cg = (dm, dr) => {
+  const j = (t, s) => ({ inicio: 1000, fim: 1600, trabalho: t, normal: 480, he50: t - 480, he100: null, placa: 'ABC1D23', date: '2026-11-03', ...s });
+  return AJ.reconcile.compareGroup({ mtJ: [j(600 + dm)], rjJ: [j(600 + dr)] }, AJ.config.DEFAULTS, new Set());
+};
+test('diferença de 2 min não exige ajuste (conciliado)', () => assert.strictEqual(cg(2, 0).status, 'conciliado'));
+test('diferença de -2 min não exige ajuste (conciliado)', () => assert.strictEqual(cg(0, 2).status, 'conciliado'));
+test('diferença de 3 min vai para conferência', () => assert.strictEqual(cg(3, 0).status, 'conferencia'));
+test('diferença de 16 min é divergente', () => assert.strictEqual(cg(16, 0).status, 'divergente'));
+test('jornada ausente no RasterJor tem criticidade Crítica', () => assert.strictEqual(ocs('ALFA', 'JORNADA_AUSENTE_RJ')[0].gravidade, 'Crítica'));
+test('jornada sem ocorrência fica "Sem ajuste"', () => {
+  const g = audit.grupos.find((x) => !x.ocorrencias.length);
+  assert.ok(!g || g.criticidade === 'SEM_AJUSTE');
+});
+
+console.log('Diárias');
+test('diária gerada em dia sem jornada é indevida (Crítica)', () => {
+  const o = ocs('ALFA', 'DIARIA_SEM_JORNADA');
+  assert.strictEqual(o.length, 1);
+  assert.strictEqual(o[0].date, '2026-11-06');
+  assert.strictEqual(o[0].gravidade, 'Crítica');
+});
+test('dia com jornada sem diária é apontado', () => {
+  const o = ocs('ALFA', 'DIARIA_NAO_GERADA');
+  assert.strictEqual(o.length, 1);
+  assert.strictEqual(o[0].date, '2026-11-05');
+});
+test('diária em dia com jornada fica correta', () => {
+  const l = audit.diarias.linhas.find((x) => x.nome.includes('ALFA') && x.date === '2026-11-03');
+  assert.strictEqual(l.resultado, 'OK');
 });
 
 console.log('Indicadores');

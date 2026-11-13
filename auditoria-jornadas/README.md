@@ -16,6 +16,7 @@ Ferramenta do RH/DP para conferir, **antes do fechamento da folha**, se as jorna
 | Conciliação de jornadas | Comparativo MaxTrack × RasterJor por jornada: início, fim, horas, HE 50%, HE 100% e motivo de cada diferença |
 | Motoristas | Relatório individual com cadastro, jornada dia a dia, validações e ocorrências, exportável em PDF/Excel |
 | Gestão de ocorrências | Tratativa (status, responsável, observações, data de resolução), atualização em lote e histórico de alterações |
+| Conciliação de diárias | Diária do RasterJor × dias com jornada: diárias indevidas (dia sem jornada), não geradas (dia com jornada) e casos de viagem para conferência |
 | Impacto na folha | HE não computadas, HE computadas a maior, horas normais não apuradas, indenizações potenciais e simulação em R$. **Não altera a folha** |
 | Histórico | Todas as auditorias (usuário, data, arquivos com hash SHA-256), reprocessamento e backup |
 | Parâmetros | Tolerâncias, limites legais e convencionais, feriados, cadastros ignorados e máscara de CPF |
@@ -25,10 +26,20 @@ Ferramenta do RH/DP para conferir, **antes do fechamento da folha**, se as jorna
 
 ## Status
 
-- 🟢 **Conciliado**: as diferenças estão dentro da tolerância (5 min por marcação e 10 min no dia, conforme a CLT, art. 58 §1º) e não há inconformidade.
+- 🟢 **Conciliado**: diferenças de até 2 minutos, para mais ou para menos (não exigem ajuste manual).
 - 🟡 **Necessita conferência**: a diferença é pequena, ou há divergência acessória (placa, refeição, feriado ou forma de agrupar a jornada).
 - 🔴 **Divergente / inconforme**: a diferença passa de 15 min, a jornada está ausente em um dos sistemas ou há infração.
 - ⚪ **Não validado**: os dados são insuficientes. A ausência de informação nunca é tratada como prova.
+
+## Criticidade
+
+Filtro disponível no painel, conciliação, motoristas, ocorrências, diárias e folha:
+
+- **Crítica**: impacto direto no pagamento (jornada/motorista não integrado, diária indevida ou não gerada, jornada em aberto no RasterJor, diferença ≥ 60 min).
+- **Alta**: infrações trabalhistas e diferenças acima de 15 min.
+- **Média**: inconformidades operacionais, horários divergentes, diárias para conferência.
+- **Baixa**: diferenças de 3 a 15 min, placa, cadastro.
+- **Sem ajuste**: jornadas com diferença de até 2 min e sem ocorrência.
 
 ## Segurança (LGPD)
 

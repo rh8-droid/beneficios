@@ -12,6 +12,7 @@
     motoristas: 'Motoristas',
     ocorrencias: 'Gestão de ocorrências',
     folha: 'Impacto na folha',
+    diarias: 'Conciliação de diárias',
     historico: 'Histórico de auditorias',
     parametros: 'Parâmetros e regras',
     metodologia: 'Metodologia',
@@ -42,7 +43,7 @@
     const f = state.filters;
     const motByKey = motMap();
     let tipoSet = null;
-    if (f.tipo || f.categoria || f.gravidade) {
+    if (f.tipo || f.categoria) {
       tipoSet = new Set(filteredOcorrencias({ ignoreTrat: true }).map((o) => o.grupo).filter(Boolean));
     }
     return a.grupos.filter((g) => {
@@ -53,6 +54,7 @@
       if (f.matricula && U.normMatricula(f.matricula) !== U.normMatricula(m.matriculaMT) && U.normMatricula(f.matricula) !== U.normMatricula(m.matriculaRJ)) return false;
       if (!textMatch(f.q, m.nome, m.cpf || m.cpfRJ)) return false;
       if (f.status && g.statusAuditoria !== f.status) return false;
+      if (f.gravidade && g.criticidade !== f.gravidade) return false;
       if (tipoSet && !tipoSet.has(g.id)) return false;
       return true;
     });
@@ -74,6 +76,7 @@
       if (!textMatch(f.q, o.nome, o.cpf)) return false;
       if (f.categoria && o.catKey !== f.categoria) return false;
       if (f.tipo && o.tipo !== f.tipo) return false;
+      if (f.gravidade === 'SEM_AJUSTE') return false;
       if (f.gravidade && o.gravidade !== f.gravidade) return false;
       if (!(opt && opt.ignoreTrat) && f.trat && tratOf(o.id).status !== f.trat) return false;
       if (f.status && o.grupo && gStatus[o.grupo] !== f.status) return false;
@@ -304,7 +307,15 @@
   async function init() {
     const ok = await AJ.store.init();
     const cfg = await AJ.store.get('settings', 'cfg');
-    if (cfg) state.cfg = AJ.config.merge(AJ.config.DEFAULTS, cfg);
+    if (cfg) {
+      // Migração: versões anteriores usavam tolerância de 5/10 min
+      if (!cfg.versaoCfg || cfg.versaoCfg < 2) {
+        cfg.toleranciaMarcacao = AJ.config.DEFAULTS.toleranciaMarcacao;
+        cfg.toleranciaDiaria = AJ.config.DEFAULTS.toleranciaDiaria;
+        cfg.versaoCfg = AJ.config.DEFAULTS.versaoCfg;
+      }
+      state.cfg = AJ.config.merge(AJ.config.DEFAULTS, cfg);
+    }
     state.user = (await AJ.store.get('settings', 'user')) || '';
     state.index = (await AJ.store.get('settings', 'auditIndex')) || [];
     const theme = await AJ.store.get('settings', 'theme');

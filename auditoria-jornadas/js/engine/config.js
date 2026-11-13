@@ -14,8 +14,10 @@
 
   const DEFAULTS = {
     // ---------- Conciliação ----------
-    toleranciaMarcacao: 5, // min por marcação (CLT art. 58 §1º)
-    toleranciaDiaria: 10, // min somados no dia (CLT art. 58 §1º)
+    versaoCfg: 2,
+    toleranciaMarcacao: 2, // min por marcação: diferenças de até 2 min não exigem ajuste manual
+    toleranciaDiaria: 2, // min de diferença de horas/HE no dia sem exigir ajuste
+    limiteCritico: 60, // min: divergências de horas/HE a partir disso são "Críticas"
     limiteConferencia: 15, // até aqui = "necessita conferência"; acima = divergente
 
     // ---------- Jornada ----------
@@ -39,6 +41,12 @@
     pausaInternaLonga: 240, // pausas internas ≥ 4h dentro de uma mesma jornada são sinalizadas
     tempoMaxAteRefeicao: 330, // 5h30 até a refeição (regra operacional configurada no MaxTrack)
     validarTempoAteRefeicao: false,
+
+    // ---------- Diárias ----------
+    conciliarDiarias: true,
+    diariaEmTodoDiaTrabalhado: true, // espera diária em todo dia com jornada iniciada
+    valorDiaria: 0, // R$ – diária inteira (0 = não simula)
+    valorMeiaDiaria: 0, // R$ – meia diária
 
     // ---------- Folha ----------
     valorHoraPadrao: 0, // R$ – 0 = não simula valores
@@ -76,6 +84,7 @@
     REGISTRO: 'Ausência / falha de registro',
     CADASTRO: 'Divergência cadastral',
     NAO_VALIDADO: 'Não foi possível validar',
+    DIARIA: 'Divergência de diárias',
   };
 
   const TIPOS = {
@@ -113,12 +122,27 @@
     JORNADA_ABERTA: { cat: 'REGISTRO', grav: 'Alta', nome: 'Jornada sem encerramento' },
     SEQUENCIA_INVALIDA: { cat: 'REGISTRO', grav: 'Média', nome: 'Sequência de eventos inconsistente' },
     SEM_DIRECAO: { cat: 'REGISTRO', grav: 'Baixa', nome: 'Jornada sem tempo de direção registrado' },
+    // Diárias
+    DIARIA_SEM_JORNADA: { cat: 'DIARIA', grav: 'Alta', nome: 'Diária gerada em dia sem jornada' },
+    DIARIA_CONTINUACAO: { cat: 'DIARIA', grav: 'Média', nome: 'Diária em dia sem início de jornada (continuação/viagem)' },
+    DIARIA_NAO_GERADA: { cat: 'DIARIA', grav: 'Alta', nome: 'Dia com jornada sem diária gerada' },
+    DIARIA_SO_RJ: { cat: 'DIARIA', grav: 'Média', nome: 'Diária em jornada sem registro no MaxTrack' },
     // Não validado
     NAO_VALIDADO: { cat: 'NAO_VALIDADO', grav: 'Baixa', nome: 'Regra não validada por falta de dados' },
   };
 
-  const GRAV_ORDEM = { Alta: 3, Média: 2, Baixa: 1 };
+  const GRAV_ORDEM = { Crítica: 4, Alta: 3, Média: 2, Baixa: 1 };
+  const CRITICIDADES = ['Crítica', 'Alta', 'Média', 'Baixa'];
 
-  AJ.config = { DEFAULTS, clone, merge, CATEGORIAS, TIPOS, GRAV_ORDEM };
+  // Ocorrências com impacto direto no pagamento são "Críticas"
+  const TIPOS_CRITICOS = new Set(['JORNADA_AUSENTE_RJ', 'MOTORISTA_AUSENTE_RJ', 'DIARIA_SEM_JORNADA', 'DIARIA_NAO_GERADA']);
+  function criticidade(o, cfg) {
+    if (TIPOS_CRITICOS.has(o.tipo)) return 'Crítica';
+    if (o.tipo === 'JORNADA_ABERTA' && o.sistema === 'RasterJor') return 'Crítica';
+    if (o.catKey === 'DIVERGENCIA' && o.minutos && o.minutos >= (cfg.limiteCritico || 60)) return 'Crítica';
+    return o.gravidade;
+  }
+
+  AJ.config = { DEFAULTS, clone, merge, CATEGORIAS, TIPOS, GRAV_ORDEM, CRITICIDADES, criticidade };
   if (typeof module !== 'undefined' && module.exports) module.exports = AJ;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

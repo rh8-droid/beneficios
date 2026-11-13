@@ -440,6 +440,7 @@
     const ctx = { out: [], porGrupo: {}, checks: {} };
     integrationRules(ctx, rec, cfg);
     legalRules(ctx, rec, cfg);
+    const diarias = AJ.diarias ? AJ.diarias.compute(rec, cfg, (tipo, mot, extra) => newOc(ctx, tipo, mot, extra)) : { linhas: [], resumo: {} };
     // IDs únicos
     const seen = {};
     for (const o of ctx.out) {
@@ -449,7 +450,9 @@
     // Ignorados (cadastros fora do escopo: ex. usuários de manutenção)
     const ign = new Set((cfg.ignorarCpfs || []).map(U.normCpf));
     const ocorrencias = ctx.out.filter((o) => !ign.has(o.cpf));
-    return { ocorrencias, porGrupo: ctx.porGrupo, checks: ctx.checks };
+    diarias.linhas = diarias.linhas.filter((l) => !ign.has(l.cpf));
+    diarias.resumo = AJ.diarias ? AJ.diarias.resumo(diarias.linhas) : {};
+    return { ocorrencias, porGrupo: ctx.porGrupo, checks: ctx.checks, diarias };
   }
 
   AJ.rules = { run, BASE_LEGAL };

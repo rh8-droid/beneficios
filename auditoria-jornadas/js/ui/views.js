@@ -37,7 +37,8 @@
     if (has('categoria'))
       parts.push(`<label class="field">Categoria<select data-f="categoria"><option value="">Todas</option>${Object.entries(AJ.config.CATEGORIAS).map(([k, v]) => `<option value="${k}" ${f.categoria === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>`);
     if (has('tipo')) parts.push(`<label class="field">Tipo de inconformidade<select data-f="tipo" style="max-width:260px"><option value="">Todos</option>${tipos.map(([k, t]) => `<option value="${k}" ${f.tipo === k ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}</select></label>`);
-    if (has('gravidade')) parts.push(`<label class="field">Gravidade<select data-f="gravidade"><option value="">Todas</option>${['Alta', 'Média', 'Baixa'].map((g) => `<option ${f.gravidade === g ? 'selected' : ''}>${g}</option>`).join('')}</select></label>`);
+    if (has('gravidade'))
+      parts.push(`<label class="field">Criticidade<select data-f="gravidade"><option value="">Todas</option>${AJ.config.CRITICIDADES.map((g) => `<option ${f.gravidade === g ? 'selected' : ''}>${g}</option>`).join('')}${fields.includes('semAjuste') ? `<option value="SEM_AJUSTE" ${f.gravidade === 'SEM_AJUSTE' ? 'selected' : ''}>Sem ajuste (dif. ≤ ${S().audit.cfg.toleranciaDiaria} min)</option>` : ''}</select></label>`);
     if (has('trat')) parts.push(`<label class="field">Tratativa<select data-f="trat"><option value="">Todas</option>${ui.TRAT_STATUS.map((g) => `<option ${f.trat === g ? 'selected' : ''}>${g}</option>`).join('')}</select></label>`);
     parts.push(`<button class="btn ghost" data-clear>Limpar filtros</button>`);
     const el = document.createElement('div');
@@ -248,7 +249,7 @@
   // =====================================================================
   V.painel = function (c) {
     if (needAudit(c)) return;
-    filterBar(c, ['periodo', 'q', 'matricula', 'empresa', 'tipo', 'status'], () => draw());
+    filterBar(c, ['periodo', 'q', 'matricula', 'empresa', 'gravidade', 'semAjuste', 'tipo', 'status'], () => draw());
     const body = document.createElement('div');
     body.style.cssText = 'display:flex;flex-direction:column;gap:18px';
     c.appendChild(body);
@@ -275,9 +276,13 @@
           ${tile('HE 100% divergentes', D(k.he100Divergentes), `${D(folha.totais.he100NaoComputada)} não computadas no RasterJor`, 'warn', { view: 'folha' })}
           ${tile('Falhas de integração', ui.num(k.falhasIntegracao), `${ui.num(k.ausentesRJ)} jornadas do MaxTrack sem apuração`, 'bad', { view: 'ocorrencias', categoria: 'INTEGRACAO' })}
           ${tile('Inconformidades', ui.num(k.inconformidades), `${ui.num(k.infracoes)} infrações · ${ui.num(k.operacionais)} operacionais · ${ui.num(k.registros)} de registro`, 'bad', { view: 'ocorrencias' })}
+          ${tile('Diárias divergentes', ui.num(os.filter((o) => o.catKey === 'DIARIA').length), `${ui.num(os.filter((o) => o.tipo === 'DIARIA_SEM_JORNADA').length)} sem jornada · ${ui.num(os.filter((o) => o.tipo === 'DIARIA_NAO_GERADA').length)} não geradas`, 'bad', { view: 'diarias' })}
           ${tile('Conformidade', ui.pct(k.percConformidade), 'jornadas conciliadas e sem inconformidade', k.percConformidade > 0.9 ? 'ok' : k.percConformidade > 0.7 ? 'warn' : 'bad')}
           ${tile('Integração MaxTrack → RasterJor', ui.pct(integ), 'jornadas do MaxTrack encontradas no RasterJor', integ > 0.98 ? 'ok' : integ > 0.9 ? 'warn' : 'bad')}
         </div>
+        <div class="card"><div class="card-head"><div><h3>Ocorrências por criticidade</h3><p>Crítica = impacto direto no pagamento (jornada/diária não integrada, diferença ≥ ${a.cfg.limiteCritico} min). Diferenças de até ${a.cfg.toleranciaDiaria} min não exigem ajuste. Clique para filtrar.</p></div></div>
+          <div class="crit-tiles">${AJ.config.CRITICIDADES.map((c) => `<div class="crit-tile" data-crit="${c}"><span class="sev ${c}">${c}</span><b>${ui.num(os.filter((o) => o.gravidade === c).length)}</b><span class="small">ocorrências</span></div>`).join('')}
+          <div class="crit-tile" data-crit="SEM_AJUSTE" data-nav-view="conciliacao"><span class="badge ok"><span class="dot"></span>Sem ajuste</span><b>${ui.num(gs.filter((g) => g.criticidade === 'SEM_AJUSTE').length)}</b><span class="small">jornadas com dif. ≤ ${a.cfg.toleranciaDiaria} min</span></div></div></div>
         <div class="card"><div class="card-head"><div><h3>Status das jornadas</h3><p>Resultado combinado da conciliação e das regras de jornada</p></div></div><div id="stack"></div></div>
         <div class="grid c2">
           <div class="card"><div class="card-head"><div><h3>Jornadas por dia</h3><p>Quantidade de jornadas por status, pela data de início</p></div></div><div id="perDay"></div></div>
@@ -287,6 +292,12 @@
           <div class="card"><div class="card-head"><div><h3>Principais tipos de ocorrência</h3><p>Quantidade no período filtrado</p></div></div><div id="perTipo"></div></div>
           <div class="card"><div class="card-head"><div><h3>Motoristas com mais ocorrências</h3><p>Clique para abrir o relatório individual</p></div></div><div id="perMot"></div></div>
         </div>`;
+      body.querySelectorAll('[data-crit]').forEach((el) =>
+        el.addEventListener('click', () => {
+          S().filters.gravidade = el.dataset.crit;
+          AJ.app.go(el.dataset.navView || 'ocorrencias');
+        })
+      );
       body.querySelectorAll('[data-nav]').forEach((el) =>
         el.addEventListener('click', () => {
           const n = JSON.parse(el.dataset.nav);
@@ -374,7 +385,7 @@
   // =====================================================================
   V.conciliacao = function (c) {
     if (needAudit(c)) return;
-    filterBar(c, ['periodo', 'q', 'matricula', 'empresa', 'status', 'tipo'], () => draw(true));
+    filterBar(c, ['periodo', 'q', 'matricula', 'empresa', 'gravidade', 'semAjuste', 'status', 'tipo'], () => draw(true));
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `<div class="card-head"><div><h3>Comparativo MaxTrack × RasterJor por jornada</h3><p>Diferença = MaxTrack − RasterJor. Positivo (vermelho): registrado e não apurado. Negativo (azul): apurado a maior no RasterJor. Clique na linha para o detalhe.</p></div></div><div id="tbl"></div>`;
@@ -391,6 +402,7 @@
         defaultSort: 'nome',
         columns: [
           { key: 'statusAuditoria', label: 'Status', render: (g) => ui.badge(g.statusAuditoria) },
+          { key: 'criticidade', label: 'Criticidade', sort: (g) => -(AJ.config.GRAV_ORDEM[g.criticidade] || 0), render: (g) => (g.criticidade === 'SEM_AJUSTE' ? '<span class="small muted">Sem ajuste</span>' : `<span class="sev ${g.criticidade}">${g.criticidade}</span>`) },
           { key: 'nome', label: 'Motorista', render: (g) => `<b>${esc(g.nome)}</b><div class="small muted">${esc(mm[g.motorista].matriculaMT || mm[g.motorista].matriculaRJ || '')}</div>` },
           { key: 'date', label: 'Data', render: (g) => U.fmtDate(g.date, true), cls: 'nowrap' },
           { key: 'ini', label: 'Início MT / RJ', sort: (g) => (g.mt || g.rj).inicio, render: (g) => `${g.mt ? DT(g.mt.inicio) : '—'}<br><span class="muted">${g.rj ? DT(g.rj.inicio) : '—'}</span>`, cls: 'nowrap mono' },
@@ -482,7 +494,7 @@
       rows: ocs,
       pageSize: 50,
       columns: [
-        { key: 'gravidade', label: 'Grav.', render: (o) => `<span class="sev ${o.gravidade}">${o.gravidade}</span>` },
+        { key: 'gravidade', label: 'Criticidade', sort: (o) => -AJ.config.GRAV_ORDEM[o.gravidade], render: (o) => `<span class="sev ${o.gravidade}">${o.gravidade}</span>` },
         { key: 'date', label: 'Data', render: (o) => (o.date ? U.fmtDate(o.date) : '—'), cls: 'nowrap' },
         { key: 'nomeTipo', label: 'Ocorrência', render: (o) => `<b>${esc(o.nomeTipo)}</b><div class="small muted">${esc(o.categoria)} · ${esc(o.sistema)}</div>` },
         { key: 'descricao', label: 'Descrição', cls: 'wrap', render: (o) => `<div class="desc small">${esc(o.descricao)}</div>` },

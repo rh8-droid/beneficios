@@ -4,7 +4,7 @@ const fs = require('fs');
 let XLSX;
 XLSX = require(path.join(__dirname, '../js/vendor/xlsx.full.min.js'));
 globalThis.XLSX = XLSX;
-for (const f of ['util', 'config', 'parsers', 'reconcile', 'rules', 'payroll', 'audit']) {
+for (const f of ['util', 'config', 'parsers', 'reconcile', 'rules', 'payroll', 'diarias', 'audit']) {
   const p = path.join(__dirname, '../js/engine', f + '.js');
   if (fs.existsSync(p)) require(p);
 }

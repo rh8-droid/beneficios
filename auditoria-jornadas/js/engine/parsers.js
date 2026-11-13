@@ -442,7 +442,7 @@
 
         let situacao = situacaoRJ(tag, inicio === null ? allTag : '');
         if (inicio === null && !anyHours) {
-          out.dias.push({ sistema: 'RJ', cpf, nome, date, situacao, rotulo: tag || (allTag ? inicioRaw : 'Sem jornada'), origem: `${sn}!L${row}` });
+          out.dias.push({ sistema: 'RJ', cpf, nome, date, situacao, rotulo: tag || (allTag ? inicioRaw : 'Sem jornada'), diaria: diariaVal(cell(r, map, 'diaria')), origem: `${sn}!L${row}` });
           continue;
         }
         const diaDsr = /dia de dsr/i.test(tag);
@@ -480,7 +480,7 @@
           repousoIni: multiDT(cell(r, map, 'repIni'), dayMin),
           repousoFim: multiDT(cell(r, map, 'repFim'), dayMin),
           faltaRepouso: U.parseDuration(cell(r, map, 'faltaRepouso')),
-          diaria: U.clean(cell(r, map, 'diaria')),
+          diaria: diariaVal(cell(r, map, 'diaria')),
           origem: `${sn}!L${row}`,
         });
         if (situacao !== 'NORMAL') {
@@ -504,6 +504,15 @@
     if (n.startsWith('falta')) return 'FALTA';
     if (n.startsWith('folga')) return 'FOLGA';
     return 'OUTRO:' + U.clean(tag);
+  }
+
+  /** Valor da diária: "Inteira", "Meia" etc. Rótulos de dia (DSR/Feriado) não são diária. */
+  function diariaVal(v) {
+    const s = U.clean(v);
+    if (U.isEmpty(s)) return '';
+    const n = norm(s);
+    if (n === 'dsr' || n.startsWith('feriado') || n.startsWith('ferias') || n.startsWith('suspens')) return '';
+    return s;
   }
 
   function firstLine(v) {

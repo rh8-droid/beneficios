@@ -24,7 +24,7 @@
   // =====================================================================
   V.motoristas = function (c) {
     if (needAudit(c)) return;
-    V.filterBar(c, ['periodo', 'q', 'matricula', 'empresa', 'status', 'tipo'], () => draw(true));
+    V.filterBar(c, ['periodo', 'q', 'matricula', 'empresa', 'gravidade', 'status', 'tipo'], () => draw(true));
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `<div class="card-head"><div><h3>Motoristas</h3><p>Clique em um motorista para ver o relatório individual com o histórico do período.</p></div></div><div id="tbl"></div>`;
@@ -78,10 +78,18 @@
       const dr = (mot.diasRJ || []).find((x) => x.date === k && !x.comJornada) || (mot.diasRJ || []).find((x) => x.date === k);
       dias.push({ k, g, dm, dr });
     }
+    const dLin = {};
+    for (const l of (a.diarias && a.diarias.linhas) || []) if (l.motorista === key) dLin[l.date] = l;
+    const diariaCell = (k) => {
+      const l = dLin[k];
+      if (!l) return '<span class="small muted">—</span>';
+      const cls = { OK: 'ok', SEM_JORNADA: 'bad', NAO_GERADA: 'bad' }[l.resultado] || 'warn';
+      return `<span class="badge ${cls}" title="${esc(AJ.diarias.RESULT[l.resultado])}"><span class="dot"></span>${esc(l.diaria || 'Não gerada')}</span>`;
+    };
     const dayRows = dias
       .map(({ k, g, dm, dr }) => {
         if (!g.length) {
-          return `<tr><td class="nowrap">${U.fmtDate(k, true)}</td><td colspan="2" class="muted">${esc(dm ? dm.rotulo : 'Sem registro')}</td><td colspan="2" class="muted">${esc(dr ? dr.rotulo || 'Sem jornada' : 'Sem registro')}</td><td colspan="5"></td><td></td></tr>`;
+          return `<tr><td class="nowrap">${U.fmtDate(k, true)}</td><td colspan="2" class="muted">${esc(dm ? dm.rotulo : 'Sem registro')}</td><td colspan="2" class="muted">${esc(dr ? dr.rotulo || 'Sem jornada' : 'Sem registro')}</td><td></td><td>${diariaCell(k)}</td><td colspan="4"></td><td></td></tr>`;
         }
         return g
           .map((x) => {
@@ -90,6 +98,7 @@
             <td class="mono nowrap">${x.mt ? DT(x.mt.inicio) + ' → ' + U.fmtDateTime(x.mt.fim, { timeOnly: 1 }) : '<span class="muted">—</span>'}</td><td class="num">${x.mt ? D(x.mt.trabalho) + '<div class="small muted">HE ' + D(U.nz(x.mt.he50) + U.nz(x.mt.he100)) + '</div>' : ''}</td>
             <td class="mono nowrap">${x.rj ? DT(x.rj.inicio) + ' → ' + U.fmtDateTime(x.rj.fim, { timeOnly: 1 }) : '<span class="muted">—</span>'}</td><td class="num">${x.rj ? D(x.rj.trabalho) + '<div class="small muted">HE ' + D(U.nz(x.rj.he50) + U.nz(x.rj.he100)) + '</div>' : ''}</td>
             ${ui.diffCell(U.nz(x.mt && x.mt.trabalho) - U.nz(x.rj && x.rj.trabalho))}
+            <td>${diariaCell(k)}</td>
             <td>${ui.chk(ck.interjornada, 'Interjornada')}</td><td>${ui.chk(ck.intrajornada, 'Intrajornada')}</td><td>${ui.chk(ck.direcao, 'Direção contínua')}</td><td>${ui.chk(ck.excesso, 'Limite diário')}</td>
             <td>${ui.badge(x.statusAuditoria)}${x.ocorrencias.length ? `<div class="small muted">${x.ocorrencias.length} ocorrência(s)</div>` : ''}</td></tr>`;
           })
@@ -118,7 +127,7 @@
           <div class="kpi bad"><div class="k-label">Ocorrências</div><div class="k-value">${os.length}</div><div class="k-sub">${os.filter((o) => o.catKey === 'INFRACAO').length} infrações · ${os.filter((o) => o.catKey === 'INTEGRACAO').length} integração</div></div>
         </div>
         <div class="card"><div class="card-head"><div><h3>Jornada diária — MaxTrack × RasterJor</h3><p>Validações: interjornada · intrajornada · direção contínua · limite diário. Clique na linha para o comparativo completo.</p></div></div>
-          <div class="table-wrap"><table class="data"><thead><tr><th>Data</th><th>MaxTrack</th><th class="num">Trab.</th><th>RasterJor</th><th class="num">Trab.</th><th class="num">Δ</th><th title="Interjornada">Inter</th><th title="Intrajornada">Intra</th><th title="Direção contínua">Dir.</th><th title="Limite diário">Lim.</th><th>Status</th></tr></thead><tbody>${dayRows}</tbody></table></div>
+          <div class="table-wrap"><table class="data"><thead><tr><th>Data</th><th>MaxTrack</th><th class="num">Trab.</th><th>RasterJor</th><th class="num">Trab.</th><th class="num">Δ</th><th>Diária</th><th title="Interjornada">Inter</th><th title="Intrajornada">Intra</th><th title="Direção contínua">Dir.</th><th title="Limite diário">Lim.</th><th>Status</th></tr></thead><tbody>${dayRows}</tbody></table></div>
         </div>
         <div class="card"><div class="card-head"><h3>Inconformidades e divergências (${os.length})</h3></div><div id="ocs"></div></div>
       </div>`;
@@ -184,7 +193,7 @@
         resetPage: reset,
         columns: [
           { key: 'sel', label: '✓', sort: (o) => (sel.has(o.id) ? 0 : 1), render: (o) => `<input type="checkbox" data-sel="${o.id}" ${sel.has(o.id) ? 'checked' : ''} aria-label="Selecionar">` },
-          { key: 'gravidade', label: 'Grav.', sort: (o) => -AJ.config.GRAV_ORDEM[o.gravidade], render: (o) => `<span class="sev ${o.gravidade}">${o.gravidade}</span>` },
+          { key: 'gravidade', label: 'Criticidade', sort: (o) => -AJ.config.GRAV_ORDEM[o.gravidade], render: (o) => `<span class="sev ${o.gravidade}">${o.gravidade}</span>` },
           { key: 'nomeTipo', label: 'Ocorrência', render: (o) => `<b>${esc(o.nomeTipo)}</b><div class="small muted">${esc(o.categoria)}</div>` },
           { key: 'nome', label: 'Motorista', render: (o) => `${esc(o.nome)}<div class="small muted">${esc(o.matricula || '')}</div>` },
           { key: 'date', label: 'Data', render: (o) => (o.date ? U.fmtDate(o.date) : '—'), cls: 'nowrap' },
@@ -214,7 +223,7 @@
     const t = AJ.app.tratOf(id);
     const LBL = { status: 'Status', responsavel: 'Responsável', observacoes: 'Observações', dataResolucao: 'Data da resolução', nota: 'Anotação' };
     const html = `
-      <div class="drawer-head"><div><div class="muted small">${esc(o.categoria)} · gravidade <span class="sev ${o.gravidade}">${o.gravidade}</span> · ID ${esc(o.id)}</div><h2>${esc(o.nomeTipo)}</h2><div class="small" style="margin-top:4px">${esc(o.nome)} · matrícula ${esc(o.matricula || '—')} · ${o.date ? U.fmtDate(o.date, true) : 'período'} · origem: ${esc(o.sistema)}</div></div><button class="btn" data-close>Fechar ✕</button></div>
+      <div class="drawer-head"><div><div class="muted small">${esc(o.categoria)} · criticidade <span class="sev ${o.gravidade}">${o.gravidade}</span> · ID ${esc(o.id)}</div><h2>${esc(o.nomeTipo)}</h2><div class="small" style="margin-top:4px">${esc(o.nome)} · matrícula ${esc(o.matricula || '—')} · ${o.date ? U.fmtDate(o.date, true) : 'período'} · origem: ${esc(o.sistema)}</div></div><button class="btn" data-close>Fechar ✕</button></div>
       <div class="drawer-body">
         <div class="card"><h3>Descrição</h3><p style="line-height:1.55">${esc(o.descricao)}</p>${o.baseLegal ? `<p class="small muted"><b>Referência:</b> ${esc(o.baseLegal)}</p>` : ''}${o.grupo ? `<button class="btn" id="verJ">Ver comparativo da jornada</button>` : ''} <button class="btn" id="verM">Ver relatório do motorista</button></div>
         <div class="card"><div class="card-head"><h3>Tratativa</h3>${ui.tratBadge(t.status)}</div>
@@ -253,7 +262,7 @@
   // =====================================================================
   V.folha = function (c) {
     if (needAudit(c)) return;
-    V.filterBar(c, ['periodo', 'q', 'matricula', 'empresa', 'status'], () => draw());
+    V.filterBar(c, ['periodo', 'q', 'matricula', 'empresa', 'gravidade', 'status'], () => draw());
     const body = document.createElement('div');
     body.style.cssText = 'display:flex;flex-direction:column;gap:18px';
     c.appendChild(body);
@@ -278,6 +287,14 @@
           ${tile('Horas pendentes de validação', D(T.horasPendentes), 'soma das diferenças de jornadas não conciliadas', 'nv')}
           ${tile('Intervalo intrajornada suprimido', D(T.intrajornadaSuprimida), 'possível indenização (CLT art. 71 §4º)', 'warn')}
           ${tile('Interjornada não usufruída', D(T.interjornadaFaltante), 'possível pagamento como extra (OJ 355)', 'warn')}
+          ${(() => {
+            const dl = AJ.views.filteredDiarias ? AJ.views.filteredDiarias('') : [];
+            const ind = dl.filter((l) => l.resultado === 'SEM_JORNADA');
+            const ng = dl.filter((l) => l.resultado === 'NAO_GERADA');
+            const v = (ls) => ls.reduce((s2, l) => s2 + AJ.diarias.valor(l, cfg), 0);
+            const temV = Number(cfg.valorDiaria) > 0;
+            return tile('Diárias indevidas (dia sem jornada)', ui.num(ind.length), temV ? 'simulação ' + ui.money(v(ind)) : 'informe o valor da diária em Parâmetros', 'bad') + tile('Diárias não geradas (dia com jornada)', ui.num(ng.length), temV ? 'simulação ' + ui.money(v(ng)) : 'possível pagamento a menor', 'bad');
+          })()}
           ${hasV ? tile('Simulação: valor não computado', ui.money(T.valorNaoComputado), 'HE não apuradas × valor hora × adicional', 'bad') : ''}
           ${hasV ? tile('Simulação: valor computado a maior', ui.money(T.valorIndevido), 'HE apuradas a maior × valor hora × adicional', 'warn') : ''}
           ${hasV ? tile('Simulação: indenizações potenciais', ui.money(T.valorIndenizacoes), 'intrajornada + interjornada', 'warn') : ''}
@@ -416,8 +433,9 @@
   // =====================================================================
   const PARAMS = [
     ['Conciliação', [
-      ['toleranciaMarcacao', 'min', 'Tolerância por marcação', 'Diferença de início/fim aceita como conciliada (CLT art. 58 §1º: 5 min).'],
-      ['toleranciaDiaria', 'min', 'Tolerância diária de horas', 'Diferença de horas/HE aceita no dia (CLT art. 58 §1º: 10 min).'],
+      ['toleranciaMarcacao', 'min', 'Tolerância por marcação', 'Diferença de início/fim que não exige ajuste manual (padrão da empresa: 2 min; CLT art. 58 §1º admite até 5).'],
+      ['toleranciaDiaria', 'min', 'Tolerância diária de horas', 'Diferença de horas/HE no dia que não exige ajuste manual (padrão: 2 min).'],
+      ['limiteCritico', 'min', 'Diferença considerada crítica', 'Diferenças de horas/HE a partir deste valor recebem criticidade "Crítica".'],
       ['limiteConferencia', 'min', 'Limite para "necessita conferência"', 'Acima da tolerância e até este valor = amarelo; acima = divergente.'],
     ]],
     ['Jornada', [
@@ -440,6 +458,12 @@
       ['pausaInternaLonga', 'hhmm', 'Pausa interna longa', 'Pausas dentro da mesma jornada a partir deste tempo são sinalizadas (podem ser repouso não encerrado).'],
       ['validarTempoAteRefeicao', 'bool', 'Validar tempo até a refeição', 'Regra operacional (MaxTrack: 05:30).'],
       ['tempoMaxAteRefeicao', 'hhmm', 'Tempo máximo até a refeição', ''],
+    ]],
+    ['Diárias', [
+      ['conciliarDiarias', 'bool', 'Conciliar diárias', 'Compara a coluna "Diária" do RasterJor com os dias trabalhados.'],
+      ['diariaEmTodoDiaTrabalhado', 'bool', 'Toda jornada iniciada gera diária', 'Se desligado, não aponta "dia com jornada sem diária".'],
+      ['valorDiaria', 'num', 'Valor da diária inteira (R$)', 'Usado apenas na simulação financeira (0 = não simula).'],
+      ['valorMeiaDiaria', 'num', 'Valor da meia diária (R$)', ''],
     ]],
     ['Privacidade', [['mascararCpf', 'bool', 'Mascarar CPF nas telas', 'Exibe ***.123.456-** nas telas e relatórios.']]],
   ];

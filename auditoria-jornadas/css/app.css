@@ -225,6 +225,7 @@ label.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; 
 .badge.plain { background: var(--surface-3); color: var(--text-2); }
 .badge.brand { background: var(--brand-soft); color: var(--brand); }
 .sev { font-size: 11.5px; font-weight: 650; }
+.sev.Crítica { color: #fff; background: var(--bad); padding: 1px 7px; border-radius: 999px; }
 .sev.Alta { color: var(--bad-text); } .sev.Média { color: var(--warn-text); } .sev.Baixa { color: var(--text-3); }
 .chk { display: inline-flex; width: 20px; height: 20px; border-radius: 50%; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; }
 .chk.ok { background: var(--ok-soft); color: var(--ok-text); }
@@ -377,3 +378,9 @@ details summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var
   .card, .kpi { box-shadow: none; break-inside: avoid; }
   .table-wrap { max-height: none; overflow: visible; }
 }
+
+.crit-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.crit-tile { border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; cursor: pointer; background: var(--surface); }
+.crit-tile:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.crit-tile b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.crit-tile span.small { color: var(--text-3); }

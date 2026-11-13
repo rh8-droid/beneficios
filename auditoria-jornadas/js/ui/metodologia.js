@@ -34,11 +34,31 @@
 <tr><td>Placa</td><td>Placa (pode listar terminal de login)</td><td>Placa</td></tr>
 </table>
 <p><b>Diferença = MaxTrack − RasterJor.</b> Positiva: registrado e não apurado (risco de pagamento a menor). Negativa: apurado a maior no RasterJor (risco de pagamento indevido).</p>
-<p><b>Status da conciliação:</b> <span class="badge ok"><span class="dot"></span>Conciliado</span> diferenças dentro da tolerância (5 min por marcação / 10 min no dia – CLT art. 58 §1º);
-<span class="badge warn"><span class="dot"></span>Necessita conferência</span> diferença acima da tolerância e até 15 min, ou diferenças acessórias (placa, refeição, agrupamento, feriado);
+<p><b>Status da conciliação:</b> <span class="badge ok"><span class="dot"></span>Conciliado</span> diferenças de até 2 minutos para mais ou para menos (arredondamento entre sistemas – não exigem ajuste manual);
+<span class="badge warn"><span class="dot"></span>Necessita conferência</span> diferença de 3 a 15 min, ou diferenças acessórias (placa, refeição, agrupamento, feriado);
 <span class="badge bad"><span class="dot"></span>Divergente</span> diferença acima de 15 min ou jornada ausente em um dos sistemas;
 <span class="badge nv"><span class="dot"></span>Não validado</span> dados insuficientes ou fora do período comum aos dois relatórios. Todos os limites são parametrizáveis.</p>
 <p><b>Feriados e DSR de escala:</b> quando o RasterJor trata o dia como feriado/DSR (HE 100%) e o MaxTrack como dia normal (HE 50%), a comparação reclassifica as horas do MaxTrack e aponta a diferença de calendário como "conferência", em vez de acusar falta de horas.</p>
+
+<h3>Criticidade</h3>
+<table>
+<tr><th>Nível</th><th>Quando</th></tr>
+<tr><td><span class="sev Crítica">Crítica</span></td><td>Impacto direto no pagamento: jornada ou motorista do MaxTrack não integrado ao RasterJor, diária indevida ou não gerada, jornada em aberto no RasterJor, diferença de horas/HE a partir de 60 min (parametrizável)</td></tr>
+<tr><td><span class="sev Alta">Alta</span></td><td>Infrações trabalhistas, diferenças de horas/HE acima de 15 min, ausência de registro relevante</td></tr>
+<tr><td><span class="sev Média">Média</span></td><td>Inconformidades operacionais, diferenças de horário, situação do dia divergente, diárias para conferência</td></tr>
+<tr><td><span class="sev Baixa">Baixa</span></td><td>Diferenças pequenas (3–15 min), placa, cadastro, registros informativos</td></tr>
+<tr><td>Sem ajuste</td><td>Jornadas sem ocorrência e com diferença de até 2 min</td></tr>
+</table>
+
+<h3>Conciliação de diárias</h3>
+<p>A coluna <b>Diária</b> do RasterJor é comparada com os dias em que o motorista teve jornada no MaxTrack:</p>
+<ul>
+<li><b>Correta</b>: diária em dia com jornada iniciada (ou em dia em que o RasterJor dividiu uma jornada confirmada pelo MaxTrack).</li>
+<li><b>Indevida</b>: diária em dia sem jornada iniciada ou em andamento em nenhum dos sistemas. Verificar se o motorista estava em viagem (pernoite fora da base).</li>
+<li><b>Para conferência</b>: diária em dia sem início de jornada, mas com jornada do dia anterior atravessando a meia-noite.</li>
+<li><b>Não gerada</b>: jornada iniciada no MaxTrack sem diária no RasterJor (inclusive quando a jornada nem foi integrada).</li>
+</ul>
+<p>O relatório não informa a regra de concessão de diária inteira × meia diária; a ferramenta mostra o tipo para análise.</p>
 
 <h3>4. Regras de auditoria</h3>
 <table>

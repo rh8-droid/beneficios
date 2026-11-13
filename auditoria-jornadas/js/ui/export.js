@@ -27,7 +27,7 @@
     if (f.status) parts.push(`Status: ${STL[f.status]}`);
     if (f.categoria) parts.push(`Categoria: ${AJ.config.CATEGORIAS[f.categoria]}`);
     if (f.tipo) parts.push(`Tipo: ${AJ.config.TIPOS[f.tipo].nome}`);
-    if (f.gravidade) parts.push(`Gravidade: ${f.gravidade}`);
+    if (f.gravidade) parts.push(`Criticidade: ${f.gravidade === 'SEM_AJUSTE' ? 'Sem ajuste' : f.gravidade}`);
     if (f.trat) parts.push(`Tratativa: ${f.trat}`);
     return parts.join(' · ') || 'Sem filtros';
   }
@@ -78,7 +78,7 @@
       const t = AJ.app.tratOf(o.id);
       return {
         ID: o.id,
-        Gravidade: o.gravidade,
+        Criticidade: o.gravidade,
         Categoria: o.categoria,
         Ocorrência: o.nomeTipo,
         Motorista: o.nome,
@@ -98,6 +98,26 @@
         Histórico: (t.historico || []).map((h) => `${new Date(h.em).toLocaleString('pt-BR')} ${h.por}: ${h.campo} ${h.de ? h.de + ' -> ' : ''}${h.para}`).join(' | '),
       };
     });
+  }
+
+  const DCRIT = { SEM_JORNADA: 'Crítica', NAO_GERADA: 'Crítica', SO_RJ: 'Média', CONTINUACAO: 'Média' };
+  function rowsDiarias() {
+    const ls = AJ.views.filteredDiarias ? AJ.views.filteredDiarias('') : [];
+    return ls.map((l) => ({
+      Criticidade: DCRIT[l.resultado] || '',
+      Resultado: AJ.diarias.RESULT[l.resultado],
+      Motorista: l.nome,
+      CPF: cpf(l.cpf),
+      Matrícula: l.matricula,
+      Empresa: l.empresa,
+      Data: U.fmtDate(l.date),
+      'Situação do dia (RasterJor)': (l.rotuloDia || '').split(':')[0],
+      'Diária (RasterJor)': l.diaria || 'Não gerada',
+      'Jornada MaxTrack': l.jornadaMT,
+      'Jornada RasterJor': l.jornadaRJ,
+      'Trabalho MT': D(l.trabalhoMT),
+      'Valor simulado (R$)': AJ.diarias.valor(l, S().cfg) || '',
+    }));
   }
 
   function rowsMotoristas(ms) {
@@ -189,6 +209,8 @@
       ['Divergências de apuração', k.divergenciasApuracao],
       ['Infrações trabalhistas', k.infracoes],
       ['Inconformidades operacionais', k.operacionais],
+      ['Divergências de diárias', k.diarias],
+      ['Ocorrências críticas', k.criticas],
       ['Falhas de registro', k.registros],
       ['Divergências cadastrais', k.cadastro],
       ['% conciliação', k.percConciliacao !== null ? ui.pct(k.percConciliacao) : ''],
@@ -225,6 +247,7 @@
     XLSX.utils.book_append_sheet(wb, sheet(rowsOcorrencias(os), { Descrição: 90, Motorista: 32, 'Base legal / referência': 50, Histórico: 60, Ocorrência: 40 }), 'Ocorrências');
     XLSX.utils.book_append_sheet(wb, sheet(rowsFolha(F), { Motorista: 32, Empresa: 30 }), 'Impacto folha');
     XLSX.utils.book_append_sheet(wb, sheet(rowsFolhaLinhas(F), { 'Causa provável': 90, Motorista: 32 }), 'Impacto folha - jornadas');
+    XLSX.utils.book_append_sheet(wb, sheet(rowsDiarias(), { Motorista: 32, Resultado: 40, 'Jornada MaxTrack': 30, 'Jornada RasterJor': 30 }), 'Diárias');
     XLSX.utils.book_append_sheet(wb, sheet(rowsMotoristas(ms), { Motorista: 32, Empresa: 30 }), 'Motoristas');
     XLSX.writeFile(wb, `auditoria-jornadas-${a.periodo.ini}_${a.periodo.fim}-${stamp()}.xlsx`, { compression: true });
   }
@@ -307,6 +330,10 @@
       title('Jornadas não conciliadas');
       const rows = gs.filter((g) => g.status !== 'conciliado');
       doc.autoTable(tblOpts(y, ['Status', 'Motorista', 'Data', 'Início MT / RJ', 'Fim MT / RJ', 'Trab. MT', 'Trab. RJ', 'Dif.', 'Dif. HE50', 'Dif. HE100', 'Motivos'], rows.map((g) => [STL[g.status], g.nome, U.fmtDate(g.date), `${U.fmtDateTime(g.mt && g.mt.inicio)} / ${U.fmtDateTime(g.rj && g.rj.inicio)}`, `${U.fmtDateTime(g.mt && g.mt.fim)} / ${U.fmtDateTime(g.rj && g.rj.fim)}`, D(g.mt && g.mt.trabalho), D(g.rj && g.rj.trabalho), DS(diff(g, 'trabalho')), DS(diff(g, 'he50')), DS(diff(g, 'he100')), g.motivos.join('; ')]), { columnStyles: { 10: { cellWidth: 230 } } }));
+    } else if (view === 'diarias') {
+      title('Conciliação de diárias – divergências');
+      const rows = rowsDiarias().filter((r) => r.Criticidade);
+      doc.autoTable(tblOpts(y, ['Criticidade', 'Resultado', 'Motorista', 'Data', 'Situação do dia', 'Diária', 'Jornada MaxTrack', 'Jornada RasterJor'], rows.map((r) => [r.Criticidade, r.Resultado, r.Motorista, r.Data, r['Situação do dia (RasterJor)'], r['Diária (RasterJor)'], r['Jornada MaxTrack'], r['Jornada RasterJor']])));
     } else if (view === 'motoristas') {
       title('Motoristas');
       doc.autoTable(tblOpts(y, ['Status', 'Motorista', 'Matr. MT/RJ', 'Jornadas', 'Concil.', 'Diverg.', 'Ocorr.', 'Infr.', 'Horas MT', 'Horas RJ', 'Dif.'], ms.map((m) => [STL[m.statusAuditoria], m.nome, `${m.matriculaMT || '-'} / ${U.clean(m.matriculaRJ) || '-'}`, m.qtdJornadas, m.qtdConciliadas, m.qtdDivergentes, m.qtdOcorrencias, m.qtdInfracoes, D(m.horasMT), D(m.horasRJ), DS(m.horasMT - m.horasRJ)])));
@@ -319,7 +346,7 @@
     } else {
       title(view === 'ocorrencias' ? 'Ocorrências' : 'Ocorrências de gravidade alta');
       const rows = view === 'ocorrencias' ? os : os.filter((o) => o.gravidade === 'Alta');
-      doc.autoTable(tblOpts(y, ['Grav.', 'Categoria', 'Ocorrência', 'Motorista', 'Data', 'Origem', 'Descrição', 'Tratativa'], rows.map((o) => [o.gravidade, o.categoria, o.nomeTipo, o.nome, o.date ? U.fmtDate(o.date) : '', o.sistema, o.descricao, AJ.app.tratOf(o.id).status]), { columnStyles: { 6: { cellWidth: 300 } } }));
+      doc.autoTable(tblOpts(y, ['Criticidade', 'Categoria', 'Ocorrência', 'Motorista', 'Data', 'Origem', 'Descrição', 'Tratativa'], rows.map((o) => [o.gravidade, o.categoria, o.nomeTipo, o.nome, o.date ? U.fmtDate(o.date) : '', o.sistema, o.descricao, AJ.app.tratOf(o.id).status]), { columnStyles: { 6: { cellWidth: 300 } } }));
     }
     footer(doc);
     doc.save(`auditoria-jornadas-${view}-${stamp()}.pdf`);
@@ -363,7 +390,7 @@
     }
     doc.setFont('helvetica', 'bold');
     doc.text(pdfTxt(`Ocorrências (${os.length})`), 36, y);
-    doc.autoTable(tblOpts(y + 8, ['Grav.', 'Ocorrência', 'Data', 'Origem', 'Descrição', 'Tratativa'], os.map((o) => [o.gravidade, o.nomeTipo, o.date ? U.fmtDate(o.date) : '', o.sistema, o.descricao, AJ.app.tratOf(o.id).status]), { columnStyles: { 4: { cellWidth: 380 } } }));
+    doc.autoTable(tblOpts(y + 8, ['Criticidade', 'Ocorrência', 'Data', 'Origem', 'Descrição', 'Tratativa'], os.map((o) => [o.gravidade, o.nomeTipo, o.date ? U.fmtDate(o.date) : '', o.sistema, o.descricao, AJ.app.tratOf(o.id).status]), { columnStyles: { 4: { cellWidth: 380 } } }));
     footer(doc);
     doc.save(`auditoria-${U.normName(mot.nome).replace(/ /g, '_')}-${stamp()}.pdf`);
   }

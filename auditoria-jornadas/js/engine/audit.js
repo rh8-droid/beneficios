@@ -37,6 +37,9 @@
       }
     }
 
+    // Criticidade (Crítica / Alta / Média / Baixa)
+    for (const o of rules.ocorrencias) o.gravidade = AJ.config.criticidade(o, cfg);
+
     // Status final de cada jornada = conciliação + ocorrências vinculadas
     const motByKey = {};
     for (const m of rec.motoristas) motByKey[m.key] = m;
@@ -45,7 +48,9 @@
       g.ocorrencias = ocs.map((o) => o.id);
       g.checks = rules.checks[g.id] || {};
       let st = g.status;
-      const grave = ocs.some((o) => o.catKey === 'INFRACAO' || (o.gravidade === 'Alta' && o.catKey !== 'DIVERGENCIA'));
+      const grave = ocs.some((o) => o.catKey === 'INFRACAO' || o.gravidade === 'Crítica' || (o.gravidade === 'Alta' && o.catKey !== 'DIVERGENCIA'));
+      const ordem = AJ.config.GRAV_ORDEM;
+      g.criticidade = ocs.length ? ocs.reduce((a, o) => (ordem[o.gravidade] > ordem[a] ? o.gravidade : a), 'Baixa') : 'SEM_AJUSTE';
       if (grave) st = 'divergente';
       else if (ocs.length && st === 'conciliado') st = 'conferencia';
       g.statusAuditoria = st;
@@ -82,6 +87,8 @@
       });
 
     const kpis = computeKpis(grupos, ocorrencias, motoristas, folha);
+    kpis.diariasIndevidas = rules.diarias.resumo.semJornada || 0;
+    kpis.diariasNaoGeradas = rules.diarias.resumo.naoGeradas || 0;
 
     return {
       id: 'aud-' + Date.now().toString(36),
@@ -98,6 +105,7 @@
       grupos,
       ocorrencias,
       folha,
+      diarias: rules.diarias,
       kpis,
     };
   }
@@ -134,6 +142,8 @@
       registros: cat('REGISTRO'),
       cadastro: cat('CADASTRO'),
       inconformidades: cat('INFRACAO') + cat('OPERACIONAL') + cat('REGISTRO'),
+      diarias: cat('DIARIA'),
+      criticas: ocorrencias.filter((o) => o.gravidade === 'Crítica').length,
       ocorrencias: ocorrencias.length,
       percConciliacao: validos ? byRec('conciliado') / validos : null,
       percConformidade: validos ? byStatus('conciliado') / validos : null,
@@ -142,7 +152,7 @@
     };
   }
 
-  AJ.VERSION = '1.0.0';
+  AJ.VERSION = '1.1.0';
   AJ.audit = { runAudit, computeKpis, STATUS_LABEL };
   if (typeof module !== 'undefined' && module.exports) module.exports = AJ;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
