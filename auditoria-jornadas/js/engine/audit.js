@@ -18,6 +18,14 @@
     const mt = AJ.parsers.mergeResults(input.mt, 'maxtrack');
     const rj = AJ.parsers.mergeResults(input.rj, 'rasterjor');
     const rec = AJ.reconcile.reconcile(mt, rj, cfg);
+    // Motoristas presentes somente no MaxTrack (agregados): fora do escopo
+    let ignoradosSomenteMT = [];
+    if (cfg.ignorarSomenteMaxTrack) {
+      const fora = new Set(rec.motoristas.filter((m) => m.vinculo === 'SO_MT').map((m) => m.key));
+      ignoradosSomenteMT = rec.motoristas.filter((m) => fora.has(m.key)).map((m) => ({ nome: m.nome, cpf: m.cpf, jornadas: m.jornadasMT ? m.jornadasMT.length : 0 }));
+      rec.motoristas = rec.motoristas.filter((m) => !fora.has(m.key));
+      rec.grupos = rec.grupos.filter((g) => !fora.has(g.motorista));
+    }
     const rules = AJ.rules.run(rec, cfg);
     const ign = new Set((cfg.ignorarCpfs || []).map(U.normCpf));
 
@@ -95,6 +103,7 @@
       criadoEm: new Date().toISOString(),
       versaoMotor: AJ.VERSION,
       cfg,
+      ignoradosSomenteMT,
       periodo: { ini: rec.periodoIni, fim: rec.periodoFim, comumIni: rec.comumIni, comumFim: rec.comumFim },
       feriados: rec.feriados,
       meta: {

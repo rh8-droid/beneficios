@@ -54,6 +54,10 @@
     adicionalHE100: 100,
     valoresHora: {}, // por CPF
 
+    // ---------- Escopo ----------
+    ignorarSomenteMaxTrack: true, // motoristas só no MaxTrack (agregados) ficam fora da auditoria
+    ignorarCpfs: [],
+
     // ---------- Exibição ----------
     mascararCpf: false,
   };

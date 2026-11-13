@@ -98,7 +98,7 @@ function test(name, fn) {
 
 const mtRes = AJ.parsers.parseFile(toBuf(mt), 'mt.xlsx');
 const rjRes = AJ.parsers.parseFile(toBuf(rj), 'rj.xlsx');
-const audit = AJ.audit.runAudit({ mt: [mtRes], rj: [rjRes], cfg: {} });
+const audit = AJ.audit.runAudit({ mt: [mtRes], rj: [rjRes], cfg: { ignorarSomenteMaxTrack: false } });
 const mot = (n) => audit.motoristas.find((m) => m.nome.includes(n));
 const grp = (n, d) => audit.grupos.find((g) => g.nome.includes(n) && g.date === d);
 const ocs = (n, tipo) => audit.ocorrencias.filter((o) => o.nome.includes(n) && o.tipo === tipo);
@@ -149,6 +149,15 @@ test('RasterJor unindo 2 jornadas do MaxTrack é agrupado e explicado', () => {
   assert.strictEqual(g.rjJ.length, 1);
   assert.strictEqual(g.uniao, 'RJ');
   assert.strictEqual(g.status, 'divergente');
+});
+test('padrão: motoristas só no MaxTrack (agregados) são ignorados', () => {
+  const a3 = AJ.audit.runAudit({ mt: [mtRes], rj: [rjRes], cfg: {} });
+  assert.ok(!a3.motoristas.some((m) => m.nome.includes('BETA')));
+  assert.ok(!a3.grupos.some((g) => g.nome.includes('BETA')));
+  assert.ok(!a3.ocorrencias.some((o) => o.nome.includes('BETA')));
+  assert.ok(!a3.diarias.linhas.some((l) => l.nome.includes('BETA')));
+  assert.strictEqual(a3.ignoradosSomenteMT.length, 1);
+  assert.ok(a3.motoristas.some((m) => m.nome.includes('ALFA')));
 });
 test('motorista só no RasterJor é sinalizado', () => assert.strictEqual(ocs('DELTA', 'MOTORISTA_AUSENTE_MT').length, 1));
 
@@ -227,7 +236,7 @@ test('KPIs coerentes', () => {
   assert.ok(k.percConformidade >= 0 && k.percConformidade <= 1);
 });
 test('IDs de ocorrência estáveis entre execuções', () => {
-  const a2 = AJ.audit.runAudit({ mt: [mtRes], rj: [rjRes], cfg: {} });
+  const a2 = AJ.audit.runAudit({ mt: [mtRes], rj: [rjRes], cfg: { ignorarSomenteMaxTrack: false } });
   assert.deepStrictEqual(a2.ocorrencias.map((o) => o.id).sort(), audit.ocorrencias.map((o) => o.id).sort());
 });
 

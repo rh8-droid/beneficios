@@ -488,6 +488,7 @@
       ['valorDiaria', 'num', 'Valor da diária inteira (R$)', 'Usado apenas na simulação financeira (0 = não simula).'],
       ['valorMeiaDiaria', 'num', 'Valor da meia diária (R$)', ''],
     ]],
+    ['Escopo', [['ignorarSomenteMaxTrack', 'bool', 'Ignorar motoristas que estão somente no MaxTrack', 'Agregados não são apurados no RasterJor: ficam fora da auditoria (jornadas, diárias, folha e ocorrências).']]],
     ['Privacidade', [['mascararCpf', 'bool', 'Mascarar CPF nas telas', 'Exibe ***.123.456-** nas telas e relatórios.']]],
   ];
 

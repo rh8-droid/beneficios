@@ -265,8 +265,9 @@
       const k = AJ.audit.computeKpis(gs, os, ms, folha);
       const integ = k.pares + k.ausentesRJ ? k.pares / (k.pares + k.ausentesRJ) : null;
       const tile = (label, value, sub, cls, nav) => `<div class="kpi ${cls || ''} ${nav ? 'clickable' : ''}" ${nav ? `data-nav='${JSON.stringify(nav)}'` : ''}><div class="k-label">${label}</div><div class="k-value">${value}</div>${sub ? `<div class="k-sub">${sub}</div>` : ''}</div>`;
+      const ignMT = a.ignoradosSomenteMT && a.ignoradosSomenteMT.length ? `<div class="alert info">${a.ignoradosSomenteMT.length} motorista(s) presentes <b>somente no MaxTrack</b> (agregados) foram desconsiderados nesta auditoria (${a.ignoradosSomenteMT.reduce((s2, m) => s2 + m.jornadas, 0)} jornadas). Para incluí-los, desative a opção em <b>Parâmetros e regras → Escopo</b>.</div>` : '';
       const cmp = a.comparativo && !S().filters.ini ? `<div class="alert info">Comparado com a auditoria anterior do mesmo período (${new Date(a.comparativo.anteriorEm).toLocaleString('pt-BR')}): <b>${a.comparativo.novas}</b> ocorrência(s) nova(s), <b>${a.comparativo.recorrentes}</b> recorrente(s), <b>${a.comparativo.naoMaisPresentes}</b> não aparecem mais (possivelmente corrigidas).</div>` : '';
-      body.innerHTML = `${cmp}
+      body.innerHTML = `${ignMT}${cmp}
         <div class="kpis">
           ${tile('Motoristas auditados', ui.num(k.motoristas), `${a.kpis.motoristasCadastro} cadastros nos dois sistemas`, 'info', { view: 'motoristas' })}
           ${tile('Jornadas analisadas', ui.num(k.jornadas), `${ui.num(k.pares)} presentes nos dois sistemas`, 'info', { view: 'conciliacao' })}
