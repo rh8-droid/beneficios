@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Via Talentos</title>
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <div class="loading" id="loading"><div class="spinner" aria-label="Carregando"></div></div>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark" id="brandMark">VD</div>
+        <div>
+          <strong>VIA <b>TALENTOS</b></strong>
+          <span>Recrutamento e Seleção · Grupo Via Dupla</span>
+        </div>
+      </div>
+      <nav class="nav" id="nav">
+        <button data-view="dashboard" class="active"><span class="n">1</span>Dashboard</button>
+        <button data-view="vagas"><span class="n">2</span>Gestão de Vagas</button>
+        <button data-view="candidatos"><span class="n">3</span>Candidatos<span class="tag">Fase 2</span></button>
+        <button data-view="kanban"><span class="n">4</span>Kanban do Recrutamento<span class="tag">Fase 2</span></button>
+        <button data-view="entrevistas"><span class="n">5</span>Entrevistas<span class="tag">Fase 2</span></button>
+        <button data-view="indicacoes"><span class="n">6</span>Indicações<span class="tag">Fase 2</span></button>
+        <button data-view="sla"><span class="n">7</span>SLA e Gargalos</button>
+        <button data-view="relatorios"><span class="n">8</span>Indicadores e Relatórios<span class="tag">Fase 3</span></button>
+        <button data-view="artes"><span class="n">9</span>Gerador de Artes<span class="tag">Fase 4</span></button>
+        <button data-view="config"><span class="n">10</span>Configurações</button>
+      </nav>
+      <div class="sidebar-foot">
+        <strong id="userName">—</strong>
+        <span id="userRole">—</span>
+        <div class="culture"><b>Código de Cultura</b> · Via Dupla</div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <button class="btn menu-btn" id="menuBtn" aria-label="Abrir menu">☰</button>
+        <div>
+          <p class="eyebrow">Via Talentos</p>
+          <h1 id="pageTitle">Dashboard</h1>
+        </div>
+        <div class="top-actions">
+          <span id="syncStatus"></span>
+          <button class="btn" id="refreshBtn">Atualizar</button>
+        </div>
+      </header>
+
+      <!-- DASHBOARD -->
+      <section class="view" id="view-dashboard">
+        <div class="hero" id="hero">
+          <p class="eyebrow">Visão gerencial</p>
+          <h2>Recrutamento e Seleção do Grupo Via Dupla</h2>
+          <p>Indicadores calculados em tempo real a partir das vagas, posições e candidaturas registradas. SLA padrão de <b id="heroSla">15</b> dias úteis por posição.</p>
+        </div>
+        <div class="filters" id="dashFilters"></div>
+        <div id="dashCards"></div>
+        <div class="grid two">
+          <section class="panel"><h2>Vagas abertas × fechadas por mês</h2><p class="sub">Abertura pela data da requisição; fechamento pela conclusão.</p><div class="chart-box"><canvas id="chMensal"></canvas></div></section>
+          <section class="panel"><h2>Vagas ativas por faixa de SLA</h2><p class="sub">Verde até 9 · Amarelo 10–12 · Laranja 13–15 · Vermelho vencido (dias úteis).</p><div class="chart-box"><canvas id="chSla"></canvas></div></section>
+          <section class="panel"><h2>Tempo médio de fechamento por cargo</h2><p class="sub">Dias úteis efetivos da aprovação ao preenchimento da posição.</p><div class="chart-box"><canvas id="chCargo"></canvas></div></section>
+          <section class="panel"><h2>Tempo médio em cada etapa da vaga</h2><p class="sub">Dias úteis por status, calculado pelo histórico de movimentações.</p><div class="chart-box"><canvas id="chEtapa"></canvas></div></section>
+          <section class="panel"><h2>Funil de recrutamento</h2><p class="sub">Candidaturas que alcançaram cada etapa.</p><div class="chart-box"><canvas id="chFunil"></canvas></div></section>
+          <section class="panel"><h2>Taxa de conversão por etapa</h2><p class="sub">% que avançou em relação à etapa anterior.</p><div class="chart-box"><canvas id="chConversao"></canvas></div></section>
+          <section class="panel"><h2>Motivos mais frequentes de reprovação</h2><p class="sub">Motivos padronizados registrados nas candidaturas.</p><div class="chart-box"><canvas id="chMotivos"></canvas></div></section>
+          <section class="panel"><h2>Vagas por analista responsável</h2><p class="sub">Ativas e concluídas.</p><div class="chart-box"><canvas id="chAnalistas"></canvas></div></section>
+          <section class="panel"><h2>Reaberturas por cargo</h2><p class="sub">Posições reabertas e requisições reabertas.</p><div class="chart-box"><canvas id="chReab"></canvas></div></section>
+          <section class="panel"><h2>Contratações por origem da candidatura</h2><p class="sub">Candidaturas na etapa "Contratado".</p><div class="chart-box"><canvas id="chOrigem"></canvas></div></section>
+        </div>
+        <h3 class="section-title">Alertas de SLA e vagas paradas</h3>
+        <div id="dashAlerts"></div>
+      </section>
+
+      <!-- VAGAS -->
+      <section class="view hidden" id="view-vagas">
+        <div class="toolbar">
+          <input class="search" id="vagaBusca" placeholder="Buscar por código, cargo, gestor, analista ou unidade…">
+          <select id="vagaFStatus"></select>
+          <select id="vagaFEmpresa"></select>
+          <select id="vagaFAnalista"></select>
+          <select id="vagaFNivel">
+            <option value="">SLA: todos</option>
+            <option value="verde">Verde</option><option value="amarelo">Amarelo</option>
+            <option value="laranja">Laranja</option><option value="vermelho">Vermelho</option>
+            <option value="neutro">Não iniciado / cancelada</option>
+          </select>
+          <label class="check"><input type="checkbox" id="vagaFAtivas" checked> Somente ativas</label>
+          <button class="btn" id="vagaExport">Exportar CSV</button>
+          <button class="btn primary" id="novaVagaBtn">+ Nova vaga</button>
+        </div>
+        <div id="vagasTable"></div>
+      </section>
+
+      <!-- SLA E GARGALOS -->
+      <section class="view hidden" id="view-sla">
+        <div class="cards" id="slaCards"></div>
+        <div class="grid two">
+          <section class="panel"><h2>Ranking de etapas com maior tempo de espera</h2><p class="sub">Tempo médio (dias úteis) em cada status, com o responsável típico pela próxima ação. Mede tempo de espera, não produtividade individual.</p><div id="slaRanking"></div></section>
+          <section class="panel"><h2>Distribuição do SLA das vagas ativas</h2><p class="sub">Dias úteis efetivos (descontadas suspensões autorizadas).</p><div class="chart-box"><canvas id="chSla2"></canvas></div></section>
+        </div>
+        <h3 class="section-title">Vagas ativas — controle de prazo</h3>
+        <div id="slaTable"></div>
+      </section>
+
+      <!-- CONFIGURAÇÕES -->
+      <section class="view hidden" id="view-config">
+        <div class="tabs" id="cfgTabs"></div>
+        <div class="toolbar"><span class="muted" id="cfgHint"></span><span style="margin-left:auto"></span><button class="btn primary" id="cfgNovo">+ Novo registro</button></div>
+        <div id="cfgTable"></div>
+      </section>
+
+      <!-- MÓDULOS DAS PRÓXIMAS FASES -->
+      <section class="view hidden" id="view-placeholder"><div class="panel placeholder" id="placeholderBody"></div></section>
+    </main>
+  </div>
+
+  <dialog id="dlg"></dialog>
+  <dialog id="dlg2" class="narrow"></dialog>
+  <div class="toast-area" id="toasts"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <?!= include('Scripts'); ?>
+</body>
+</html>

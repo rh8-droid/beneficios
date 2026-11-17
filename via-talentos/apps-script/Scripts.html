@@ -1,0 +1,731 @@
+<script>
+/* =========================================================================
+   VIA TALENTOS — aplicação cliente
+   ========================================================================= */
+var S = { user: null, lk: null, marca: {}, view: 'dashboard', vagas: [], dash: null, charts: {}, cfgTab: 'Empresas', cfgRows: [], timer: null };
+
+/* ---------------------------- utilitários ---------------------------- */
+function $(sel, root) { return (root || document).querySelector(sel); }
+function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+function esc(v) {
+  return String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}:\d{2}))?/);
+  return m ? m[3] + '/' + m[2] + '/' + m[1] + (m[4] ? ' ' + m[4] : '') : esc(iso);
+}
+function todayIso() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function num(v) { return v === null || v === undefined ? '—' : String(v).replace('.', ','); }
+function options(list, selected, placeholder) {
+  var html = placeholder !== undefined && placeholder !== null ? '<option value="">' + esc(placeholder) + '</option>' : '';
+  return html + (list || []).map(function (o) {
+    var value = typeof o === 'object' ? o.value : o;
+    var label = typeof o === 'object' ? o.label : o;
+    return '<option value="' + esc(value) + '"' + (String(value) === String(selected || '') ? ' selected' : '') + '>' + esc(label) + '</option>';
+  }).join('');
+}
+function names(list) { return (list || []).map(function (r) { return r.Nome; }); }
+function isAdmin() { return S.user && S.user.perfil === 'Administrador RH'; }
+function canWrite() { return S.user && (S.user.perfil === 'Administrador RH' || S.user.perfil === 'Analista RH'); }
+
+function api(action, payload) {
+  return new Promise(function (resolve, reject) {
+    google.script.run
+      .withSuccessHandler(function (raw) {
+        var res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (res && res.ok) resolve(res.data); else reject(new Error(res ? res.error : 'Falha de comunicação.'));
+      })
+      .withFailureHandler(function (err) { reject(new Error(err && err.message ? err.message : String(err))); })
+      .api(action, payload || {});
+  });
+}
+
+function toast(msg, isError) {
+  var el = document.createElement('div');
+  el.className = 'toast' + (isError ? ' error' : '');
+  el.textContent = msg;
+  $('#toasts').appendChild(el);
+  setTimeout(function () { el.remove(); }, isError ? 7000 : 3500);
+}
+function fail(err) { toast(err.message || String(err), true); }
+
+function slaBadge(sla) {
+  if (!sla || !sla.iniciado) return '<span class="badge sla-neutro">SLA não iniciado</span>';
+  if (sla.cancelada) return '<span class="badge sla-neutro">Cancelada</span>';
+  var txt;
+  if (sla.fechado) txt = sla.cumprido ? 'No prazo (' + sla.diasEfetivos + 'd)' : 'Atrasou ' + sla.atraso + 'd';
+  else if (sla.diasRestantes < 0) txt = 'Vencida há ' + sla.atraso + 'd';
+  else txt = sla.diasEfetivos + '/' + sla.limite + 'd · resta ' + sla.diasRestantes;
+  if (sla.suspensa) txt += ' · suspensa';
+  return '<span class="badge dot sla-' + sla.nivel + '">' + esc(txt) + '</span>';
+}
+function statusBadge(s) { return '<span class="badge">' + esc(s) + '</span>'; }
+function progressBar(sla) {
+  if (!sla || !sla.iniciado) return '';
+  var color = { verde: 'var(--green)', amarelo: 'var(--yellow)', laranja: 'var(--orange)', vermelho: 'var(--red)' }[sla.nivel] || 'var(--neutral)';
+  return '<div class="progress" title="' + sla.percentual + '% do SLA consumido"><i style="width:' + Math.min(100, sla.percentual) + '%;background:' + color + '"></i></div>';
+}
+
+/* ------------------------------ diálogos ------------------------------ */
+function openDialog(id, html) {
+  var d = $(id);
+  d.innerHTML = html;
+  $$('[data-close]', d).forEach(function (b) { b.addEventListener('click', function () { d.close(); }); });
+  if (!d.open) d.showModal();
+  return d;
+}
+
+/**
+ * Formulário genérico em diálogo. fields: [{k,label,type,options,req,value,span,hint,show}]
+ * onSubmit(values) deve retornar Promise; erros aparecem no próprio formulário.
+ */
+function formDialog(cfg) {
+  var html = '<form method="dialog" novalidate><div class="dlg-head"><h3>' + esc(cfg.title) + '</h3><button type="button" class="btn small x" data-close>Fechar</button></div>' +
+    '<div class="dlg-body">' + (cfg.intro ? '<p class="muted" style="margin-top:0">' + cfg.intro + '</p>' : '') +
+    '<div class="form-error hidden"></div><div class="form-grid">' + cfg.fields.map(fieldHtml).join('') + '</div></div>' +
+    '<div class="dlg-foot"><button type="button" class="btn" data-close>Cancelar</button><button type="submit" class="btn primary">' + esc(cfg.submit || 'Salvar') + '</button></div></form>';
+  var d = openDialog(cfg.wide ? '#dlg' : '#dlg2', html);
+  var form = $('form', d);
+  if (cfg.onRender) cfg.onRender(form);
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var values = {};
+    cfg.fields.forEach(function (f) {
+      if (f.type === 'section') return;
+      if (f.type === 'checks') {
+        values[f.k] = $$('input[name="' + f.k + '"]:checked', form).map(function (i) { return i.value; }).join(';');
+      } else if (f.type === 'checkbox') {
+        values[f.k] = form.elements[f.k].checked ? 'Sim' : 'Não';
+      } else {
+        values[f.k] = form.elements[f.k] ? form.elements[f.k].value.trim() : '';
+      }
+    });
+    var missing = cfg.fields.filter(function (f) {
+      var el = form.elements[f.k];
+      var visible = el && !(el.closest && el.closest('.hidden'));
+      return f.req && visible && !values[f.k];
+    });
+    var errBox = $('.form-error', form);
+    if (missing.length) {
+      errBox.textContent = 'Preencha: ' + missing.map(function (f) { return f.label; }).join(', ') + '.';
+      errBox.classList.remove('hidden');
+      return;
+    }
+    var btn = $('button[type=submit]', form);
+    btn.disabled = true; btn.textContent = 'Salvando…';
+    Promise.resolve(cfg.onSubmit(values)).then(function () { d.close(); })
+      .catch(function (e) { errBox.textContent = e.message; errBox.classList.remove('hidden'); d.querySelector('.dlg-body').scrollTop = 0; })
+      .then(function () { btn.disabled = false; btn.textContent = cfg.submit || 'Salvar'; });
+  });
+  return d;
+}
+
+function fieldHtml(f) {
+  if (f.type === 'section') return '<div class="form-section">' + esc(f.label) + '</div>';
+  var cls = 'field' + (f.span ? ' span-' + f.span : '');
+  var req = f.req ? ' <span class="req">*</span>' : '';
+  var v = f.value === undefined || f.value === null ? '' : f.value;
+  var input;
+  if (f.type === 'select') input = '<select name="' + f.k + '">' + options(f.options, v, 'placeholder' in f ? f.placeholder : 'Selecione…') + '</select>';
+  else if (f.type === 'textarea') input = '<textarea name="' + f.k + '">' + esc(v) + '</textarea>';
+  else if (f.type === 'checkbox') return '<label class="check ' + (f.span ? 'span-' + f.span : '') + '" data-wrap="' + f.k + '"><input type="checkbox" name="' + f.k + '"' + (v === 'Sim' ? ' checked' : '') + '> ' + esc(f.label) + '</label>';
+  else if (f.type === 'checks') {
+    var sel = String(v || '').split(';');
+    return '<div class="' + cls + '"><span class="field">' + esc(f.label) + '</span><div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px">' +
+      f.options.map(function (o) { return '<label class="check"><input type="checkbox" name="' + f.k + '" value="' + esc(o) + '"' + (!v || sel.indexOf(o) >= 0 ? ' checked' : '') + '> ' + esc(o) + '</label>'; }).join('') + '</div></div>';
+  }
+  else input = '<input name="' + f.k + '" type="' + (f.type || 'text') + '" value="' + esc(v) + '"' + (f.min !== undefined ? ' min="' + f.min + '"' : '') + (f.max !== undefined ? ' max="' + f.max + '"' : '') + '>';
+  return '<label class="' + cls + '" data-wrap="' + f.k + '"><span>' + esc(f.label) + req + '</span>' + input + (f.hint ? '<span class="muted">' + esc(f.hint) + '</span>' : '') + '</label>';
+}
+
+/* ------------------------------ navegação ------------------------------ */
+var TITLES = {
+  dashboard: 'Dashboard', vagas: 'Gestão de Vagas', candidatos: 'Candidatos', kanban: 'Kanban do Recrutamento',
+  entrevistas: 'Entrevistas', indicacoes: 'Indicações', sla: 'SLA e Gargalos', relatorios: 'Indicadores e Relatórios',
+  artes: 'Gerador de Artes', config: 'Configurações'
+};
+var FUTURE = {
+  candidatos: { fase: 2, itens: ['Base única de candidatos com bloqueio de duplicidade (CPF, e-mail e telefone)', 'Currículo anexado no Drive com acesso restrito', 'Histórico de participação em outros processos', 'Consentimento e prazo de retenção (LGPD)'] },
+  kanban: { fase: 2, itens: ['Quadro com 12 colunas e arrastar-e-soltar', 'Etapas configuráveis por vaga (já gravadas no cadastro da vaga)', 'Dias úteis aguardando, próxima ação, responsável e prazo em cada card'] },
+  entrevistas: { fase: 2, itens: ['Agenda de entrevistas RH, gestor e direção', 'Parecer, resultado e motivo padronizado de reprovação', 'Próxima etapa e data prevista de retorno'] },
+  indicacoes: { fase: 2, itens: ['Cadastro do indicado e do colaborador indicador', 'Taxa de conversão e cargos com mais indicações', 'Identificação de candidatos que já participaram de processos anteriores'] },
+  relatorios: { fase: 3, itens: ['11 relatórios com filtros e exportação para Excel e PDF', 'Produtividade por analista separada da espera de outras áreas', 'Recorrência por cargo (requisições, posições, preenchidas e reaberturas)', 'Alertas automáticos por e-mail'] },
+  artes: { fase: 4, itens: ['Arte preenchida com os dados da vaga, no modelo institucional', 'Versões PNG, LinkedIn, Instagram, WhatsApp e PDF', 'Histórico, regeneração e aprovação manual antes da divulgação'] }
+};
+
+function showView(view) {
+  S.view = view;
+  $$('#nav button').forEach(function (b) { b.classList.toggle('active', b.dataset.view === view); });
+  $$('.view').forEach(function (v) { v.classList.add('hidden'); });
+  $('#pageTitle').textContent = TITLES[view];
+  $('#sidebar').classList.remove('open');
+  if (FUTURE[view]) {
+    var f = FUTURE[view];
+    $('#placeholderBody').innerHTML = '<p class="eyebrow">Fase ' + f.fase + ' do desenvolvimento</p><h2>' + esc(TITLES[view]) + '</h2>' +
+      '<p class="muted">Este módulo será entregue na Fase ' + f.fase + '. As tabelas no banco de dados já foram criadas e os indicadores do dashboard já leem esses registros.</p>' +
+      '<ul>' + f.itens.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul>';
+    $('#view-placeholder').classList.remove('hidden');
+    return;
+  }
+  $('#view-' + view).classList.remove('hidden');
+  refresh();
+}
+
+function refresh() {
+  if (S.view === 'dashboard') return loadDashboard();
+  if (S.view === 'vagas') return loadVagas();
+  if (S.view === 'sla') return loadSla();
+  if (S.view === 'config') return loadCadastro();
+}
+
+function setSync(text) { $('#syncStatus').textContent = text; }
+
+/* ------------------------------ dashboard ------------------------------ */
+var DASH_FILTERS = [
+  { k: 'de', label: 'De (abertura)', type: 'date' },
+  { k: 'ate', label: 'Até', type: 'date' },
+  { k: 'Empresa', label: 'Empresa', list: function () { return names(S.lk.empresas); } },
+  { k: 'Unidade', label: 'Unidade', list: function () { return names(S.lk.unidades); } },
+  { k: 'Cargo', label: 'Cargo', list: function () { return names(S.lk.cargos); } },
+  { k: 'Gestor', label: 'Gestor', list: function () { return names(S.lk.gestores); } },
+  { k: 'Analista', label: 'Analista', list: function () { return names(S.lk.analistas); } },
+  { k: 'Status', label: 'Status', list: function () { return S.lk.statusVaga; } },
+  { k: 'Departamento', label: 'Departamento', list: function () { return names(S.lk.departamentos); } }
+];
+
+function renderDashFilters() {
+  $('#dashFilters').innerHTML = DASH_FILTERS.map(function (f) {
+    var input = f.type === 'date' ? '<input type="date" data-f="' + f.k + '">' : '<select data-f="' + f.k + '">' + options(f.list(), '', 'Todos') + '</select>';
+    return '<label>' + esc(f.label) + input + '</label>';
+  }).join('') + '<label>&nbsp;<button class="btn" id="dashClear">Limpar filtros</button></label>';
+  $$('#dashFilters [data-f]').forEach(function (el) { el.addEventListener('change', loadDashboard); });
+  $('#dashClear').addEventListener('click', function () { $$('#dashFilters [data-f]').forEach(function (el) { el.value = ''; }); loadDashboard(); });
+}
+
+function dashFilterValues() {
+  var f = {};
+  $$('#dashFilters [data-f]').forEach(function (el) { if (el.value) f[el.dataset.f] = el.value; });
+  return f;
+}
+
+function loadDashboard() {
+  setSync('Atualizando…');
+  return api('dashboard', dashFilterValues()).then(function (d) {
+    S.dash = d;
+    renderDashboard(d);
+    setSync('Atualizado em ' + fmtDate(d.atualizadoEm));
+  }).catch(function (e) { setSync('Erro ao atualizar'); fail(e); });
+}
+
+function card(label, value, cls, small) {
+  return '<div class="card ' + (cls || '') + '"><span>' + esc(label) + '</span><strong>' + value + '</strong>' + (small ? '<small>' + small + '</small>' : '') + '</div>';
+}
+
+function renderDashboard(d) {
+  var c = d.cards;
+  $('#dashCards').innerHTML =
+    '<h3 class="section-title">Vagas e prazos</h3><div class="cards">' +
+    card('Vagas abertas', c.vagasAbertas, 'accent', c.vagasSuspensas ? c.vagasSuspensas + ' suspensa(s) à parte' : '') +
+    card('Posições disponíveis', c.posicoesDisponiveis, 'accent') +
+    card('Vagas abertas no mês', c.abertasNoMes) +
+    card('Vagas encerradas no mês', c.encerradasNoMes) +
+    card('Concluídas dentro do SLA', c.concluidasNoSla, 'green') +
+    card('Fora do SLA', c.foraDoSla, 'red', c.foraDoSlaAbertas + ' abertas vencidas · ' + c.foraDoSlaConcluidas + ' concluídas com atraso') +
+    card('Próximas do vencimento', c.proximasVencimento, 'orange', 'até ' + esc(S.lk.config.ALERTA_DIAS_RESTANTES) + ' dias úteis restantes') +
+    card('Tempo médio de fechamento', c.tempoMedioFechamento === null ? '—' : num(c.tempoMedioFechamento) + '<small> dias úteis</small>') +
+    card('Cumprimento do SLA', c.taxaSla === null ? '—' : c.taxaSla + '%', c.taxaSla === null ? '' : (c.taxaSla >= 80 ? 'green' : 'red'), c.posicoesPreenchidas + ' posições preenchidas') +
+    '</div><h3 class="section-title">Candidatos</h3><div class="cards">' +
+    card('Candidaturas recebidas', c.candidaturas) +
+    card('Em processo seletivo', c.emProcesso) +
+    card('Aprovados', c.aprovados, 'green') +
+    card('Reprovados / desistentes', c.reprovados, 'red') +
+    card('Contratações efetivadas', c.contratacoes, 'accent', 'posições preenchidas') +
+    '</div>';
+
+  var g = d.graficos;
+  barChart('chMensal', g.mensal.map(function (m) { return m.label.substr(5) + '/' + m.label.substr(2, 2); }), [
+    { label: 'Abertas', data: g.mensal.map(function (m) { return m.abertas; }), backgroundColor: '#f2c200' },
+    { label: 'Concluídas', data: g.mensal.map(function (m) { return m.fechadas; }), backgroundColor: '#e8e8e8' },
+    { label: 'Canceladas', data: g.mensal.map(function (m) { return m.canceladas; }), backgroundColor: '#5a5a5a' }
+  ]);
+  slaDoughnut('chSla', g.sla);
+  barChart('chCargo', g.tempoCargo.map(function (x) { return x.label; }), [{ label: 'Dias úteis', data: g.tempoCargo.map(function (x) { return x.valor; }), backgroundColor: '#f2c200' }], { indexAxis: 'y', sla: true });
+  barChart('chEtapa', g.tempoEtapa.map(function (x) { return x.label; }), [{ label: 'Dias úteis (média)', data: g.tempoEtapa.map(function (x) { return x.valor; }), backgroundColor: '#d9d9d9' }], { indexAxis: 'y' });
+  var funilVazio = !g.funil.some(function (f) { return f.valor; });
+  barChart('chFunil', funilVazio ? [] : g.funil.map(function (x) { return x.label; }), [{ label: 'Candidaturas', data: g.funil.map(function (x) { return x.valor; }), backgroundColor: '#f2c200' }], { indexAxis: 'y' });
+  barChart('chConversao', funilVazio ? [] : g.conversao.map(function (x) { return x.label; }), [{ label: '% de conversão', data: g.conversao.map(function (x) { return x.valor; }), backgroundColor: '#e8e8e8' }], { indexAxis: 'y', max: 100 });
+  barChart('chMotivos', g.motivos.map(function (x) { return x.label; }), [{ label: 'Reprovações', data: g.motivos.map(function (x) { return x.valor; }), backgroundColor: '#e5484d' }], { indexAxis: 'y' });
+  barChart('chAnalistas', g.analistas.map(function (x) { return x.label; }), [
+    { label: 'Ativas', data: g.analistas.map(function (x) { return x.ativas; }), backgroundColor: '#f2c200' },
+    { label: 'Concluídas', data: g.analistas.map(function (x) { return x.concluidas; }), backgroundColor: '#e8e8e8' },
+    { label: 'Canceladas', data: g.analistas.map(function (x) { return x.outras; }), backgroundColor: '#5a5a5a' }
+  ], { stacked: true });
+  barChart('chReab', g.reaberturas.map(function (x) { return x.label; }), [{ label: 'Reaberturas', data: g.reaberturas.map(function (x) { return x.valor; }), backgroundColor: '#f08a24' }], { indexAxis: 'y' });
+  doughnut('chOrigem', g.origens.map(function (x) { return x.label; }), g.origens.map(function (x) { return x.valor; }));
+  $('#dashAlerts').innerHTML = alertsTable(d.alertas);
+  bindVagaLinks($('#dashAlerts'));
+}
+
+function alertsTable(list) {
+  if (!list.length) return '<div class="empty">Nenhuma vaga em alerta. 👏</div>';
+  return '<div class="table-wrap"><table><thead><tr><th>Vaga</th><th>Etapa atual</th><th>Responsável pela próxima ação</th><th>Parada há</th><th>SLA</th><th>Prazo</th></tr></thead><tbody>' +
+    list.map(function (a) {
+      return '<tr class="clickable" data-vaga="' + esc(a.ID) + '"><td><span class="code">' + esc(a.Codigo) + '</span><br>' + esc(a.Cargo) + ' <span class="muted">· ' + esc(a.Unidade) + '</span></td>' +
+        '<td>' + statusBadge(a.Status) + '</td><td>' + esc(a.responsavel || '—') + '<br><span class="muted">Gestor: ' + esc(a.Gestor) + ' · Analista: ' + esc(a.Analista) + '</span></td>' +
+        '<td>' + a.diasNaEtapa + ' dia(s) útil(eis)' + (a.semMovimentacao ? '<br><span class="badge sla-laranja">sem movimentação</span>' : '') + '</td>' +
+        '<td>' + slaBadge(a.sla) + '</td><td>' + (a.sla.iniciado ? fmtDate(a.sla.prazoAjustado) : '—') + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+}
+
+/* ------------------------------ gráficos ------------------------------ */
+function resetCanvas(id) {
+  if (S.charts[id]) { S.charts[id].destroy(); delete S.charts[id]; }
+  var old = document.getElementById(id);
+  var box = old.parentElement;
+  box.innerHTML = '<canvas id="' + id + '"></canvas>';
+  return box;
+}
+function emptyChart(box, msg) { box.innerHTML = '<div class="empty">' + esc(msg || 'Sem dados para os filtros selecionados.') + '</div><canvas id="' + box.dataset.id + '" class="hidden"></canvas>'; }
+function chartReady(id, hasData) {
+  var box = resetCanvas(id);
+  box.dataset.id = id;
+  if (!window.Chart) { emptyChart(box, 'Biblioteca de gráficos indisponível.'); return null; }
+  if (!hasData) { emptyChart(box); return null; }
+  return document.getElementById(id);
+}
+function baseOptions(o) {
+  o = o || {};
+  var scales = {
+    x: { stacked: !!o.stacked, grid: { color: '#262626' }, ticks: { color: '#bdbdbd' }, beginAtZero: true },
+    y: { stacked: !!o.stacked, grid: { color: '#262626' }, ticks: { color: '#bdbdbd', autoSkip: false, callback: function (v) { var l = this.getLabelForValue ? this.getLabelForValue(v) : v; return typeof l === 'string' && l.length > 28 ? l.substr(0, 27) + '…' : l; } }, beginAtZero: true }
+  };
+  if (o.indexAxis !== 'y') scales.y.ticks.callback = undefined;
+  if (o.max) scales[o.indexAxis === 'y' ? 'x' : 'y'].max = o.max;
+  return { responsive: true, maintainAspectRatio: false, indexAxis: o.indexAxis || 'x', plugins: { legend: { labels: { color: '#e6e6e6', boxWidth: 12 } } }, scales: scales };
+}
+function barChart(id, labels, datasets, o) {
+  var hasData = labels.length && datasets.some(function (ds) { return ds.data.some(function (v) { return v; }); });
+  var canvas = chartReady(id, hasData);
+  if (!canvas) return;
+  datasets.forEach(function (ds) { ds.borderRadius = 6; ds.maxBarThickness = 34; });
+  var opts = baseOptions(o);
+  if (datasets.length === 1) opts.plugins.legend.display = false;
+  if (o && o.sla) {
+    var lim = Number(S.lk.config.SLA_DIAS_UTEIS || 15);
+    datasets.push({ type: 'line', label: 'SLA (' + lim + ' dias úteis)', data: labels.map(function () { return lim; }), borderColor: '#e5484d', borderDash: [6, 4], pointRadius: 0 });
+    opts.plugins.legend.display = true;
+  }
+  S.charts[id] = new Chart(canvas, { type: 'bar', data: { labels: labels, datasets: datasets }, options: opts });
+}
+function doughnut(id, labels, data, colors) {
+  var canvas = chartReady(id, data.some(function (v) { return v; }));
+  if (!canvas) return;
+  S.charts[id] = new Chart(canvas, {
+    type: 'doughnut',
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: colors || ['#f2c200', '#e8e8e8', '#8f8f8f', '#f08a24', '#3fb46b', '#5a5a5a', '#e5484d', '#b5b5b5'], borderColor: '#1b1b1b', borderWidth: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'right', labels: { color: '#e6e6e6', boxWidth: 12 } } } }
+  });
+}
+function slaDoughnut(id, s) {
+  doughnut(id, ['Verde (até 9)', 'Amarelo (10–12)', 'Laranja (13–15)', 'Vermelho (vencido)'], [s.verde, s.amarelo, s.laranja, s.vermelho], ['#3fb46b', '#f2c200', '#f08a24', '#e5484d']);
+}
+
+/* ------------------------------ vagas ------------------------------ */
+function initVagaToolbar() {
+  $('#vagaFStatus').innerHTML = options(S.lk.statusVaga, '', 'Status: todos');
+  $('#vagaFEmpresa').innerHTML = options(names(S.lk.empresas), '', 'Empresa: todas');
+  $('#vagaFAnalista').innerHTML = options(names(S.lk.analistas), '', 'Analista: todos');
+  var t;
+  $('#vagaBusca').addEventListener('input', function () { clearTimeout(t); t = setTimeout(loadVagas, 300); });
+  ['#vagaFStatus', '#vagaFEmpresa', '#vagaFAnalista', '#vagaFNivel', '#vagaFAtivas'].forEach(function (s) { $(s).addEventListener('change', loadVagas); });
+  $('#novaVagaBtn').addEventListener('click', function () { vagaForm(null); });
+  $('#novaVagaBtn').classList.toggle('hidden', !canWrite());
+  $('#vagaExport').addEventListener('click', exportVagas);
+}
+
+function loadVagas() {
+  setSync('Carregando vagas…');
+  var f = { busca: $('#vagaBusca').value, Status: $('#vagaFStatus').value, Empresa: $('#vagaFEmpresa').value, Analista: $('#vagaFAnalista').value, nivel: $('#vagaFNivel').value };
+  if ($('#vagaFAtivas').checked && !f.Status) f.situacao = 'ativas';
+  return api('listVagas', f).then(function (list) {
+    S.vagas = list;
+    renderVagas(list);
+    setSync(list.length + ' vaga(s)');
+  }).catch(fail);
+}
+
+function renderVagas(list) {
+  if (!list.length) { $('#vagasTable').innerHTML = '<div class="empty">Nenhuma vaga encontrada.' + (canWrite() ? ' Clique em "+ Nova vaga" para cadastrar.' : '') + '</div>'; return; }
+  $('#vagasTable').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Código</th><th>Cargo</th><th>Empresa / Unidade</th><th>Analista / Gestor</th><th>Posições</th><th>Status</th><th>SLA</th><th>Prioridade</th></tr></thead><tbody>' +
+    list.map(function (v) {
+      return '<tr class="clickable" data-vaga="' + esc(v.ID) + '"><td><span class="code">' + esc(v.Codigo || v.ID) + '</span><br><span class="muted">' + fmtDate(v.DataAbertura) + '</span></td>' +
+        '<td><b>' + esc(v.Cargo) + '</b><br><span class="muted">' + esc(v.Departamento) + '</span></td>' +
+        '<td>' + esc(v.Empresa) + '<br><span class="muted">' + esc(v.Unidade) + '</span></td>' +
+        '<td>' + esc(v.Analista) + '<br><span class="muted">' + esc(v.Gestor) + '</span></td>' +
+        '<td>' + v.posicoesAbertas + ' aberta(s)<br><span class="muted">' + v.posicoesPreenchidas + '/' + v.posicoesTotal + ' preenchida(s)</span></td>' +
+        '<td>' + statusBadge(v.Status) + '</td><td>' + slaBadge(v.sla) + progressBar(v.sla) + '</td>' +
+        '<td><span class="prio-' + esc(v.Prioridade) + '">● ' + esc(v.Prioridade) + '</span></td></tr>';
+    }).join('') + '</tbody></table></div>';
+  bindVagaLinks($('#vagasTable'));
+}
+
+function bindVagaLinks(root) {
+  $$('[data-vaga]', root).forEach(function (tr) { tr.addEventListener('click', function () { openVaga(tr.dataset.vaga); }); });
+}
+
+function exportVagas() {
+  var cols = ['Codigo', 'Empresa', 'Unidade', 'Cargo', 'Departamento', 'Gestor', 'Analista', 'QtdPosicoes', 'DataAbertura', 'DataAprovacao', 'Status', 'DataFechamento', 'Prioridade', 'MotivoAbertura', 'TipoContrato', 'Reaberturas'];
+  var extra = ['PosicoesAbertas', 'PosicoesPreenchidas', 'DiasUteisEfetivos', 'DiasRestantes', 'PrazoOriginal', 'PrazoAjustado', 'NivelSLA', 'SLACumprido'];
+  var rows = [cols.concat(extra)].concat(S.vagas.map(function (v) {
+    var s = v.sla || {};
+    return cols.map(function (c) { return v[c]; }).concat([v.posicoesAbertas, v.posicoesPreenchidas, s.diasEfetivos, s.diasRestantes, s.prazoOriginal, s.prazoAjustado, s.nivel, s.cumprido === null || s.cumprido === undefined ? '' : (s.cumprido ? 'Sim' : 'Não')]);
+  }));
+  var csv = '﻿' + rows.map(function (r) { return r.map(function (c) { var s = c === undefined || c === null ? '' : String(c); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(';'); }).join('\n');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'via-talentos-vagas-' + todayIso() + '.csv';
+  a.click();
+}
+
+function vagaFields(v) {
+  v = v || {};
+  var unidades = S.lk.unidades.filter(function (u) { return !v.Empresa || u.Empresa === v.Empresa; });
+  var unidadeNames = names(unidades.length ? unidades : S.lk.unidades);
+  return [
+    { type: 'section', label: 'Identificação' },
+    { k: 'Empresa', label: 'Empresa', type: 'select', options: names(S.lk.empresas), req: true, value: v.Empresa },
+    { k: 'Unidade', label: 'Unidade / localidade', type: 'select', options: unidadeNames.concat(v.Unidade && unidadeNames.indexOf(v.Unidade) < 0 ? [v.Unidade] : []), req: true, value: v.Unidade },
+    { k: 'Cargo', label: 'Cargo', type: 'select', options: names(S.lk.cargos).concat(v.Cargo && names(S.lk.cargos).indexOf(v.Cargo) < 0 ? [v.Cargo] : []), req: true, value: v.Cargo, span: 2 },
+    { k: 'Departamento', label: 'Departamento', type: 'select', options: names(S.lk.departamentos).concat(v.Departamento && names(S.lk.departamentos).indexOf(v.Departamento) < 0 ? [v.Departamento] : []), req: true, value: v.Departamento },
+    { k: 'Gestor', label: 'Gestor solicitante', type: 'select', options: names(S.lk.gestores).concat(v.Gestor && names(S.lk.gestores).indexOf(v.Gestor) < 0 ? [v.Gestor] : []), req: true, value: v.Gestor },
+    { k: 'Analista', label: 'Analista de RH responsável', type: 'select', options: names(S.lk.analistas).concat(v.Analista && names(S.lk.analistas).indexOf(v.Analista) < 0 ? [v.Analista] : []), req: true, value: v.Analista },
+    { k: 'QtdPosicoes', label: 'Quantidade de posições', type: 'number', min: 1, max: 200, req: true, value: v.QtdPosicoes || 1 },
+    { k: 'DataAbertura', label: 'Data de abertura', type: 'date', req: true, value: v.DataAbertura || todayIso() },
+    { k: 'DataAprovacao', label: 'Data oficial de aprovação', type: 'date', value: v.DataAprovacao, hint: 'Início do SLA. Deixe vazio se aguarda aprovação.' },
+    { k: 'Prioridade', label: 'Prioridade', type: 'select', options: S.lk.prioridades, req: true, value: v.Prioridade || 'Média' },
+    { k: 'MotivoAbertura', label: 'Motivo da abertura', type: 'select', options: S.lk.motivosAbertura, req: true, value: v.MotivoAbertura },
+    { k: 'ColaboradorSubstituido', label: 'Colaborador substituído', value: v.ColaboradorSubstituido, span: 2 },
+    { type: 'section', label: 'Contratação' },
+    { k: 'TipoContrato', label: 'Tipo de contrato', type: 'select', options: S.lk.tiposContrato, req: true, value: v.TipoContrato || 'CLT' },
+    { k: 'Modalidade', label: 'Modalidade de trabalho', type: 'select', options: S.lk.modalidades, value: v.Modalidade || 'Presencial' },
+    { k: 'Horario', label: 'Horário de trabalho', value: v.Horario, span: 2 },
+    { k: 'Salario', label: 'Faixa salarial', value: v.Salario, span: 2, hint: 'Ex.: R$ 3.500 a R$ 4.200' },
+    { k: 'SalarioACombinar', label: 'Salário a combinar', type: 'checkbox', value: v.SalarioACombinar, span: 2 },
+    { type: 'section', label: 'Descrição' },
+    { k: 'Atribuicoes', label: 'Atribuições', type: 'textarea', value: v.Atribuicoes, span: 2 },
+    { k: 'Requisitos', label: 'Requisitos', type: 'textarea', value: v.Requisitos, span: 2 },
+    { k: 'Beneficios', label: 'Benefícios (um por linha)', type: 'textarea', value: v.Beneficios, span: 2 },
+    { k: 'Observacoes', label: 'Observações internas', type: 'textarea', value: v.Observacoes, span: 2 },
+    { k: 'Etapas', label: 'Etapas do processo seletivo desta vaga', type: 'checks', options: S.lk.etapasKanban, value: v.Etapas, span: 4 }
+  ];
+}
+
+function vagaForm(vaga, prefill) {
+  var editing = !!(vaga && vaga.ID);
+  var data = editing ? vaga : (prefill || {});
+  var fields = vagaFields(data);
+  if (editing && vaga.DataAprovacao) fields.splice(fields.findIndex(function (f) { return f.k === 'Prioridade'; }), 0, { k: 'Justificativa', label: 'Justificativa (se alterar a aprovação)', span: 1 });
+  var missingCad = ['empresas', 'unidades', 'cargos', 'departamentos', 'gestores', 'analistas'].filter(function (k) { return !S.lk[k].length; });
+  formDialog({
+    title: editing ? 'Editar vaga ' + (vaga.Codigo || '') : (data.ReaberturaDe ? 'Nova requisição a partir de ' + data.ReaberturaDeCodigo : 'Abertura de vaga'),
+    wide: true,
+    intro: missingCad.length ? '⚠️ Cadastre antes em Configurações: ' + missingCad.join(', ') + '.' : (editing ? '' : 'O código é gerado automaticamente. Campos com * são obrigatórios.'),
+    fields: fields,
+    submit: editing ? 'Salvar alterações' : 'Abrir vaga',
+    onRender: function (form) {
+      function sync() {
+        $('[data-wrap="ColaboradorSubstituido"]', form).classList.toggle('hidden', form.elements.MotivoAbertura.value !== 'Substituição');
+        var combinar = form.elements.SalarioACombinar.checked;
+        form.elements.Salario.disabled = combinar;
+      }
+      form.elements.MotivoAbertura.addEventListener('change', sync);
+      form.elements.SalarioACombinar.addEventListener('change', sync);
+      form.elements.Empresa.addEventListener('change', function () {
+        var emp = form.elements.Empresa.value;
+        var us = S.lk.unidades.filter(function (u) { return !emp || u.Empresa === emp; });
+        form.elements.Unidade.innerHTML = options(names(us), form.elements.Unidade.value, 'Selecione…');
+      });
+      form.elements.Cargo.addEventListener('change', function () {
+        var c = S.lk.cargos.filter(function (x) { return x.Nome === form.elements.Cargo.value; })[0];
+        if (c && c.Departamento && !form.elements.Departamento.value) form.elements.Departamento.value = c.Departamento;
+      });
+      sync();
+    },
+    onSubmit: function (values) {
+      if (editing) values.ID = vaga.ID;
+      if (data.ReaberturaDe) values.ReaberturaDe = data.ReaberturaDe;
+      return api('saveVaga', values).then(function (v) {
+        toast(editing ? 'Vaga atualizada.' : 'Vaga ' + v.Codigo + ' aberta com ' + v.posicoes.length + ' posição(ões).');
+        refresh();
+        setTimeout(function () { renderVagaDetail(v); }, 50);
+      });
+    }
+  });
+}
+
+function openVaga(id) {
+  api('getVaga', { id: id }).then(renderVagaDetail).catch(fail);
+}
+
+function renderVagaDetail(v) {
+  var s = v.sla;
+  var final = ['Concluída / contratada', 'Cancelada'].indexOf(v.Status) >= 0;
+  var actions = '';
+  if (v.podeEditar) {
+    if (!final) actions += '<button class="btn small" id="actEdit">Editar</button>';
+    actions += '<button class="btn small primary" id="actStatus">Alterar status</button>';
+    if (isAdmin() && s.iniciado && !final) actions += '<button class="btn small" id="actExc">Exceção de SLA</button>';
+    actions += '<button class="btn small" id="actDup">Nova requisição a partir desta</button>';
+  }
+  var slaHtml = s.iniciado ?
+    '<div class="sla-panel">' +
+    card('Dias úteis decorridos', s.diasEfetivos + '<small> / ' + s.limite + '</small>', s.nivel === 'vermelho' ? 'red' : (s.nivel === 'verde' ? 'green' : 'orange'), s.diasPausados ? s.diasPausados + ' pausado(s) por suspensão' : '') +
+    card(s.fechado ? 'Resultado' : 'Dias úteis restantes', s.fechado ? (s.cumprido ? 'No prazo' : 'Atraso ' + s.atraso + 'd') : (s.diasRestantes < 0 ? '−' + s.atraso : s.diasRestantes), '') +
+    card('Prazo original', fmtDate(s.prazoOriginal), '', 'aprovação ' + fmtDate(s.inicio)) +
+    card('Prazo ajustado', fmtDate(s.prazoAjustado), '', s.diasAdicionais ? '+' + s.diasAdicionais + ' por exceção' : 'sem exceções') +
+    card('SLA consumido', s.percentual + '%', '', progressBar(s)) +
+    '</div>' : '<div class="empty" style="margin-bottom:16px">SLA ainda não iniciado: a vaga aguarda aprovação. A contagem de ' + esc(S.lk.config.SLA_DIAS_UTEIS) + ' dias úteis começa na data oficial de aprovação.</div>';
+
+  var posRows = v.posicoes.map(function (p) {
+    var ps = (s.posicoes || []).filter(function (x) { return x.posicaoId === p.ID; })[0];
+    var acts = '';
+    if (v.podeEditar) {
+      if (p.Status === 'Aberta' && v.Status !== 'Suspensa' && s.iniciado) acts += '<button class="btn small primary" data-fill="' + p.ID + '">Registrar contratação</button> ';
+      if (p.Status === 'Aberta') acts += '<button class="btn small danger" data-cancel="' + p.ID + '">Cancelar</button>';
+      if (p.Status !== 'Aberta') acts += '<button class="btn small" data-reopen="' + p.ID + '">Reabrir</button>';
+    }
+    return '<tr><td>#' + esc(p.Numero) + '</td><td>' + statusBadge(p.Status) + (Number(p.Reaberturas) ? ' <span class="muted">' + p.Reaberturas + ' reabertura(s)</span>' : '') + '</td><td>' + esc(p.NomeContratado || '—') + '</td><td>' + fmtDate(p.DataFechamento) + '</td><td>' + (ps && p.Status !== 'Cancelada' ? slaBadge(ps) : '—') + '</td><td style="text-align:right">' + acts + '</td></tr>';
+  }).join('');
+
+  var dados = [
+    ['Empresa', v.Empresa], ['Unidade', v.Unidade], ['Departamento', v.Departamento],
+    ['Gestor solicitante', v.Gestor], ['Analista responsável', v.Analista], ['Prioridade', v.Prioridade],
+    ['Data de abertura', fmtDate(v.DataAbertura)], ['Aprovação oficial', fmtDate(v.DataAprovacao)], ['Fechamento', fmtDate(v.DataFechamento)],
+    ['Motivo', v.MotivoAbertura + (v.ColaboradorSubstituido ? ' — ' + v.ColaboradorSubstituido : '')], ['Contrato', v.TipoContrato + ' · ' + (v.Modalidade || '')], ['Horário', v.Horario],
+    ['Salário', v.SalarioACombinar === 'Sim' ? 'A combinar' : v.Salario], ['Reaberturas', v.Reaberturas || '0'], ['Responsável pela próxima ação', v.responsavelAcao || '—']
+  ].map(function (kv) { return '<div><span>' + esc(kv[0]) + '</span><p>' + esc(kv[1] || '—') + '</p></div>'; }).join('') +
+    ['Atribuicoes', 'Requisitos', 'Beneficios', 'Observacoes'].map(function (k) {
+      var label = { Atribuicoes: 'Atribuições', Requisitos: 'Requisitos', Beneficios: 'Benefícios', Observacoes: 'Observações internas' }[k];
+      return '<div class="wide"><span>' + label + '</span><p>' + esc(v[k] || '—') + '</p></div>';
+    }).join('') +
+    '<div class="wide"><span>Etapas do processo</span><p>' + esc((v.Etapas || 'Todas as etapas padrão').split(';').join(' → ')) + '</p></div>';
+
+  var hist = v.historico.map(function (h) {
+    return '<div class="item"><span class="muted">' + fmtDate(h.DataHora) + ' · ' + esc(h.Usuario) + ' · ' + esc(h.Tipo) + '</span><br>' +
+      (h.Para ? (h.De ? esc(h.De) + ' → ' : '') + '<b>' + esc(h.Para) + '</b><br>' : '') + esc(h.Nota) + '</div>';
+  }).join('') || '<div class="empty">Sem histórico.</div>';
+
+  var susp = '<h3 class="section-title" style="margin-top:0">Suspensões</h3>' + (v.suspensoes.length ? '<div class="table-wrap"><table><thead><tr><th>Início</th><th>Fim</th><th>Pausa SLA</th><th>Justificativa</th><th>Usuário</th></tr></thead><tbody>' +
+    v.suspensoes.map(function (x) { return '<tr><td>' + fmtDate(x.Inicio) + '</td><td>' + (x.Fim ? fmtDate(x.Fim) : '<span class="badge sla-laranja">em aberto</span>') + '</td><td>' + esc(x.PausaSLA) + '</td><td>' + esc(x.Justificativa) + '</td><td class="muted">' + esc(x.Usuario) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">Nenhuma suspensão.</div>') +
+    '<h3 class="section-title">Exceções de SLA</h3>' + (v.excecoes.length ? '<div class="table-wrap"><table><thead><tr><th>Data</th><th>Dias adicionais</th><th>Justificativa</th><th>Usuário</th></tr></thead><tbody>' +
+    v.excecoes.map(function (x) { return '<tr><td>' + fmtDate(x.CriadoEm) + '</td><td>+' + esc(x.DiasAdicionais) + '</td><td>' + esc(x.Justificativa) + '</td><td class="muted">' + esc(x.Usuario) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">Nenhuma exceção. O prazo original permanece sempre registrado.</div>');
+
+  var html = '<div class="dlg-head"><div><p class="eyebrow">' + esc(v.Codigo || v.ID) + ' · ' + esc(v.Empresa) + '</p><h3>' + esc(v.Cargo) + '</h3></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto">' + statusBadge(v.Status) + slaBadge(s) + '</div><button class="btn small" data-close>Fechar</button></div>' +
+    '<div class="dlg-body"><div class="toolbar">' + actions + '</div>' + slaHtml +
+    '<div class="tabs"><button class="active" data-tab="pos">Posições (' + v.posicoes.length + ')</button><button data-tab="dados">Dados da vaga</button><button data-tab="hist">Histórico (' + v.historico.length + ')</button><button data-tab="susp">Suspensões e exceções</button></div>' +
+    '<div data-pane="pos"><div class="table-wrap"><table><thead><tr><th>Posição</th><th>Status</th><th>Contratado</th><th>Fechamento</th><th>SLA da posição</th><th></th></tr></thead><tbody>' + posRows + '</tbody></table></div></div>' +
+    '<div data-pane="dados" class="hidden"><div class="kv">' + dados + '</div></div>' +
+    '<div data-pane="hist" class="hidden"><div class="timeline">' + hist + '</div></div>' +
+    '<div data-pane="susp" class="hidden">' + susp + '</div></div>';
+
+  var d = openDialog('#dlg', html);
+  $$('[data-tab]', d).forEach(function (b) {
+    b.addEventListener('click', function () {
+      $$('[data-tab]', d).forEach(function (x) { x.classList.toggle('active', x === b); });
+      $$('[data-pane]', d).forEach(function (p) { p.classList.toggle('hidden', p.dataset.pane !== b.dataset.tab); });
+    });
+  });
+  function after(updated, msg) { toast(msg); renderVagaDetail(updated); refresh(); }
+  if ($('#actEdit', d)) $('#actEdit', d).addEventListener('click', function () { vagaForm(v); });
+  if ($('#actDup', d)) $('#actDup', d).addEventListener('click', function () {
+    var copy = {}; Object.keys(v).forEach(function (k) { copy[k] = v[k]; });
+    copy.ID = ''; copy.DataAbertura = todayIso(); copy.DataAprovacao = ''; copy.ReaberturaDe = v.ID; copy.ReaberturaDeCodigo = v.Codigo;
+    vagaForm(null, copy);
+  });
+  if ($('#actExc', d)) $('#actExc', d).addEventListener('click', function () {
+    formDialog({
+      title: 'Exceção de SLA — ' + v.Codigo, intro: 'Amplia o prazo ajustado. O prazo original (' + fmtDate(s.prazoOriginal) + ') continua registrado para auditoria.',
+      fields: [{ k: 'dias', label: 'Dias úteis adicionais', type: 'number', min: 1, max: 60, req: true, span: 4 }, { k: 'justificativa', label: 'Justificativa', type: 'textarea', req: true, span: 4 }],
+      onSubmit: function (x) { return api('addSlaException', { id: v.ID, dias: x.dias, justificativa: x.justificativa }).then(function (u) { after(u, 'Exceção registrada.'); }); }
+    });
+  });
+  if ($('#actStatus', d)) $('#actStatus', d).addEventListener('click', function () {
+    formDialog({
+      title: 'Alterar status — ' + v.Codigo,
+      intro: 'Status atual: <b>' + esc(v.Status) + '</b>. Toda alteração fica no histórico com data, horário e usuário.',
+      fields: [
+        { k: 'status', label: 'Novo status', type: 'select', options: S.lk.statusVaga.filter(function (x) { return x !== v.Status; }), req: true, span: 4 },
+        { k: 'data', label: 'Data do evento', type: 'date', value: todayIso(), span: 4, hint: 'Usada como data de aprovação, início/fim de suspensão ou cancelamento.' },
+        { k: 'pausaSLA', label: 'Suspensão autorizada interrompe o SLA?', type: 'select', options: ['Sim', 'Não'], value: 'Sim', placeholder: undefined, span: 4 },
+        { k: 'justificativa', label: 'Justificativa', type: 'textarea', span: 4, hint: 'Obrigatória para suspender, cancelar ou reabrir.' }
+      ],
+      onRender: function (form) {
+        function sync() { $('[data-wrap="pausaSLA"]', form).classList.toggle('hidden', form.elements.status.value !== 'Suspensa'); }
+        form.elements.status.addEventListener('change', sync); sync();
+      },
+      onSubmit: function (x) { return api('changeVagaStatus', { id: v.ID, status: x.status, data: x.data, justificativa: x.justificativa, pausaSLA: x.pausaSLA }).then(function (u) { after(u, 'Status alterado para ' + x.status + '.'); }); }
+    });
+  });
+  $$('[data-fill]', d).forEach(function (b) {
+    b.addEventListener('click', function () {
+      formDialog({
+        title: 'Registrar contratação', intro: 'A data real de fechamento encerra o SLA desta posição.',
+        fields: [{ k: 'nome', label: 'Nome do contratado', req: true, span: 4 }, { k: 'data', label: 'Data de fechamento', type: 'date', value: todayIso(), req: true, span: 4 }],
+        onSubmit: function (x) { return api('fillPosition', { id: b.dataset.fill, nome: x.nome, data: x.data }).then(function (u) { after(u, u.Status === 'Concluída / contratada' ? 'Todas as posições preenchidas: vaga concluída.' : 'Posição preenchida.'); }); }
+      });
+    });
+  });
+  $$('[data-cancel]', d).forEach(function (b) {
+    b.addEventListener('click', function () {
+      formDialog({ title: 'Cancelar posição', fields: [{ k: 'justificativa', label: 'Justificativa', type: 'textarea', req: true, span: 4 }], submit: 'Cancelar posição',
+        onSubmit: function (x) { return api('cancelPosition', { id: b.dataset.cancel, justificativa: x.justificativa }).then(function (u) { after(u, 'Posição cancelada.'); }); } });
+    });
+  });
+  $$('[data-reopen]', d).forEach(function (b) {
+    b.addEventListener('click', function () {
+      formDialog({ title: 'Reabrir posição', intro: 'A reabertura é contabilizada nos indicadores de recorrência.', fields: [{ k: 'justificativa', label: 'Justificativa', type: 'textarea', req: true, span: 4 }], submit: 'Reabrir',
+        onSubmit: function (x) { return api('reopenPosition', { id: b.dataset.reopen, justificativa: x.justificativa }).then(function (u) { after(u, 'Posição reaberta.'); }); } });
+    });
+  });
+}
+
+/* ------------------------------ SLA e gargalos ------------------------------ */
+function loadSla() {
+  setSync('Calculando SLA…');
+  return Promise.all([api('dashboard', {}), api('listVagas', { situacao: 'ativas' })]).then(function (r) {
+    var d = r[0], vagas = r[1];
+    var dist = d.graficos.sla;
+    var naoIniciadas = vagas.filter(function (v) { return !v.sla.iniciado; }).length;
+    $('#slaCards').innerHTML = card('Vagas ativas', vagas.length, 'accent') + card('Verde · até 9 dias', dist.verde, 'green') + card('Amarelo · 10 a 12', dist.amarelo) +
+      card('Laranja · 13 a 15', dist.laranja, 'orange') + card('Vermelho · vencidas', dist.vermelho, 'red') + card('Aguardando aprovação', naoIniciadas) +
+      card('Cumprimento do SLA', d.cards.taxaSla === null ? '—' : d.cards.taxaSla + '%', '', 'posições preenchidas');
+    var rank = d.graficos.tempoEtapa.slice().sort(function (a, b) { return b.valor - a.valor; });
+    $('#slaRanking').innerHTML = rank.length ? '<div class="table-wrap"><table style="min-width:0"><thead><tr><th>#</th><th>Etapa</th><th>Média</th><th>Responsável típico</th><th>Ocorrências</th></tr></thead><tbody>' +
+      rank.map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(x.label) + '</td><td><b>' + num(x.valor) + '</b> d.u.</td><td>' + esc(x.responsavel || '—') + '</td><td class="muted">' + x.n + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">Sem movimentações registradas ainda.</div>';
+    slaDoughnut('chSla2', dist);
+    vagas.sort(function (a, b) { var ra = a.sla.iniciado ? a.sla.diasRestantes : 999, rb = b.sla.iniciado ? b.sla.diasRestantes : 999; return ra - rb; });
+    $('#slaTable').innerHTML = vagas.length ? '<div class="table-wrap"><table><thead><tr><th>Vaga</th><th>Status / responsável</th><th>Aprovação</th><th>Prazo original</th><th>Prazo ajustado</th><th>Decorridos</th><th>Restantes</th><th style="width:160px">Consumo</th></tr></thead><tbody>' +
+      vagas.map(function (v) {
+        var s = v.sla;
+        return '<tr class="clickable" data-vaga="' + esc(v.ID) + '"><td><span class="code">' + esc(v.Codigo || v.ID) + '</span><br>' + esc(v.Cargo) + '</td><td>' + statusBadge(v.Status) + '<br><span class="muted">' + esc(v.responsavelAcao || '—') + '</span></td>' +
+          '<td>' + fmtDate(v.DataAprovacao) + '</td><td>' + (s.iniciado ? fmtDate(s.prazoOriginal) : '—') + '</td><td>' + (s.iniciado ? fmtDate(s.prazoAjustado) : '—') + '</td>' +
+          '<td>' + (s.iniciado ? s.diasEfetivos + (s.diasPausados ? ' <span class="muted">(+' + s.diasPausados + ' pausa)</span>' : '') : '—') + '</td><td>' + slaBadge(s) + '</td><td>' + (s.iniciado ? progressBar(s) + '<span class="muted">' + s.percentual + '%</span>' : '') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' : '<div class="empty">Nenhuma vaga ativa.</div>';
+    bindVagaLinks($('#slaTable'));
+    setSync('Atualizado em ' + fmtDate(d.atualizadoEm));
+  }).catch(fail);
+}
+
+/* ------------------------------ configurações ------------------------------ */
+var CFG = {
+  Empresas: { titulo: 'Empresas', key: 'ID', cols: ['Nome', 'Sigla', 'Ativo'], fields: function () { return [{ k: 'Nome', label: 'Nome', req: true, span: 4 }, { k: 'Sigla', label: 'Sigla (prefixo do código da vaga)', req: true, span: 4 }]; } },
+  Unidades: { titulo: 'Unidades', key: 'ID', cols: ['Empresa', 'Nome', 'Cidade', 'UF', 'Ativo'], fields: function () { return [{ k: 'Empresa', label: 'Empresa', type: 'select', options: names(S.lk.empresas), req: true, span: 4 }, { k: 'Nome', label: 'Nome da unidade', req: true, span: 4, hint: 'Ex.: Araucária/PR — usado também nos feriados locais' }, { k: 'Cidade', label: 'Cidade', span: 2 }, { k: 'UF', label: 'UF', span: 2 }]; } },
+  Departamentos: { titulo: 'Departamentos', key: 'ID', cols: ['Nome', 'Ativo'], fields: function () { return [{ k: 'Nome', label: 'Nome', req: true, span: 4 }]; } },
+  Cargos: { titulo: 'Cargos', key: 'ID', cols: ['Nome', 'Departamento', 'Ativo'], fields: function () { return [{ k: 'Nome', label: 'Nome do cargo', req: true, span: 4 }, { k: 'Departamento', label: 'Departamento padrão', type: 'select', options: names(S.lk.departamentos), span: 4 }]; } },
+  Gestores: { titulo: 'Gestores', key: 'ID', cols: ['Nome', 'Email', 'Empresa', 'Departamento', 'Ativo'], fields: function () { return [{ k: 'Nome', label: 'Nome', req: true, span: 4 }, { k: 'Email', label: 'E-mail corporativo', type: 'email', span: 4, hint: 'Vincula o gestor ao usuário de perfil Gestor.' }, { k: 'Empresa', label: 'Empresa', type: 'select', options: names(S.lk.empresas), span: 2 }, { k: 'Departamento', label: 'Departamento', type: 'select', options: names(S.lk.departamentos), span: 2 }]; } },
+  Analistas: { titulo: 'Analistas de RH', key: 'ID', cols: ['Nome', 'Email', 'Ativo'], fields: function () { return [{ k: 'Nome', label: 'Nome', req: true, span: 4 }, { k: 'Email', label: 'E-mail corporativo', type: 'email', span: 4 }]; } },
+  Feriados: { titulo: 'Feriados', key: 'ID', cols: ['Data', 'Unidade', 'Descricao'], hint: 'Unidade vazia = feriado para todas as unidades. Feriados estaduais e municipais devem ser vinculados à unidade.', fields: function () { return [{ k: 'Data', label: 'Data', type: 'date', req: true, span: 4 }, { k: 'Unidade', label: 'Unidade', type: 'select', options: names(S.lk.unidades), placeholder: 'Todas as unidades', span: 4 }, { k: 'Descricao', label: 'Descrição', req: true, span: 4 }]; } },
+  Usuarios: { titulo: 'Usuários e perfis', key: 'Email', admin: true, cols: ['Email', 'Nome', 'Perfil', 'Ativo'], hint: 'Somente e-mails ativos acessam o sistema. Para Gestor/Analista, use o mesmo nome do cadastro de gestores/analistas.', fields: function (r) { return [{ k: 'Email', label: 'E-mail Google', type: 'email', req: true, span: 4, hint: r ? 'O e-mail não pode ser alterado.' : '' }, { k: 'Nome', label: 'Nome', req: true, span: 4 }, { k: 'Perfil', label: 'Perfil', type: 'select', options: S.lk.perfis, req: true, span: 2 }, { k: 'Ativo', label: 'Ativo', type: 'select', options: ['Sim', 'Não'], value: 'Sim', placeholder: undefined, span: 2 }]; } },
+  Config: { titulo: 'Parâmetros', key: 'Chave', admin: true, cols: ['Chave', 'Valor'], hint: 'SLA_DIAS_UTEIS · SLA_SUSPENSAO_PAUSA (Sim/Não) · ALERTA_DIAS_RESTANTES · SEM_MOVIMENTACAO_DIAS · SITE_CANDIDATURA · LOGO_DRIVE_ID / FOTO_DRIVE_ID (ID do arquivo no Drive)', fields: function (r) { return [{ k: 'Chave', label: 'Chave', req: true, span: 4 }, { k: 'Valor', label: 'Valor', span: 4 }]; } }
+};
+
+function renderCfgTabs() {
+  $('#cfgTabs').innerHTML = Object.keys(CFG).filter(function (k) { return !CFG[k].admin || isAdmin(); }).map(function (k) {
+    return '<button data-cfg="' + k + '" class="' + (k === S.cfgTab ? 'active' : '') + '">' + esc(CFG[k].titulo) + '</button>';
+  }).join('');
+  $$('[data-cfg]').forEach(function (b) { b.addEventListener('click', function () { S.cfgTab = b.dataset.cfg; renderCfgTabs(); loadCadastro(); }); });
+  $('#cfgNovo').classList.toggle('hidden', !isAdmin());
+}
+
+function loadCadastro() {
+  var tab = S.cfgTab, def = CFG[tab];
+  $('#cfgHint').textContent = def.hint || (isAdmin() ? '' : 'Somente o Administrador RH altera cadastros.');
+  return api('listCadastro', { tabela: tab }).then(function (rows) {
+    S.cfgRows = rows;
+    if (!rows.length) { $('#cfgTable').innerHTML = '<div class="empty">Nenhum registro.</div>'; return; }
+    $('#cfgTable').innerHTML = '<div class="table-wrap"><table><thead><tr>' + def.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + (isAdmin() ? '<th></th>' : '') + '</tr></thead><tbody>' +
+      rows.map(function (r, i) {
+        return '<tr>' + def.cols.map(function (c) { return '<td>' + (c === 'Data' ? fmtDate(r[c]) : esc(r[c] || (c === 'Unidade' ? 'Todas' : '—'))) + '</td>'; }).join('') +
+          (isAdmin() ? '<td style="text-align:right;white-space:nowrap"><button class="btn small" data-edit="' + i + '">Editar</button> ' +
+            (tab === 'Config' ? '' : (r.Ativo === 'Não' ? '' : '<button class="btn small danger" data-del="' + i + '">' + (tab === 'Feriados' ? 'Excluir' : 'Inativar') + '</button>')) + '</td>' : '') + '</tr>';
+      }).join('') + '</tbody></table></div>';
+    $$('[data-edit]').forEach(function (b) { b.addEventListener('click', function () { cadastroForm(S.cfgRows[+b.dataset.edit]); }); });
+    $$('[data-del]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var r = S.cfgRows[+b.dataset.del];
+        if (!confirm((tab === 'Feriados' ? 'Excluir' : 'Inativar') + ' este registro?')) return;
+        api('deleteCadastro', { tabela: tab, key: r[def.key] }).then(function () { toast('Registro atualizado.'); afterCadastro(); }).catch(fail);
+      });
+    });
+  }).catch(fail);
+}
+
+function cadastroForm(row) {
+  var tab = S.cfgTab, def = CFG[tab];
+  var fields = def.fields(row).map(function (f) { if (row && row[f.k] !== undefined) f.value = row[f.k]; return f; });
+  if (row && row.Ativo !== undefined && tab !== 'Usuarios') fields.push({ k: 'Ativo', label: 'Ativo', type: 'select', options: ['Sim', 'Não'], value: row.Ativo || 'Sim', placeholder: undefined, span: 4 });
+  formDialog({
+    title: (row ? 'Editar' : 'Novo') + ' — ' + def.titulo,
+    fields: fields,
+    onRender: function (form) { if (row && def.key !== 'ID' && form.elements[def.key]) form.elements[def.key].readOnly = true; },
+    onSubmit: function (values) {
+      if (row) values._key = row[def.key];
+      if (row && def.key === 'ID') values.ID = row.ID;
+      return api('saveCadastro', { tabela: tab, registro: values }).then(function () { toast('Salvo.'); afterCadastro(); });
+    }
+  });
+}
+
+function afterCadastro() {
+  loadCadastro();
+  api('lookups').then(function (lk) { S.lk = lk; renderDashFilters(); initVagaSelects(); }).catch(fail);
+}
+function initVagaSelects() {
+  $('#vagaFStatus').innerHTML = options(S.lk.statusVaga, $('#vagaFStatus').value, 'Status: todos');
+  $('#vagaFEmpresa').innerHTML = options(names(S.lk.empresas), $('#vagaFEmpresa').value, 'Empresa: todas');
+  $('#vagaFAnalista').innerHTML = options(names(S.lk.analistas), $('#vagaFAnalista').value, 'Analista: todos');
+}
+
+/* ------------------------------ inicialização ------------------------------ */
+function applyBranding(m) {
+  if (m.LOGO_DRIVE_ID) $('#brandMark').innerHTML = '<img src="' + m.LOGO_DRIVE_ID + '" alt="Via Dupla">';
+  if (m.FOTO_DRIVE_ID) {
+    var h = $('#hero');
+    h.classList.add('with-photo');
+    h.style.backgroundImage = 'linear-gradient(90deg, rgba(10,10,10,.95) 0%, rgba(10,10,10,.75) 55%, rgba(10,10,10,.35) 100%), url(' + m.FOTO_DRIVE_ID + ')';
+  }
+}
+
+function init() {
+  $$('#nav button').forEach(function (b) { b.addEventListener('click', function () { showView(b.dataset.view); }); });
+  $('#menuBtn').addEventListener('click', function () { $('#sidebar').classList.toggle('open'); });
+  $('#refreshBtn').addEventListener('click', refresh);
+  $('#cfgNovo').addEventListener('click', function () { cadastroForm(null); });
+  if (window.Chart) { Chart.defaults.color = '#cfcfcf'; Chart.defaults.font.family = 'Inter, Segoe UI, Roboto, sans-serif'; }
+
+  api('bootstrap').then(function (b) {
+    S.user = b.usuario; S.lk = b.lookups; S.marca = b.marca || {};
+    $('#userName').textContent = S.user.nome;
+    $('#userRole').textContent = S.user.perfil + ' · ' + S.user.email;
+    $('#heroSla').textContent = S.lk.config.SLA_DIAS_UTEIS;
+    applyBranding(S.marca);
+    renderDashFilters();
+    initVagaToolbar();
+    renderCfgTabs();
+    $('#loading').classList.add('hidden');
+    showView('dashboard');
+    // Atualização automática do painel a cada 5 minutos
+    S.timer = setInterval(function () { if (S.view === 'dashboard' && !document.hidden && !$('#dlg').open) loadDashboard(); }, 300000);
+  }).catch(function (e) {
+    $('#loading').innerHTML = '<div class="panel" style="max-width:480px;text-align:center"><p class="eyebrow">Via Talentos</p><h2>Não foi possível entrar</h2><p class="muted">' + esc(e.message) + '</p></div>';
+  });
+}
+init();
+</script>
