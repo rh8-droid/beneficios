@@ -56,6 +56,8 @@ Basta copiar e colar **2 arquivos** da pasta [`dist/`](dist):
 1. Abra a planilha e vá em **Extensões → Apps Script**.
 2. No arquivo `Código.gs` que já existe, apague tudo e cole o conteúdo de **`dist/Codigo.gs`**.
 3. Clique em **+ → HTML**, dê o nome **`Index`** (sem ".html") e cole o conteúdo de **`dist/Index.html`**.
+   Em **Configurações do projeto** (engrenagem), marque "Exibir arquivo de manifesto appsscript.json no editor" e substitua o conteúdo de `appsscript.json` por **`dist/appsscript.json`**.
+   Depois, selecione a função **`autorizarPermissoes`** e clique em **Executar** para aceitar todas as permissões (Drive, e-mail e agendamento).
 4. Salve. No topo, selecione a função **`setup`** e clique em **Executar** (autorize na primeira vez — e de novo sempre que uma nova fase pedir permissões, como o Drive para currículos). Ela cria as abas e colunas que faltam sem apagar nada.
 5. (Opcional) Execute **`cadastrarFeriadosNacionais`**; cadastre feriados estaduais e municipais pela tela de Configurações.
 6. Confira a aba **Usuarios** (Email, Nome, Perfil, Ativo): só e-mails ativos acessam.

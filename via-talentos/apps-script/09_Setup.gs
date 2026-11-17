@@ -29,6 +29,27 @@ function setup() {
   return 'Via Talentos: estrutura atualizada.';
 }
 
+/**
+ * Execute esta função UMA VEZ pelo editor (Executar → autorizarPermissoes) com a conta que
+ * publica o app. Ela força a tela de autorização do Google para todos os serviços usados:
+ * planilha, Drive (currículos, artes e identidade visual), e-mail (alertas) e agendamento.
+ */
+function autorizarPermissoes() {
+  var ok = [];
+  SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty(VT.SPREADSHEET_ID_PROPERTY));
+  ok.push('Planilha');
+  var pasta = DriveApp.createFolder('Via Talentos — teste de permissão (pode apagar)');
+  pasta.setTrashed(true);
+  ok.push('Drive (criar pastas e arquivos)');
+  MailApp.getRemainingDailyQuota();
+  ok.push('E-mail');
+  ScriptApp.getProjectTriggers();
+  ok.push('Agendamento');
+  var msg = 'Permissões concedidas: ' + ok.join(', ') + '.';
+  Logger.log(msg);
+  return msg;
+}
+
 /** Feriados nacionais fixos e móveis de um ano (opcional; feriados locais devem ser cadastrados por unidade). */
 function cadastrarFeriadosNacionais(ano) {
   ano = ano || new Date().getFullYear();

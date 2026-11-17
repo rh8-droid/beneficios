@@ -17,4 +17,5 @@ fs.writeFileSync(path.join(out, 'Codigo.gs'),
 let html = fs.readFileSync(path.join(src, 'Index.html'), 'utf8');
 html = html.replace(/<\?!= include\('(\w+)'\); \?>/g, (_, f) => fs.readFileSync(path.join(src, f + '.html'), 'utf8'));
 fs.writeFileSync(path.join(out, 'Index.html'), html);
-console.log('dist/Codigo.gs e dist/Index.html gerados.');
+fs.copyFileSync(path.join(src, 'appsscript.json'), path.join(out, 'appsscript.json'));
+console.log('dist/Codigo.gs, dist/Index.html e dist/appsscript.json gerados.');

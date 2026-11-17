@@ -84,6 +84,7 @@ function createBackend(opts = {}) {
   }
   const sandbox = {
     console,
+    Logger: { log: () => {} },
     Date: ClockDate,
     Set, Map, JSON, Math, Object, Array, String, Number, RegExp, Error,
     SpreadsheetApp: { getActiveSpreadsheet: () => state.ss, openById: () => state.ss, flush() {} },
