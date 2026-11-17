@@ -96,6 +96,7 @@ function getVaga(id) {
   }).map(clean_).sort(function (a, b) { return b.DataHora.localeCompare(a.DataHora); });
   full.suspensoes = data.suspensoes.filter(function (s) { return s.VagaID === vaga.ID; }).map(clean_);
   full.excecoes = data.excecoes.filter(function (s) { return s.VagaID === vaga.ID; }).map(clean_);
+  full.candidatos = resumoCandidatosVaga_(vaga.ID);
   return full;
 }
 
@@ -396,4 +397,33 @@ function addSlaException(vagaId, dias, justificativa) {
     logHistory_('Vaga', vaga.ID, '', '', 'Exceção de SLA: +' + n + ' dia(s) útil(eis) — ' + justificativa);
     return getVaga(vaga.ID);
   });
+}
+
+/** Contagem de candidatos da vaga por etapa alcançada (cabeçalho da página da vaga). */
+function resumoCandidatosVaga_(vagaId) {
+  var etapas = VT.ETAPAS_KANBAN;
+  var idxReprov = etapas.indexOf('Reprovado / desistente');
+  var cands = Db.all('Candidaturas').filter(function (c) { return c.VagaID === vagaId; });
+  var ids = {};
+  cands.forEach(function (c) { ids[c.ID] = true; });
+  var max = {};
+  cands.forEach(function (c) { var i = etapas.indexOf(c.Etapa); max[c.ID] = i >= 0 && i !== idxReprov ? i : 0; });
+  Db.all('EtapasCandidatura').forEach(function (e) {
+    if (!ids[e.CandidaturaID]) return;
+    var i = etapas.indexOf(e.Etapa);
+    if (i >= 0 && i !== idxReprov) max[e.CandidaturaID] = Math.max(max[e.CandidaturaID], i);
+  });
+  var entrevistados = {};
+  Db.all('Entrevistas').forEach(function (e) { if (ids[e.CandidaturaID] && e.Realizacao) entrevistados[e.CandidaturaID] = true; });
+  function alcancou(nome) { var n = etapas.indexOf(nome); return cands.filter(function (c) { return max[c.ID] >= n; }).length; }
+  return {
+    total: cands.length,
+    triados: alcancou('Triagem de currículo'),
+    entrevistados: Math.max(Object.keys(entrevistados).length, alcancou('Entrevista RH')),
+    encaminhados: alcancou('Entrevista gestor'),
+    aprovados: alcancou('Aprovado'),
+    admissao: alcancou('Processo admissional'),
+    contratados: alcancou('Contratado'),
+    reprovados: cands.filter(function (c) { return etapas.indexOf(c.Etapa) === idxReprov; }).length
+  };
 }

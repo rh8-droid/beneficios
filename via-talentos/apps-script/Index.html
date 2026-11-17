@@ -20,20 +20,21 @@
         </div>
       </div>
       <nav class="nav" id="nav">
-        <button data-view="dashboard" class="active"><span class="n">1</span>Dashboard</button>
-        <button data-view="vagas"><span class="n">2</span>Gestão de Vagas</button>
-        <button data-view="candidatos"><span class="n">3</span>Candidatos<span class="tag">Fase 2</span></button>
-        <button data-view="kanban"><span class="n">4</span>Kanban do Recrutamento<span class="tag">Fase 2</span></button>
-        <button data-view="entrevistas"><span class="n">5</span>Entrevistas<span class="tag">Fase 2</span></button>
-        <button data-view="indicacoes"><span class="n">6</span>Indicações<span class="tag">Fase 2</span></button>
-        <button data-view="sla"><span class="n">7</span>SLA e Gargalos</button>
-        <button data-view="relatorios"><span class="n">8</span>Indicadores e Relatórios<span class="tag">Fase 3</span></button>
-        <button data-view="artes"><span class="n">9</span>Gerador de Artes<span class="tag">Fase 4</span></button>
-        <button data-view="config"><span class="n">10</span>Configurações</button>
+        <button data-view="dashboard" class="active"><i data-icon="grid"></i>Dashboard</button>
+        <button data-view="vagas"><i data-icon="briefcase"></i>Gestão de Vagas</button>
+        <button data-view="candidatos"><i data-icon="users"></i>Candidatos<span class="tag">Fase 2</span></button>
+        <button data-view="kanban"><i data-icon="columns"></i>Kanban do Recrutamento<span class="tag">Fase 2</span></button>
+        <button data-view="entrevistas"><i data-icon="chat"></i>Entrevistas<span class="tag">Fase 2</span></button>
+        <button data-view="indicacoes"><i data-icon="handshake"></i>Indicações<span class="tag">Fase 2</span></button>
+        <button data-view="sla"><i data-icon="clock"></i>SLA e Gargalos</button>
+        <button data-view="relatorios"><i data-icon="chart"></i>Indicadores e Relatórios<span class="tag">Fase 3</span></button>
+        <button data-view="artes"><i data-icon="image"></i>Gerador de Artes<span class="tag">Fase 4</span></button>
+        <button data-view="config"><i data-icon="gear"></i>Configurações</button>
       </nav>
       <div class="sidebar-foot">
         <strong id="userName">—</strong>
         <span id="userRole">—</span>
+        <button class="theme-btn" id="themeBtn">Tema escuro</button>
         <div class="culture"><b>Código de Cultura</b> · Via Dupla</div>
       </div>
     </aside>
@@ -59,6 +60,8 @@
           <p>Indicadores calculados em tempo real a partir das vagas, posições e candidaturas registradas. SLA padrão de <b id="heroSla">15</b> dias úteis por posição.</p>
         </div>
         <div class="filters" id="dashFilters"></div>
+        <div class="status-tiles" id="dashTiles"></div>
+        <div id="dashPrazos" style="margin-bottom:8px"></div>
         <div id="dashCards"></div>
         <div class="grid two">
           <section class="panel"><h2>Vagas abertas × fechadas por mês</h2><p class="sub">Abertura pela data da requisição; fechamento pela conclusão.</p><div class="chart-box"><canvas id="chMensal"></canvas></div></section>
@@ -72,7 +75,7 @@
           <section class="panel"><h2>Reaberturas por cargo</h2><p class="sub">Posições reabertas e requisições reabertas.</p><div class="chart-box"><canvas id="chReab"></canvas></div></section>
           <section class="panel"><h2>Contratações por origem da candidatura</h2><p class="sub">Candidaturas na etapa "Contratado".</p><div class="chart-box"><canvas id="chOrigem"></canvas></div></section>
         </div>
-        <h3 class="section-title">Alertas de SLA e vagas paradas</h3>
+        <h3 class="section-title">Vagas paradas e aguardando aprovação</h3>
         <div id="dashAlerts"></div>
       </section>
 

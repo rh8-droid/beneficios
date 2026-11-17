@@ -6,95 +6,138 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Via Talentos</title>
   <style>
+/* ===== Tema claro (padrão) — menu lateral sempre preto/grafite ===== */
 :root {
+  --bg: #f3f3f1;
+  --bg-2: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f7f7f5;
+  --surface-3: #efefec;
+  --line: #e4e4e0;
+  --line-2: #ececE8;
+  --text: #161616;
+  --text-2: #3d3d3a;
+  --muted: #7a7a75;
+  --accent: #f2c200;
+  --accent-ink: #111111;
+  --accent-soft: rgba(242, 194, 0, .16);
+  --accent-text: #8a6d00;
+  --green: #2f9e5b;
+  --yellow: #d9a800;
+  --orange: #e57a12;
+  --red: #d93b40;
+  --blue: #2b6cb0;
+  --neutral: #8b8b86;
+  --icon-bg: #fff8d6;
+  --radius: 16px;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
+  --shadow-lg: 0 20px 50px rgba(0,0,0,.18);
+  --topbar: rgba(243, 243, 241, .9);
+  --th: #fafaf8;
+  --chart-grid: #ececE8;
+  --chart-text: #5c5c58;
+  --chart-alt: #1f1f1f;
+  --chart-alt-2: #b9b9b4;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
   --bg: #0e0e0e;
   --bg-2: #151515;
   --surface: #1b1b1b;
   --surface-2: #232323;
   --surface-3: #2c2c2c;
-  --line: #333333;
+  --line: #303030;
+  --line-2: #262626;
   --text: #ffffff;
-  --text-2: #c9c9c9;
+  --text-2: #d0d0d0;
   --muted: #8f8f8f;
-  --accent: #f2c200;
-  --accent-ink: #111111;
-  --accent-soft: rgba(242, 194, 0, .12);
+  --accent-soft: rgba(242, 194, 0, .13);
+  --accent-text: #f2c200;
   --green: #3fb46b;
   --yellow: #f2c200;
   --orange: #f08a24;
   --red: #e5484d;
-  --neutral: #6e6e6e;
-  --radius: 14px;
+  --blue: #5b9be0;
+  --icon-bg: rgba(242, 194, 0, .12);
   --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  --shadow-lg: 0 20px 50px rgba(0,0,0,.6);
+  --topbar: rgba(14, 14, 14, .92);
+  --th: #181818;
+  --chart-grid: #2a2a2a;
+  --chart-text: #bdbdbd;
+  --chart-alt: #e8e8e8;
+  --chart-alt-2: #5a5a5a;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
 body { font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, sans-serif; font-size: 14px; line-height: 1.45; }
 button, input, select, textarea { font: inherit; color: inherit; }
-a { color: var(--accent); }
+a { color: var(--accent-text); }
 .hidden { display: none !important; }
+svg.i { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
 /* ---------- layout ---------- */
-.layout { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
+.layout { display: grid; grid-template-columns: 252px minmax(0, 1fr); min-height: 100vh; }
 .sidebar {
-  position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 22px 14px;
-  background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%); border-right: 1px solid #222; z-index: 40;
-  display: flex; flex-direction: column;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 22px 14px; color: #fff;
+  background: linear-gradient(180deg, #0a0a0a 0%, #1c1c1c 100%); z-index: 40; display: flex; flex-direction: column;
 }
 .brand { display: flex; gap: 12px; align-items: center; padding: 4px 8px 20px; border-bottom: 1px solid #262626; }
 .brand-mark { width: 44px; height: 44px; border-radius: 12px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 900; letter-spacing: -.04em; overflow: hidden; flex: none; }
 .brand-mark img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
 .brand strong { display: block; font-size: 16px; letter-spacing: .08em; }
 .brand strong b { color: var(--accent); }
-.brand span { display: block; font-size: 11px; color: var(--muted); }
+.brand span { display: block; font-size: 11px; color: #8f8f8f; }
 .nav { display: grid; gap: 3px; margin-top: 18px; }
 .nav button {
   display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 0; border-radius: 10px;
-  background: transparent; color: var(--text-2); text-align: left; font-weight: 600; cursor: pointer;
+  background: transparent; color: #c9c9c9; text-align: left; font-weight: 600; cursor: pointer;
 }
-.nav button .n { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 11px; background: #242424; color: var(--muted); flex: none; }
-.nav button:hover { background: #1f1f1f; color: #fff; }
-.nav button.active { background: var(--accent-soft); color: #fff; box-shadow: inset 3px 0 0 var(--accent); }
-.nav button.active .n { background: var(--accent); color: var(--accent-ink); }
-.nav button .tag { margin-left: auto; font-size: 10px; color: var(--muted); border: 1px solid #333; border-radius: 999px; padding: 0 6px; }
-.sidebar-foot { margin-top: auto; padding: 14px 8px 0; border-top: 1px solid #262626; font-size: 12px; color: var(--muted); }
+.nav button svg.i { width: 18px; height: 18px; color: #8f8f8f; }
+.nav button:hover { background: #222; color: #fff; }
+.nav button.active { background: rgba(242, 194, 0, .14); color: #fff; box-shadow: inset 3px 0 0 var(--accent); }
+.nav button.active svg.i { color: var(--accent); }
+.nav button .tag { margin-left: auto; font-size: 10px; color: #8f8f8f; border: 1px solid #383838; border-radius: 999px; padding: 0 6px; white-space: nowrap; }
+.sidebar-foot { margin-top: auto; padding: 14px 8px 0; border-top: 1px solid #262626; font-size: 12px; color: #8f8f8f; }
 .sidebar-foot strong { display: block; color: #fff; font-size: 13px; }
-.culture { margin-top: 10px; font-size: 11px; color: var(--muted); }
+.theme-btn { margin-top: 10px; width: 100%; background: #222; border: 1px solid #333; color: #ddd; border-radius: 9px; padding: 7px 10px; cursor: pointer; font-size: 12px; font-weight: 700; }
+.culture { margin-top: 10px; font-size: 11px; color: #8f8f8f; }
 .culture b { color: var(--accent); }
 
 main { min-width: 0; padding: 0 28px 48px; }
 .topbar {
-  position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 14px; min-height: 76px;
-  background: rgba(14, 14, 14, .92); backdrop-filter: blur(10px); border-bottom: 1px solid #1f1f1f; margin: 0 -28px 20px; padding: 0 28px;
+  position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 14px; min-height: 74px;
+  background: var(--topbar); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); margin: 0 -28px 20px; padding: 0 28px;
 }
-.topbar h1 { margin: 0; font-size: 22px; }
-.eyebrow { margin: 0; font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.topbar h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+.eyebrow { margin: 0; font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-text); }
 .top-actions { margin-left: auto; display: flex; gap: 10px; align-items: center; }
 #syncStatus { font-size: 12px; color: var(--muted); }
-.menu-btn { display: none; }
+.btn.menu-btn { display: none; }
 
 /* ---------- controls ---------- */
-.btn { border: 1px solid var(--line); background: var(--surface-2); color: #fff; border-radius: 10px; padding: 9px 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
-.btn:hover { border-color: #4a4a4a; background: var(--surface-3); }
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 10px; padding: 9px 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.btn.primary:hover { filter: brightness(1.06); }
-.btn.danger { border-color: rgba(229, 72, 77, .5); color: #ff8b8e; }
+.btn.primary:hover { filter: brightness(1.04); }
+.btn.dark { background: #161616; color: #fff; border-color: #161616; }
+.btn.danger { border-color: rgba(217, 59, 64, .45); color: var(--red); }
 .btn.small { padding: 5px 10px; font-size: 12px; border-radius: 8px; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 input, select, textarea {
-  width: 100%; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; color: #fff; outline: none;
+  width: 100%; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; color: var(--text); outline: none;
 }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 textarea { min-height: 84px; resize: vertical; }
-label.field input, label.field select, label.field textarea { font-weight: 400; }
 label.field { display: grid; gap: 5px; align-content: start; font-size: 12px; font-weight: 700; color: var(--text-2); }
-label.field .req { color: var(--accent); }
+label.field input, label.field select, label.field textarea { font-weight: 400; }
+label.field .req { color: var(--orange); }
 .check { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--text-2); }
-.check input { width: auto; accent-color: var(--accent); }
+.check input { width: auto; accent-color: #161616; }
 
 /* ---------- panels ---------- */
-.panel { background: var(--surface); border: 1px solid #262626; border-radius: var(--radius); padding: 18px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--radius); padding: 18px; min-width: 0; box-shadow: var(--shadow); }
 .panel h2 { margin: 0 0 4px; font-size: 15px; }
 .panel .sub { margin: 0 0 14px; color: var(--muted); font-size: 12px; }
 .grid { display: grid; gap: 16px; }
@@ -102,54 +145,77 @@ label.field .req { color: var(--accent); }
 .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 .hero {
-  position: relative; overflow: hidden; border-radius: var(--radius); padding: 22px 24px; margin-bottom: 16px;
-  background: linear-gradient(100deg, #0b0b0b 0%, #1c1c1c 60%, #262626 100%); border: 1px solid #262626;
+  position: relative; overflow: hidden; border-radius: var(--radius); padding: 22px 24px; margin-bottom: 16px; color: #fff;
+  background: linear-gradient(100deg, #0b0b0b 0%, #1c1c1c 60%, #2a2a2a 100%); box-shadow: var(--shadow);
 }
 .hero.with-photo { background-size: cover; background-position: center; }
-.hero::after { content: ""; position: absolute; right: -40px; top: -40px; width: 220px; height: 220px; border-radius: 50%; border: 28px solid var(--accent); opacity: .12; }
+.hero::after { content: ""; position: absolute; right: -40px; top: -40px; width: 220px; height: 220px; border-radius: 50%; border: 28px solid var(--accent); opacity: .18; }
+.hero .eyebrow { color: var(--accent); }
 .hero h2 { margin: 4px 0 6px; font-size: 22px; }
-.hero p { margin: 0; color: var(--text-2); max-width: 720px; }
+.hero p { margin: 0; color: #d0d0d0; max-width: 720px; }
 
-.filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; align-items: end; margin-bottom: 16px; }
+.filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; align-items: end; margin-bottom: 16px; padding: 14px; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: var(--shadow); }
 .filters label { font-size: 11px; color: var(--muted); font-weight: 700; display: grid; gap: 4px; }
 
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.card { background: var(--surface); border: 1px solid #262626; border-radius: 12px; padding: 14px 16px; position: relative; overflow: hidden; }
-.card span { display: block; color: var(--muted); font-size: 12px; font-weight: 600; }
-.card strong { display: block; font-size: 28px; margin-top: 4px; letter-spacing: -.02em; }
-.card small { color: var(--muted); font-size: 11px; }
-.card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--line); }
-.card.accent::before { background: var(--accent); }
-.card.green::before { background: var(--green); }
-.card.orange::before { background: var(--orange); }
-.card.red::before { background: var(--red); }
+/* blocos de status (ref.: Urgente / Atenção / Em dia / Todas) */
+.status-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.tile { border: 0; border-radius: 14px; padding: 16px 18px; text-align: left; cursor: pointer; color: #fff; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow); transition: transform .12s ease, box-shadow .12s ease; position: relative; }
+.tile:hover { transform: translateY(-2px); }
+.tile .t-label { font-weight: 800; font-size: 14px; }
+.tile .t-count { font-size: 30px; font-weight: 900; line-height: 1; margin-left: auto; }
+.tile .t-sub { display: block; font-size: 11px; opacity: .85; font-weight: 600; }
+.tile svg.i { width: 28px; height: 28px; }
+.tile.red { background: linear-gradient(135deg, #e5484d, #c22d33); }
+.tile.orange { background: linear-gradient(135deg, #f5a03c, #e57a12); }
+.tile.green { background: linear-gradient(135deg, #3fb46b, #2a8a50); }
+.tile.dark { background: linear-gradient(135deg, #2a2a2a, #0f0f0f); }
+.tile.dark svg.i { color: var(--accent); }
+.tile.selected { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line-2); border-radius: 14px; padding: 14px 16px; position: relative; overflow: hidden; box-shadow: var(--shadow); display: flex; gap: 12px; align-items: flex-start; }
+.card .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--icon-bg); color: var(--accent-text); flex: none; }
+.card.green .ic { background: rgba(47, 158, 91, .12); color: var(--green); }
+.card.red .ic { background: rgba(217, 59, 64, .1); color: var(--red); }
+.card.orange .ic { background: rgba(229, 122, 18, .12); color: var(--orange); }
+.card .cb { min-width: 0; }
+.card span.lb { display: block; color: var(--muted); font-size: 12px; font-weight: 600; }
+.card strong { display: block; font-size: 26px; margin-top: 2px; letter-spacing: -.02em; line-height: 1.15; }
+.card small { color: var(--muted); font-size: 11px; display: block; }
 .section-title { margin: 22px 0 10px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 800; }
 
 .chart-box { position: relative; height: 280px; }
 .chart-box:has(> .empty) { height: auto; }
-.empty { color: var(--muted); font-size: 13px; padding: 26px; text-align: center; border: 1px dashed #333; border-radius: 12px; }
+.empty { color: var(--muted); font-size: 13px; padding: 26px; text-align: center; border: 1px dashed var(--line); border-radius: 12px; background: var(--surface-2); }
 
 /* ---------- tables ---------- */
-.table-wrap { overflow-x: auto; border: 1px solid #262626; border-radius: 12px; }
-table { width: 100%; border-collapse: collapse; min-width: 720px; }
-th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #242424; vertical-align: middle; }
-th { position: sticky; top: 0; background: #181818; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line-2); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); }
+.table-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line-2); flex-wrap: wrap; }
+.table-head h3 { margin: 0; font-size: 14px; }
+.table-head input { max-width: 260px; margin-left: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 760px; }
+th, td { padding: 11px 12px; text-align: left; border-bottom: 1px solid var(--line-2); vertical-align: middle; }
+th { position: sticky; top: 0; background: var(--th); color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
 tbody tr { background: var(--surface); }
+tbody tr:last-child td { border-bottom: 0; }
 tbody tr.clickable { cursor: pointer; }
 tbody tr.clickable:hover { background: var(--surface-2); }
 td .muted, .muted { color: var(--muted); font-size: 12px; }
-.code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--accent); }
+.code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--accent-text); font-weight: 700; }
+.sdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.sdot.verde { background: var(--green); } .sdot.amarelo { background: var(--yellow); } .sdot.laranja { background: var(--orange); } .sdot.vermelho { background: var(--red); } .sdot.neutro { background: var(--neutral); }
+.late { color: var(--red); font-weight: 800; }
 
-.badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #2a2a2a; color: var(--text-2); white-space: nowrap; }
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--surface-3); color: var(--text-2); white-space: nowrap; }
 .badge.dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.sla-verde { color: var(--green); background: rgba(63, 180, 107, .12); }
-.sla-amarelo { color: var(--yellow); background: rgba(242, 194, 0, .12); }
-.sla-laranja { color: var(--orange); background: rgba(240, 138, 36, .13); }
-.sla-vermelho { color: var(--red); background: rgba(229, 72, 77, .13); }
-.sla-neutro { color: var(--muted); background: #262626; }
+.sla-verde { color: var(--green); background: rgba(47, 158, 91, .12); }
+.sla-amarelo { color: var(--yellow); background: rgba(217, 168, 0, .14); }
+.sla-laranja { color: var(--orange); background: rgba(229, 122, 18, .13); }
+.sla-vermelho { color: var(--red); background: rgba(217, 59, 64, .12); }
+.sla-neutro { color: var(--muted); background: var(--surface-3); }
 .prio-Crítica { color: var(--red); } .prio-Alta { color: var(--orange); } .prio-Média { color: var(--yellow); } .prio-Baixa { color: var(--muted); }
 
-.progress { height: 8px; background: #2a2a2a; border-radius: 999px; overflow: hidden; }
+.progress { height: 8px; background: var(--surface-3); border-radius: 999px; overflow: hidden; margin-top: 4px; }
 .progress i { display: block; height: 100%; border-radius: 999px; }
 
 /* ---------- toolbar ---------- */
@@ -158,37 +224,61 @@ td .muted, .muted { color: var(--muted); font-size: 12px; }
 .toolbar select { width: auto; min-width: 150px; }
 
 /* ---------- dialogs ---------- */
-dialog { border: 1px solid #2f2f2f; border-radius: 16px; padding: 0; background: var(--surface); color: #fff; width: min(980px, calc(100vw - 24px)); max-height: calc(100vh - 24px); box-shadow: var(--shadow); }
-dialog.narrow { width: min(520px, calc(100vw - 24px)); }
-dialog::backdrop { background: rgba(0, 0, 0, .7); }
-.dlg-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #2a2a2a; position: sticky; top: 0; background: var(--surface); z-index: 2; }
+dialog { border: 0; border-radius: 18px; padding: 0; background: var(--bg); color: var(--text); width: min(1040px, calc(100vw - 24px)); max-height: calc(100vh - 24px); box-shadow: var(--shadow-lg); }
+dialog.narrow { width: min(520px, calc(100vw - 24px)); background: var(--surface); }
+dialog::backdrop { background: rgba(0, 0, 0, .55); }
+.dlg-head { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--surface); z-index: 3; }
 .dlg-head h3 { margin: 0; font-size: 17px; }
 .dlg-head .x { margin-left: auto; }
 .dlg-body { padding: 18px 20px; overflow-y: auto; }
-.dlg-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; border-top: 1px solid #2a2a2a; position: sticky; bottom: 0; background: var(--surface); }
+.dlg-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--line); position: sticky; bottom: 0; background: var(--surface); }
 .form-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .form-grid .span-2 { grid-column: span 2; } .form-grid .span-4 { grid-column: 1 / -1; }
-.form-section { grid-column: 1 / -1; margin: 8px 0 -2px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 800; }
-.form-error { white-space: pre-line; background: rgba(229, 72, 77, .12); border: 1px solid rgba(229, 72, 77, .4); color: #ffb3b5; padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; }
+.form-section { grid-column: 1 / -1; margin: 8px 0 -2px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); font-weight: 800; }
+.form-error { white-space: pre-line; background: rgba(217, 59, 64, .08); border: 1px solid rgba(217, 59, 64, .35); color: var(--red); padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; }
 
-.tabs { display: flex; gap: 6px; border-bottom: 1px solid #2a2a2a; margin-bottom: 14px; overflow-x: auto; }
+/* página da vaga (ref.: etapas + cartão de informações + indicadores) */
+.stepper { display: flex; background: var(--surface); border-bottom: 1px solid var(--line); overflow-x: auto; position: sticky; top: 61px; z-index: 2; }
+.step { flex: 1 0 120px; padding: 12px 14px 10px; position: relative; text-align: center; color: var(--muted); font-weight: 700; font-size: 13px; border-bottom: 3px solid transparent; }
+.step + .step::before { content: "›"; position: absolute; left: -4px; top: 10px; color: var(--line); font-size: 20px; }
+.step small { display: block; font-size: 11px; font-weight: 600; margin-top: 2px; }
+.step.done { color: var(--text-2); }
+.step.done small { color: var(--green); }
+.step.current { color: var(--text); border-bottom-color: var(--accent); background: var(--accent-soft); }
+.info-card { display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)) auto; gap: 16px; align-items: center; background: var(--surface); border-radius: 16px; padding: 14px 18px; box-shadow: var(--shadow); border: 1px solid var(--line-2); margin-bottom: 14px; }
+.avatar { width: 46px; height: 46px; border-radius: 50%; background: #161616; color: var(--accent); display: grid; place-items: center; font-weight: 900; }
+.info-item { display: flex; gap: 10px; align-items: flex-start; font-size: 12px; color: var(--muted); min-width: 0; }
+.info-item svg.i { color: var(--accent-text); width: 20px; height: 20px; margin-top: 2px; }
+.info-item b { color: var(--text); font-weight: 700; }
+.menu-wrap { position: relative; }
+.menu-pop { position: absolute; right: 0; top: calc(100% + 6px); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 6px; min-width: 250px; z-index: 5; display: grid; }
+.menu-pop button { background: none; border: 0; text-align: left; padding: 9px 10px; border-radius: 8px; cursor: pointer; font-weight: 600; color: var(--text); }
+.menu-pop button:hover { background: var(--surface-2); }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.kpi { background: var(--surface); border: 1px solid var(--line-2); border-radius: 14px; overflow: hidden; text-align: center; box-shadow: var(--shadow); }
+.kpi .k-ic { background: var(--icon-bg); padding: 14px 0 10px; color: var(--accent-text); display: grid; place-items: center; }
+.kpi .k-ic svg.i { width: 34px; height: 34px; stroke-width: 1.5; }
+.kpi.green .k-ic { background: rgba(47, 158, 91, .1); color: var(--green); }
+.kpi.orange .k-ic { background: rgba(229, 122, 18, .1); color: var(--orange); }
+.kpi.red .k-ic { background: rgba(217, 59, 64, .09); color: var(--red); }
+.kpi strong { display: block; font-size: 18px; padding: 10px 6px 0; }
+.kpi span { display: block; font-size: 11px; color: var(--muted); padding: 0 6px 12px; }
+
+.tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin-bottom: 14px; overflow-x: auto; }
 .tabs button { background: none; border: 0; padding: 10px 12px; color: var(--muted); font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
-.tabs button.active { color: #fff; border-color: var(--accent); }
+.tabs button.active { color: var(--text); border-color: var(--accent); }
 
-.kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 18px; }
+.kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 18px; background: var(--surface); padding: 16px; border-radius: 14px; border: 1px solid var(--line-2); }
 .kv div span { display: block; font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
 .kv div p { margin: 2px 0 0; white-space: pre-line; }
 .kv .wide { grid-column: 1 / -1; }
 
-.sla-panel { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
-.sla-panel .card strong { font-size: 22px; }
-
 .timeline { display: grid; gap: 8px; }
-.timeline .item { background: var(--bg-2); border: 1px solid #262626; border-radius: 10px; padding: 10px 12px; }
-.timeline .item b { color: var(--accent); }
+.timeline .item { background: var(--surface); border: 1px solid var(--line-2); border-left: 3px solid var(--accent); border-radius: 10px; padding: 10px 12px; }
+.timeline .item b { color: var(--text); }
 
 .toast-area { position: fixed; right: 18px; bottom: 18px; display: grid; gap: 8px; z-index: 100; }
-.toast { background: #222; border: 1px solid #333; border-left: 4px solid var(--green); padding: 12px 14px; border-radius: 10px; box-shadow: var(--shadow); max-width: 380px; white-space: pre-line; }
+.toast { background: #161616; color: #fff; border-left: 4px solid var(--green); padding: 12px 14px; border-radius: 10px; box-shadow: var(--shadow-lg); max-width: 380px; white-space: pre-line; }
 .toast.error { border-left-color: var(--red); }
 
 .placeholder { padding: 40px; text-align: center; }
@@ -196,30 +286,37 @@ dialog::backdrop { background: rgba(0, 0, 0, .7); }
 .placeholder ul { text-align: left; display: inline-block; color: var(--text-2); }
 
 .loading { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 200; }
-.spinner { width: 42px; height: 42px; border-radius: 50%; border: 4px solid #2a2a2a; border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+.spinner { width: 42px; height: 42px; border-radius: 50%; border: 4px solid var(--line); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ---------- responsive ---------- */
 @media (max-width: 1100px) {
   .grid.two, .grid.three { grid-template-columns: 1fr; }
-  .sla-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .info-card { grid-template-columns: auto 1fr 1fr; }
+  .info-card .menu-wrap { grid-column: 1 / -1; }
 }
 @media (max-width: 860px) {
   .layout { grid-template-columns: 1fr; }
-  .sidebar { position: fixed; left: 0; top: 0; width: 264px; transform: translateX(-100%); transition: transform .2s ease; box-shadow: var(--shadow); }
+  .sidebar { position: fixed; left: 0; top: 0; width: 268px; transform: translateX(-100%); transition: transform .2s ease; box-shadow: var(--shadow-lg); }
   .sidebar.open { transform: translateX(0); }
-  .menu-btn { display: inline-flex; }
+  .btn.menu-btn { display: inline-flex; }
   main { padding: 0 16px 40px; }
   .topbar { margin: 0 -16px 16px; padding: 10px 16px; flex-wrap: wrap; }
   .topbar h1 { font-size: 18px; }
   #syncStatus { display: none; }
+  .status-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tile .t-count { font-size: 24px; }
   .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card { flex-direction: column; gap: 8px; }
   .card strong { font-size: 22px; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .info-card { grid-template-columns: 1fr; }
   .kv { grid-template-columns: 1fr 1fr; }
   .form-grid { grid-template-columns: 1fr; }
   .form-grid .span-2 { grid-column: auto; }
   .toolbar select { flex: 1 1 140px; }
+  .stepper { top: 0; position: static; }
 }
 </style>
 
@@ -237,20 +334,21 @@ dialog::backdrop { background: rgba(0, 0, 0, .7); }
         </div>
       </div>
       <nav class="nav" id="nav">
-        <button data-view="dashboard" class="active"><span class="n">1</span>Dashboard</button>
-        <button data-view="vagas"><span class="n">2</span>Gestão de Vagas</button>
-        <button data-view="candidatos"><span class="n">3</span>Candidatos<span class="tag">Fase 2</span></button>
-        <button data-view="kanban"><span class="n">4</span>Kanban do Recrutamento<span class="tag">Fase 2</span></button>
-        <button data-view="entrevistas"><span class="n">5</span>Entrevistas<span class="tag">Fase 2</span></button>
-        <button data-view="indicacoes"><span class="n">6</span>Indicações<span class="tag">Fase 2</span></button>
-        <button data-view="sla"><span class="n">7</span>SLA e Gargalos</button>
-        <button data-view="relatorios"><span class="n">8</span>Indicadores e Relatórios<span class="tag">Fase 3</span></button>
-        <button data-view="artes"><span class="n">9</span>Gerador de Artes<span class="tag">Fase 4</span></button>
-        <button data-view="config"><span class="n">10</span>Configurações</button>
+        <button data-view="dashboard" class="active"><i data-icon="grid"></i>Dashboard</button>
+        <button data-view="vagas"><i data-icon="briefcase"></i>Gestão de Vagas</button>
+        <button data-view="candidatos"><i data-icon="users"></i>Candidatos<span class="tag">Fase 2</span></button>
+        <button data-view="kanban"><i data-icon="columns"></i>Kanban do Recrutamento<span class="tag">Fase 2</span></button>
+        <button data-view="entrevistas"><i data-icon="chat"></i>Entrevistas<span class="tag">Fase 2</span></button>
+        <button data-view="indicacoes"><i data-icon="handshake"></i>Indicações<span class="tag">Fase 2</span></button>
+        <button data-view="sla"><i data-icon="clock"></i>SLA e Gargalos</button>
+        <button data-view="relatorios"><i data-icon="chart"></i>Indicadores e Relatórios<span class="tag">Fase 3</span></button>
+        <button data-view="artes"><i data-icon="image"></i>Gerador de Artes<span class="tag">Fase 4</span></button>
+        <button data-view="config"><i data-icon="gear"></i>Configurações</button>
       </nav>
       <div class="sidebar-foot">
         <strong id="userName">—</strong>
         <span id="userRole">—</span>
+        <button class="theme-btn" id="themeBtn">Tema escuro</button>
         <div class="culture"><b>Código de Cultura</b> · Via Dupla</div>
       </div>
     </aside>
@@ -276,6 +374,8 @@ dialog::backdrop { background: rgba(0, 0, 0, .7); }
           <p>Indicadores calculados em tempo real a partir das vagas, posições e candidaturas registradas. SLA padrão de <b id="heroSla">15</b> dias úteis por posição.</p>
         </div>
         <div class="filters" id="dashFilters"></div>
+        <div class="status-tiles" id="dashTiles"></div>
+        <div id="dashPrazos" style="margin-bottom:8px"></div>
         <div id="dashCards"></div>
         <div class="grid two">
           <section class="panel"><h2>Vagas abertas × fechadas por mês</h2><p class="sub">Abertura pela data da requisição; fechamento pela conclusão.</p><div class="chart-box"><canvas id="chMensal"></canvas></div></section>
@@ -289,7 +389,7 @@ dialog::backdrop { background: rgba(0, 0, 0, .7); }
           <section class="panel"><h2>Reaberturas por cargo</h2><p class="sub">Posições reabertas e requisições reabertas.</p><div class="chart-box"><canvas id="chReab"></canvas></div></section>
           <section class="panel"><h2>Contratações por origem da candidatura</h2><p class="sub">Candidaturas na etapa "Contratado".</p><div class="chart-box"><canvas id="chOrigem"></canvas></div></section>
         </div>
-        <h3 class="section-title">Alertas de SLA e vagas paradas</h3>
+        <h3 class="section-title">Vagas paradas e aguardando aprovação</h3>
         <div id="dashAlerts"></div>
       </section>
 
@@ -348,6 +448,33 @@ dialog::backdrop { background: rgba(0, 0, 0, .7); }
 var S = { user: null, lk: null, marca: {}, view: 'dashboard', vagas: [], dash: null, charts: {}, cfgTab: 'Empresas', cfgRows: [], timer: null };
 
 /* ---------------------------- utilitários ---------------------------- */
+var ICONS = {
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  briefcase: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/>',
+  columns: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/>',
+  chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
+  handshake: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
+  alert: '<path d="M12 3l10 18H2L12 3z"/><path d="M12 10v5M12 18h.01"/>',
+  check: '<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  userCheck: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 11l2 2 4-4"/>',
+  userX: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 9l4 4M21 9l-4 4"/>',
+  file: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
+  money: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>',
+  building: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10 21v-3h4v3"/>',
+  chevron: '<path d="M6 9l6 6 6-6"/>'
+};
+function icon(name) { return '<svg class="i" viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[name] || ICONS.chart) + '</svg>'; }
+function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
 function $(sel, root) { return (root || document).querySelector(sel); }
 function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 function esc(v) {
@@ -566,8 +693,14 @@ function loadDashboard() {
   }).catch(function (e) { setSync('Erro ao atualizar'); fail(e); });
 }
 
-function card(label, value, cls, small) {
-  return '<div class="card ' + (cls || '') + '"><span>' + esc(label) + '</span><strong>' + value + '</strong>' + (small ? '<small>' + small + '</small>' : '') + '</div>';
+var CARD_ICONS = {
+  'Vagas abertas': 'briefcase', 'Posições disponíveis': 'target', 'Vagas abertas no mês': 'calendar', 'Vagas encerradas no mês': 'check',
+  'Concluídas dentro do SLA': 'check', 'Fora do SLA': 'alert', 'Próximas do vencimento': 'clock', 'Tempo médio de fechamento': 'clock',
+  'Cumprimento do SLA': 'chart', 'Candidaturas recebidas': 'file', 'Em processo seletivo': 'users', 'Aprovados': 'userCheck',
+  'Reprovados / desistentes': 'userX', 'Contratações efetivadas': 'handshake', 'Vagas ativas': 'briefcase', 'Aguardando aprovação': 'clock'
+};
+function card(label, value, cls, small, ic) {
+  return '<div class="card ' + (cls || '') + '"><div class="ic">' + icon(ic || CARD_ICONS[label] || 'chart') + '</div><div class="cb"><span class="lb">' + esc(label) + '</span><strong>' + value + '</strong>' + (small ? '<small>' + small + '</small>' : '') + '</div></div>';
 }
 
 function renderDashboard(d) {
@@ -594,29 +727,69 @@ function renderDashboard(d) {
   var g = d.graficos;
   barChart('chMensal', g.mensal.map(function (m) { return m.label.substr(5) + '/' + m.label.substr(2, 2); }), [
     { label: 'Abertas', data: g.mensal.map(function (m) { return m.abertas; }), backgroundColor: '#f2c200' },
-    { label: 'Concluídas', data: g.mensal.map(function (m) { return m.fechadas; }), backgroundColor: '#e8e8e8' },
-    { label: 'Canceladas', data: g.mensal.map(function (m) { return m.canceladas; }), backgroundColor: '#5a5a5a' }
+    { label: 'Concluídas', data: g.mensal.map(function (m) { return m.fechadas; }), backgroundColor: cssVar('--chart-alt') },
+    { label: 'Canceladas', data: g.mensal.map(function (m) { return m.canceladas; }), backgroundColor: cssVar('--chart-alt-2') }
   ]);
   slaDoughnut('chSla', g.sla);
   barChart('chCargo', g.tempoCargo.map(function (x) { return x.label; }), [{ label: 'Dias úteis', data: g.tempoCargo.map(function (x) { return x.valor; }), backgroundColor: '#f2c200' }], { indexAxis: 'y', sla: true });
-  barChart('chEtapa', g.tempoEtapa.map(function (x) { return x.label; }), [{ label: 'Dias úteis (média)', data: g.tempoEtapa.map(function (x) { return x.valor; }), backgroundColor: '#d9d9d9' }], { indexAxis: 'y' });
+  barChart('chEtapa', g.tempoEtapa.map(function (x) { return x.label; }), [{ label: 'Dias úteis (média)', data: g.tempoEtapa.map(function (x) { return x.valor; }), backgroundColor: cssVar('--chart-alt') }], { indexAxis: 'y' });
   var funilVazio = !g.funil.some(function (f) { return f.valor; });
   barChart('chFunil', funilVazio ? [] : g.funil.map(function (x) { return x.label; }), [{ label: 'Candidaturas', data: g.funil.map(function (x) { return x.valor; }), backgroundColor: '#f2c200' }], { indexAxis: 'y' });
-  barChart('chConversao', funilVazio ? [] : g.conversao.map(function (x) { return x.label; }), [{ label: '% de conversão', data: g.conversao.map(function (x) { return x.valor; }), backgroundColor: '#e8e8e8' }], { indexAxis: 'y', max: 100 });
+  barChart('chConversao', funilVazio ? [] : g.conversao.map(function (x) { return x.label; }), [{ label: '% de conversão', data: g.conversao.map(function (x) { return x.valor; }), backgroundColor: cssVar('--chart-alt') }], { indexAxis: 'y', max: 100 });
   barChart('chMotivos', g.motivos.map(function (x) { return x.label; }), [{ label: 'Reprovações', data: g.motivos.map(function (x) { return x.valor; }), backgroundColor: '#e5484d' }], { indexAxis: 'y' });
   barChart('chAnalistas', g.analistas.map(function (x) { return x.label; }), [
     { label: 'Ativas', data: g.analistas.map(function (x) { return x.ativas; }), backgroundColor: '#f2c200' },
-    { label: 'Concluídas', data: g.analistas.map(function (x) { return x.concluidas; }), backgroundColor: '#e8e8e8' },
-    { label: 'Canceladas', data: g.analistas.map(function (x) { return x.outras; }), backgroundColor: '#5a5a5a' }
+    { label: 'Concluídas', data: g.analistas.map(function (x) { return x.concluidas; }), backgroundColor: cssVar('--chart-alt') },
+    { label: 'Canceladas', data: g.analistas.map(function (x) { return x.outras; }), backgroundColor: cssVar('--chart-alt-2') }
   ], { stacked: true });
   barChart('chReab', g.reaberturas.map(function (x) { return x.label; }), [{ label: 'Reaberturas', data: g.reaberturas.map(function (x) { return x.valor; }), backgroundColor: '#f08a24' }], { indexAxis: 'y' });
   doughnut('chOrigem', g.origens.map(function (x) { return x.label; }), g.origens.map(function (x) { return x.valor; }));
-  $('#dashAlerts').innerHTML = alertsTable(d.alertas);
+  renderPrazos();
+  $('#dashAlerts').innerHTML = alertsTable(d.alertas.filter(function (a) { return a.semMovimentacao || !a.sla.iniciado; }));
   bindVagaLinks($('#dashAlerts'));
 }
 
+var PRAZO_TILES = [
+  { k: 'vermelho', label: 'Vencidas', sub: 'prazo ultrapassado', cls: 'red', ic: 'alert', test: function (x) { return x.sla.iniciado && x.sla.nivel === 'vermelho'; } },
+  { k: 'atencao', label: 'Atenção', sub: '10 a 15 dias úteis', cls: 'orange', ic: 'clock', test: function (x) { return x.sla.iniciado && (x.sla.nivel === 'amarelo' || x.sla.nivel === 'laranja'); } },
+  { k: 'verde', label: 'Em dia', sub: 'até 9 dias úteis', cls: 'green', ic: 'check', test: function (x) { return x.sla.iniciado && x.sla.nivel === 'verde'; } },
+  { k: 'todas', label: 'Todas', sub: 'vagas ativas', cls: 'dark', ic: 'list', test: function () { return true; } }
+];
+function renderPrazos() {
+  var list = (S.dash && S.dash.prazos) || [];
+  var sel = S.prazoFiltro || 'todas';
+  $('#dashTiles').innerHTML = PRAZO_TILES.map(function (t) {
+    var n = list.filter(t.test).length;
+    return '<button class="tile ' + t.cls + (sel === t.k ? ' selected' : '') + '" data-tile="' + t.k + '">' + icon(t.ic) + '<span><span class="t-label">' + t.label + '</span><span class="t-sub">' + t.sub + '</span></span><span class="t-count">' + n + '</span></button>';
+  }).join('');
+  $$('[data-tile]').forEach(function (b) { b.addEventListener('click', function () { S.prazoFiltro = b.dataset.tile; renderPrazos(); }); });
+  var tile = PRAZO_TILES.filter(function (t) { return t.k === sel; })[0];
+  var q = (S.prazoBusca || '').toLowerCase();
+  var rows = list.filter(tile.test).filter(function (x) {
+    return !q || [x.Codigo, x.Cargo, x.Analista, x.Departamento, x.Unidade].join(' ').toLowerCase().indexOf(q) >= 0;
+  }).sort(function (a, b) {
+    var ra = a.sla.iniciado ? a.sla.diasRestantes : 999, rb = b.sla.iniciado ? b.sla.diasRestantes : 999;
+    return ra - rb;
+  });
+  var body = rows.length ? rows.map(function (x) {
+    var s = x.sla;
+    var atraso = !s.iniciado ? '<span class="muted">—</span>' : (s.diasRestantes < 0 ? '<span class="late">' + s.atraso + '</span>' : '0');
+    return '<tr class="clickable" data-vaga="' + esc(x.ID) + '"><td><span class="sdot ' + s.nivel + '" title="' + esc(s.nivel) + '"></span></td>' +
+      '<td><b>' + esc(x.Cargo) + '</b><br><span class="code">' + esc(x.Codigo) + '</span></td><td>' + esc(x.Analista) + '</td>' +
+      '<td>' + fmtDate(x.DataAbertura) + '</td><td>' + (s.iniciado ? fmtDate(s.prazoAjustado) : '<span class="muted">aguarda aprovação</span>') + '</td>' +
+      '<td>' + atraso + '</td><td>' + (s.iniciado && s.diasRestantes >= 0 ? s.diasRestantes : '—') + '</td>' +
+      '<td>' + esc(x.Departamento) + '</td><td>' + esc(x.Unidade) + '</td><td>' + x.posicoesAbertas + '/' + x.posicoesTotal + '</td>' +
+      '<td style="min-width:110px">' + (s.iniciado ? '<span class="muted">' + s.diasEfetivos + '/' + s.limite + ' d.u.</span>' + progressBar(s) : '') + '</td></tr>';
+  }).join('') : '<tr><td colspan="11"><div class="empty">Nenhuma vaga nesta situação.</div></td></tr>';
+  $('#dashPrazos').innerHTML = '<div class="table-wrap"><div class="table-head"><h3>Vagas por data limite — ' + esc(tile.label) + '</h3><span class="muted">' + rows.length + ' vaga(s)</span><input id="prazoBusca" placeholder="Pesquisar…" value="' + esc(S.prazoBusca || '') + '"></div>' +
+    '<table><thead><tr><th></th><th>Vaga</th><th>Recrutador</th><th>Abertura</th><th>Data limite</th><th>Atraso (dias)</th><th>Restam</th><th>Departamento</th><th>Unidade</th><th>Posições</th><th>SLA</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+  var inp = $('#prazoBusca');
+  inp.addEventListener('input', function () { S.prazoBusca = inp.value; var pos = inp.selectionStart; renderPrazos(); var n = $('#prazoBusca'); n.focus(); n.setSelectionRange(pos, pos); });
+  bindVagaLinks($('#dashPrazos'));
+}
+
 function alertsTable(list) {
-  if (!list.length) return '<div class="empty">Nenhuma vaga em alerta. 👏</div>';
+  if (!list.length) return '<div class="empty">Nenhuma vaga parada ou aguardando aprovação.</div>';
   return '<div class="table-wrap"><table><thead><tr><th>Vaga</th><th>Etapa atual</th><th>Responsável pela próxima ação</th><th>Parada há</th><th>SLA</th><th>Prazo</th></tr></thead><tbody>' +
     list.map(function (a) {
       return '<tr class="clickable" data-vaga="' + esc(a.ID) + '"><td><span class="code">' + esc(a.Codigo) + '</span><br>' + esc(a.Cargo) + ' <span class="muted">· ' + esc(a.Unidade) + '</span></td>' +
@@ -645,12 +818,12 @@ function chartReady(id, hasData) {
 function baseOptions(o) {
   o = o || {};
   var scales = {
-    x: { stacked: !!o.stacked, grid: { color: '#262626' }, ticks: { color: '#bdbdbd' }, beginAtZero: true },
-    y: { stacked: !!o.stacked, grid: { color: '#262626' }, ticks: { color: '#bdbdbd', autoSkip: false, callback: function (v) { var l = this.getLabelForValue ? this.getLabelForValue(v) : v; return typeof l === 'string' && l.length > 28 ? l.substr(0, 27) + '…' : l; } }, beginAtZero: true }
+    x: { stacked: !!o.stacked, grid: { color: cssVar('--chart-grid') }, ticks: { color: cssVar('--chart-text') }, beginAtZero: true },
+    y: { stacked: !!o.stacked, grid: { color: cssVar('--chart-grid') }, ticks: { color: cssVar('--chart-text'), autoSkip: false, callback: function (v) { var l = this.getLabelForValue ? this.getLabelForValue(v) : v; return typeof l === 'string' && l.length > 28 ? l.substr(0, 27) + '…' : l; } }, beginAtZero: true }
   };
   if (o.indexAxis !== 'y') scales.y.ticks.callback = undefined;
   if (o.max) scales[o.indexAxis === 'y' ? 'x' : 'y'].max = o.max;
-  return { responsive: true, maintainAspectRatio: false, indexAxis: o.indexAxis || 'x', plugins: { legend: { labels: { color: '#e6e6e6', boxWidth: 12 } } }, scales: scales };
+  return { responsive: true, maintainAspectRatio: false, indexAxis: o.indexAxis || 'x', plugins: { legend: { labels: { color: cssVar('--chart-text'), boxWidth: 12 } } }, scales: scales };
 }
 function barChart(id, labels, datasets, o) {
   var hasData = labels.length && datasets.some(function (ds) { return ds.data.some(function (v) { return v; }); });
@@ -671,8 +844,8 @@ function doughnut(id, labels, data, colors) {
   if (!canvas) return;
   S.charts[id] = new Chart(canvas, {
     type: 'doughnut',
-    data: { labels: labels, datasets: [{ data: data, backgroundColor: colors || ['#f2c200', '#e8e8e8', '#8f8f8f', '#f08a24', '#3fb46b', '#5a5a5a', '#e5484d', '#b5b5b5'], borderColor: '#1b1b1b', borderWidth: 3 }] },
-    options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'right', labels: { color: '#e6e6e6', boxWidth: 12 } } } }
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: colors || ['#f2c200', cssVar('--chart-alt'), '#8f8f8f', '#f08a24', '#3fb46b', cssVar('--chart-alt-2'), '#e5484d', '#b5b5b5'], borderColor: cssVar('--surface'), borderWidth: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'right', labels: { color: cssVar('--chart-text'), boxWidth: 12 } } } }
   });
 }
 function slaDoughnut(id, s) {
@@ -819,21 +992,66 @@ function openVaga(id) {
 function renderVagaDetail(v) {
   var s = v.sla;
   var final = ['Concluída / contratada', 'Cancelada'].indexOf(v.Status) >= 0;
+  var c = v.candidatos || {};
   var actions = '';
   if (v.podeEditar) {
-    if (!final) actions += '<button class="btn small" id="actEdit">Editar</button>';
-    actions += '<button class="btn small primary" id="actStatus">Alterar status</button>';
-    if (isAdmin() && s.iniciado && !final) actions += '<button class="btn small" id="actExc">Exceção de SLA</button>';
-    actions += '<button class="btn small" id="actDup">Nova requisição a partir desta</button>';
+    actions += '<button id="actStatus">Alterar status</button>';
+    if (!final) actions += '<button id="actEdit">Editar dados da vaga</button>';
+    if (isAdmin() && s.iniciado && !final) actions += '<button id="actExc">Registrar exceção de SLA</button>';
+    actions += '<button id="actDup">Nova requisição a partir desta</button>';
   }
-  var slaHtml = s.iniciado ?
-    '<div class="sla-panel">' +
-    card('Dias úteis decorridos', s.diasEfetivos + '<small> / ' + s.limite + '</small>', s.nivel === 'vermelho' ? 'red' : (s.nivel === 'verde' ? 'green' : 'orange'), s.diasPausados ? s.diasPausados + ' pausado(s) por suspensão' : '') +
-    card(s.fechado ? 'Resultado' : 'Dias úteis restantes', s.fechado ? (s.cumprido ? 'No prazo' : 'Atraso ' + s.atraso + 'd') : (s.diasRestantes < 0 ? '−' + s.atraso : s.diasRestantes), '') +
-    card('Prazo original', fmtDate(s.prazoOriginal), '', 'aprovação ' + fmtDate(s.inicio)) +
-    card('Prazo ajustado', fmtDate(s.prazoAjustado), '', s.diasAdicionais ? '+' + s.diasAdicionais + ' por exceção' : 'sem exceções') +
-    card('SLA consumido', s.percentual + '%', '', progressBar(s)) +
-    '</div>' : '<div class="empty" style="margin-bottom:16px">SLA ainda não iniciado: a vaga aguarda aprovação. A contagem de ' + esc(S.lk.config.SLA_DIAS_UTEIS) + ' dias úteis começa na data oficial de aprovação.</div>';
+
+  // Etapas macro do processo (ref.: Triar › Convocar › Selecionar › Contratar)
+  var STEPS = [
+    { label: 'Aprovação', st: ['Aguardando aprovação'] },
+    { label: 'Divulgação', st: ['Aprovada / aguardando divulgação', 'Aberta / recebendo candidaturas'], n: c.total, u: 'candidatura(s)' },
+    { label: 'Triagem', st: ['Triagem de currículos'], n: c.triados, u: 'triado(s)' },
+    { label: 'Entrevistas', st: ['Entrevistas com RH', 'Entrevistas com gestor', 'Entrevistas com direção', 'Etapa de testes ou avaliações', 'Aguardando retorno'], n: c.entrevistados, u: 'entrevistado(s)' },
+    { label: 'Proposta', st: ['Proposta enviada'], n: c.aprovados, u: 'aprovado(s)' },
+    { label: 'Admissão', st: ['Processo admissional'], n: c.admissao, u: 'em admissão' },
+    { label: 'Contratação', st: ['Concluída / contratada'], n: v.posicoesPreenchidas, u: 'de ' + v.posicoesTotal + ' posição(ões)' }
+  ];
+  var statusRef = v.Status;
+  if (v.Status === 'Suspensa' || v.Status === 'Cancelada') {
+    var prev = v.historico.filter(function (h) { return h.Tipo === 'Vaga' && h.Para && h.Para !== 'Suspensa' && h.Para !== 'Cancelada'; })[0];
+    statusRef = prev ? prev.Para : 'Aguardando aprovação';
+  }
+  var cur = STEPS.findIndex(function (st) { return st.st.indexOf(statusRef) >= 0; });
+  var stepper = '<div class="stepper">' + STEPS.map(function (st, i) {
+    var cls = i < cur || (i === cur && v.Status === 'Concluída / contratada') ? 'done' : (i === cur ? 'current' : '');
+    var sub = st.n !== undefined ? st.n + ' ' + st.u : (v.DataAprovacao ? 'em ' + fmtDate(v.DataAprovacao) : 'pendente');
+    return '<div class="step ' + cls + '">' + (i < cur ? '✓ ' : '') + esc(st.label) + '<small>' + sub + '</small></div>';
+  }).join('') + '</div>';
+
+  var initials = String(v.Analista || '?').split(/\s+/).map(function (w) { return w.charAt(0); }).slice(0, 2).join('').toUpperCase();
+  var infoCard = '<div class="info-card"><div class="avatar" title="Analista responsável">' + esc(initials) + '</div>' +
+    '<div class="info-item">' + icon('users') + '<div>Analista: <b>' + esc(v.Analista) + '</b><br>Aberta por: ' + esc(v.CriadoPor || '—') + '</div></div>' +
+    '<div class="info-item">' + icon('file') + '<div>Contrato: <b>' + esc(v.TipoContrato) + ' · ' + esc(v.Modalidade || '') + '</b><br>Salário: <b>' + esc(v.SalarioACombinar === 'Sim' ? 'A combinar' : (v.Salario || '—')) + '</b></div></div>' +
+    '<div class="info-item">' + icon('building') + '<div>Gestor: <b>' + esc(v.Gestor) + '</b><br>' + esc(v.Empresa) + ' · ' + esc(v.Departamento) + ' · ' + esc(v.Unidade) + '</div></div>' +
+    (actions ? '<div class="menu-wrap"><button class="btn primary" id="actMenu">Ações ' + icon('chevron') + '</button><div class="menu-pop hidden" id="actPop">' + actions + '</div></div>' : '<div></div>') +
+    '</div>';
+
+  var nivelCls = { verde: 'green', amarelo: 'orange', laranja: 'orange', vermelho: 'red' }[s.nivel] || '';
+  function kpi(ic, value, label, cls) { return '<div class="kpi ' + (cls || '') + '"><div class="k-ic">' + icon(ic) + '</div><strong>' + value + '</strong><span>' + label + '</span></div>'; }
+  var kpis = '<div class="kpis">' +
+    kpi('calendar', fmtDate(v.DataAbertura), 'Data de abertura') +
+    kpi('clock', s.iniciado ? s.diasEfetivos + ' de ' + s.limite : '—', s.iniciado ? 'Dias úteis transcorridos' : 'SLA não iniciado', nivelCls) +
+    kpi('flag', s.iniciado ? fmtDate(s.prazoAjustado) : '—', s.iniciado ? (s.fechado ? (s.cumprido ? 'Concluída no prazo' : 'Atraso de ' + s.atraso + ' d.u.') : (s.diasRestantes < 0 ? 'Vencida há ' + s.atraso + ' d.u.' : 'Data limite · resta(m) ' + s.diasRestantes)) : 'Data limite', nivelCls) +
+    kpi('briefcase', v.posicoesPreenchidas + ' de ' + v.posicoesTotal, 'Posições preenchidas') +
+    kpi('users', c.total || 0, 'Candidatos totais') +
+    kpi('chat', c.entrevistados || 0, 'Entrevistados') +
+    kpi('userCheck', c.aprovados || 0, 'Aprovados', 'green') +
+    '</div>';
+
+  var slaHtml = s.iniciado
+    ? '<div class="panel" style="margin-bottom:14px;padding:12px 16px"><div style="display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;font-size:13px">' +
+      '<span>' + slaBadge(s) + '</span><span class="muted">Aprovação: <b>' + fmtDate(s.inicio) + '</b></span>' +
+      '<span class="muted">Prazo original: <b>' + fmtDate(s.prazoOriginal) + '</b></span><span class="muted">Prazo ajustado: <b>' + fmtDate(s.prazoAjustado) + '</b></span>' +
+      (s.diasPausados ? '<span class="muted">Pausados por suspensão: <b>' + s.diasPausados + ' d.u.</b></span>' : '') +
+      (s.diasAdicionais ? '<span class="muted">Exceções: <b>+' + s.diasAdicionais + ' d.u.</b></span>' : '') +
+      '<span class="muted">Responsável pela próxima ação: <b>' + esc(v.responsavelAcao || '—') + '</b></span>' +
+      '<span style="flex:1 1 160px">' + progressBar(s) + '</span><b>' + s.percentual + '%</b></div></div>'
+    : '<div class="empty" style="margin-bottom:14px">SLA ainda não iniciado: a vaga aguarda aprovação. A contagem de ' + esc(S.lk.config.SLA_DIAS_UTEIS) + ' dias úteis começa na data oficial de aprovação.</div>';
 
   var posRows = v.posicoes.map(function (p) {
     var ps = (s.posicoes || []).filter(function (x) { return x.posicaoId === p.ID; })[0];
@@ -869,9 +1087,9 @@ function renderVagaDetail(v) {
     '<h3 class="section-title">Exceções de SLA</h3>' + (v.excecoes.length ? '<div class="table-wrap"><table><thead><tr><th>Data</th><th>Dias adicionais</th><th>Justificativa</th><th>Usuário</th></tr></thead><tbody>' +
     v.excecoes.map(function (x) { return '<tr><td>' + fmtDate(x.CriadoEm) + '</td><td>+' + esc(x.DiasAdicionais) + '</td><td>' + esc(x.Justificativa) + '</td><td class="muted">' + esc(x.Usuario) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">Nenhuma exceção. O prazo original permanece sempre registrado.</div>');
 
-  var html = '<div class="dlg-head"><div><p class="eyebrow">' + esc(v.Codigo || v.ID) + ' · ' + esc(v.Empresa) + '</p><h3>' + esc(v.Cargo) + '</h3></div>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto">' + statusBadge(v.Status) + slaBadge(s) + '</div><button class="btn small" data-close>Fechar</button></div>' +
-    '<div class="dlg-body"><div class="toolbar">' + actions + '</div>' + slaHtml +
+  var html = '<div class="dlg-head"><div><p class="eyebrow">' + esc(v.Codigo || v.ID) + ' · ' + esc(v.Empresa) + '</p><h3># ' + esc(v.Cargo) + ' — ' + v.posicoesTotal + ' posição(ões) em ' + esc(v.Unidade) + '</h3></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto">' + statusBadge(v.Status) + '<span class="badge prio-' + esc(v.Prioridade) + '">● ' + esc(v.Prioridade) + '</span></div><button class="btn small" data-close>Fechar</button></div>' +
+    stepper + '<div class="dlg-body">' + infoCard + kpis + slaHtml +
     '<div class="tabs"><button class="active" data-tab="pos">Posições (' + v.posicoes.length + ')</button><button data-tab="dados">Dados da vaga</button><button data-tab="hist">Histórico (' + v.historico.length + ')</button><button data-tab="susp">Suspensões e exceções</button></div>' +
     '<div data-pane="pos"><div class="table-wrap"><table><thead><tr><th>Posição</th><th>Status</th><th>Contratado</th><th>Fechamento</th><th>SLA da posição</th><th></th></tr></thead><tbody>' + posRows + '</tbody></table></div></div>' +
     '<div data-pane="dados" class="hidden"><div class="kv">' + dados + '</div></div>' +
@@ -886,6 +1104,10 @@ function renderVagaDetail(v) {
     });
   });
   function after(updated, msg) { toast(msg); renderVagaDetail(updated); refresh(); }
+  if ($('#actMenu', d)) {
+    $('#actMenu', d).addEventListener('click', function (ev) { ev.stopPropagation(); $('#actPop', d).classList.toggle('hidden'); });
+    d.addEventListener('click', function () { var pop = $('#actPop', d); if (pop) pop.classList.add('hidden'); });
+  }
   if ($('#actEdit', d)) $('#actEdit', d).addEventListener('click', function () { vagaForm(v); });
   if ($('#actDup', d)) $('#actDup', d).addEventListener('click', function () {
     var copy = {}; Object.keys(v).forEach(function (k) { copy[k] = v[k]; });
@@ -1046,12 +1268,27 @@ function applyBranding(m) {
   }
 }
 
+function readTheme() { try { return localStorage.getItem('vt-theme') || 'light'; } catch (e) { return 'light'; } }
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  $('#themeBtn').textContent = t === 'dark' ? 'Tema claro' : 'Tema escuro';
+  if (window.Chart) Chart.defaults.color = cssVar('--chart-text');
+}
+
 function init() {
   $$('#nav button').forEach(function (b) { b.addEventListener('click', function () { showView(b.dataset.view); }); });
   $('#menuBtn').addEventListener('click', function () { $('#sidebar').classList.toggle('open'); });
   $('#refreshBtn').addEventListener('click', refresh);
   $('#cfgNovo').addEventListener('click', function () { cadastroForm(null); });
-  if (window.Chart) { Chart.defaults.color = '#cfcfcf'; Chart.defaults.font.family = 'Inter, Segoe UI, Roboto, sans-serif'; }
+  $$('[data-icon]').forEach(function (el) { el.outerHTML = icon(el.dataset.icon); });
+  applyTheme(readTheme());
+  $('#themeBtn').addEventListener('click', function () {
+    var next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('vt-theme', next); } catch (e) { /* armazenamento indisponível */ }
+    applyTheme(next);
+    refresh();
+  });
+  if (window.Chart) { Chart.defaults.font.family = 'Inter, Segoe UI, Roboto, sans-serif'; }
 
   api('bootstrap').then(function (b) {
     S.user = b.usuario; S.lk = b.lookups; S.marca = b.marca || {};

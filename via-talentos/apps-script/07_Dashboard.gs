@@ -165,7 +165,18 @@ function getDashboard(filtros) {
       sla: slaDist,
       slaConcluidas: { noPrazo: concluidasNoSla.length, atrasadas: concluidasForaSla.length }
     },
-    alertas: alertas
+    alertas: alertas,
+    prazos: vagas.filter(function (v) { return VT.STATUS_FINAIS.indexOf(v.Status) < 0; }).map(function (v) {
+      return {
+        ID: v.ID, Codigo: v.Codigo || v.ID, Cargo: v.Cargo, Analista: v.Analista, Departamento: v.Departamento,
+        Unidade: v.Unidade, Status: v.Status, DataAbertura: v.DataAbertura, posicoesAbertas: v.posicoesAbertas,
+        posicoesTotal: v.posicoesTotal, sla: {
+          iniciado: v.sla.iniciado, nivel: v.sla.nivel, diasEfetivos: v.sla.diasEfetivos, diasRestantes: v.sla.diasRestantes,
+          atraso: v.sla.atraso, limite: v.sla.limite, prazoAjustado: v.sla.prazoAjustado, percentual: v.sla.percentual,
+          suspensa: v.sla.suspensa, fechado: false
+        }
+      };
+    })
   };
 }
 

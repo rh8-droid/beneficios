@@ -5,6 +5,33 @@
 var S = { user: null, lk: null, marca: {}, view: 'dashboard', vagas: [], dash: null, charts: {}, cfgTab: 'Empresas', cfgRows: [], timer: null };
 
 /* ---------------------------- utilitários ---------------------------- */
+var ICONS = {
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  briefcase: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/>',
+  columns: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/>',
+  chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
+  handshake: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
+  alert: '<path d="M12 3l10 18H2L12 3z"/><path d="M12 10v5M12 18h.01"/>',
+  check: '<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  userCheck: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 11l2 2 4-4"/>',
+  userX: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 9l4 4M21 9l-4 4"/>',
+  file: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
+  money: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>',
+  building: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10 21v-3h4v3"/>',
+  chevron: '<path d="M6 9l6 6 6-6"/>'
+};
+function icon(name) { return '<svg class="i" viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[name] || ICONS.chart) + '</svg>'; }
+function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
 function $(sel, root) { return (root || document).querySelector(sel); }
 function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 function esc(v) {
@@ -223,8 +250,14 @@ function loadDashboard() {
   }).catch(function (e) { setSync('Erro ao atualizar'); fail(e); });
 }
 
-function card(label, value, cls, small) {
-  return '<div class="card ' + (cls || '') + '"><span>' + esc(label) + '</span><strong>' + value + '</strong>' + (small ? '<small>' + small + '</small>' : '') + '</div>';
+var CARD_ICONS = {
+  'Vagas abertas': 'briefcase', 'Posições disponíveis': 'target', 'Vagas abertas no mês': 'calendar', 'Vagas encerradas no mês': 'check',
+  'Concluídas dentro do SLA': 'check', 'Fora do SLA': 'alert', 'Próximas do vencimento': 'clock', 'Tempo médio de fechamento': 'clock',
+  'Cumprimento do SLA': 'chart', 'Candidaturas recebidas': 'file', 'Em processo seletivo': 'users', 'Aprovados': 'userCheck',
+  'Reprovados / desistentes': 'userX', 'Contratações efetivadas': 'handshake', 'Vagas ativas': 'briefcase', 'Aguardando aprovação': 'clock'
+};
+function card(label, value, cls, small, ic) {
+  return '<div class="card ' + (cls || '') + '"><div class="ic">' + icon(ic || CARD_ICONS[label] || 'chart') + '</div><div class="cb"><span class="lb">' + esc(label) + '</span><strong>' + value + '</strong>' + (small ? '<small>' + small + '</small>' : '') + '</div></div>';
 }
 
 function renderDashboard(d) {
@@ -251,29 +284,69 @@ function renderDashboard(d) {
   var g = d.graficos;
   barChart('chMensal', g.mensal.map(function (m) { return m.label.substr(5) + '/' + m.label.substr(2, 2); }), [
     { label: 'Abertas', data: g.mensal.map(function (m) { return m.abertas; }), backgroundColor: '#f2c200' },
-    { label: 'Concluídas', data: g.mensal.map(function (m) { return m.fechadas; }), backgroundColor: '#e8e8e8' },
-    { label: 'Canceladas', data: g.mensal.map(function (m) { return m.canceladas; }), backgroundColor: '#5a5a5a' }
+    { label: 'Concluídas', data: g.mensal.map(function (m) { return m.fechadas; }), backgroundColor: cssVar('--chart-alt') },
+    { label: 'Canceladas', data: g.mensal.map(function (m) { return m.canceladas; }), backgroundColor: cssVar('--chart-alt-2') }
   ]);
   slaDoughnut('chSla', g.sla);
   barChart('chCargo', g.tempoCargo.map(function (x) { return x.label; }), [{ label: 'Dias úteis', data: g.tempoCargo.map(function (x) { return x.valor; }), backgroundColor: '#f2c200' }], { indexAxis: 'y', sla: true });
-  barChart('chEtapa', g.tempoEtapa.map(function (x) { return x.label; }), [{ label: 'Dias úteis (média)', data: g.tempoEtapa.map(function (x) { return x.valor; }), backgroundColor: '#d9d9d9' }], { indexAxis: 'y' });
+  barChart('chEtapa', g.tempoEtapa.map(function (x) { return x.label; }), [{ label: 'Dias úteis (média)', data: g.tempoEtapa.map(function (x) { return x.valor; }), backgroundColor: cssVar('--chart-alt') }], { indexAxis: 'y' });
   var funilVazio = !g.funil.some(function (f) { return f.valor; });
   barChart('chFunil', funilVazio ? [] : g.funil.map(function (x) { return x.label; }), [{ label: 'Candidaturas', data: g.funil.map(function (x) { return x.valor; }), backgroundColor: '#f2c200' }], { indexAxis: 'y' });
-  barChart('chConversao', funilVazio ? [] : g.conversao.map(function (x) { return x.label; }), [{ label: '% de conversão', data: g.conversao.map(function (x) { return x.valor; }), backgroundColor: '#e8e8e8' }], { indexAxis: 'y', max: 100 });
+  barChart('chConversao', funilVazio ? [] : g.conversao.map(function (x) { return x.label; }), [{ label: '% de conversão', data: g.conversao.map(function (x) { return x.valor; }), backgroundColor: cssVar('--chart-alt') }], { indexAxis: 'y', max: 100 });
   barChart('chMotivos', g.motivos.map(function (x) { return x.label; }), [{ label: 'Reprovações', data: g.motivos.map(function (x) { return x.valor; }), backgroundColor: '#e5484d' }], { indexAxis: 'y' });
   barChart('chAnalistas', g.analistas.map(function (x) { return x.label; }), [
     { label: 'Ativas', data: g.analistas.map(function (x) { return x.ativas; }), backgroundColor: '#f2c200' },
-    { label: 'Concluídas', data: g.analistas.map(function (x) { return x.concluidas; }), backgroundColor: '#e8e8e8' },
-    { label: 'Canceladas', data: g.analistas.map(function (x) { return x.outras; }), backgroundColor: '#5a5a5a' }
+    { label: 'Concluídas', data: g.analistas.map(function (x) { return x.concluidas; }), backgroundColor: cssVar('--chart-alt') },
+    { label: 'Canceladas', data: g.analistas.map(function (x) { return x.outras; }), backgroundColor: cssVar('--chart-alt-2') }
   ], { stacked: true });
   barChart('chReab', g.reaberturas.map(function (x) { return x.label; }), [{ label: 'Reaberturas', data: g.reaberturas.map(function (x) { return x.valor; }), backgroundColor: '#f08a24' }], { indexAxis: 'y' });
   doughnut('chOrigem', g.origens.map(function (x) { return x.label; }), g.origens.map(function (x) { return x.valor; }));
-  $('#dashAlerts').innerHTML = alertsTable(d.alertas);
+  renderPrazos();
+  $('#dashAlerts').innerHTML = alertsTable(d.alertas.filter(function (a) { return a.semMovimentacao || !a.sla.iniciado; }));
   bindVagaLinks($('#dashAlerts'));
 }
 
+var PRAZO_TILES = [
+  { k: 'vermelho', label: 'Vencidas', sub: 'prazo ultrapassado', cls: 'red', ic: 'alert', test: function (x) { return x.sla.iniciado && x.sla.nivel === 'vermelho'; } },
+  { k: 'atencao', label: 'Atenção', sub: '10 a 15 dias úteis', cls: 'orange', ic: 'clock', test: function (x) { return x.sla.iniciado && (x.sla.nivel === 'amarelo' || x.sla.nivel === 'laranja'); } },
+  { k: 'verde', label: 'Em dia', sub: 'até 9 dias úteis', cls: 'green', ic: 'check', test: function (x) { return x.sla.iniciado && x.sla.nivel === 'verde'; } },
+  { k: 'todas', label: 'Todas', sub: 'vagas ativas', cls: 'dark', ic: 'list', test: function () { return true; } }
+];
+function renderPrazos() {
+  var list = (S.dash && S.dash.prazos) || [];
+  var sel = S.prazoFiltro || 'todas';
+  $('#dashTiles').innerHTML = PRAZO_TILES.map(function (t) {
+    var n = list.filter(t.test).length;
+    return '<button class="tile ' + t.cls + (sel === t.k ? ' selected' : '') + '" data-tile="' + t.k + '">' + icon(t.ic) + '<span><span class="t-label">' + t.label + '</span><span class="t-sub">' + t.sub + '</span></span><span class="t-count">' + n + '</span></button>';
+  }).join('');
+  $$('[data-tile]').forEach(function (b) { b.addEventListener('click', function () { S.prazoFiltro = b.dataset.tile; renderPrazos(); }); });
+  var tile = PRAZO_TILES.filter(function (t) { return t.k === sel; })[0];
+  var q = (S.prazoBusca || '').toLowerCase();
+  var rows = list.filter(tile.test).filter(function (x) {
+    return !q || [x.Codigo, x.Cargo, x.Analista, x.Departamento, x.Unidade].join(' ').toLowerCase().indexOf(q) >= 0;
+  }).sort(function (a, b) {
+    var ra = a.sla.iniciado ? a.sla.diasRestantes : 999, rb = b.sla.iniciado ? b.sla.diasRestantes : 999;
+    return ra - rb;
+  });
+  var body = rows.length ? rows.map(function (x) {
+    var s = x.sla;
+    var atraso = !s.iniciado ? '<span class="muted">—</span>' : (s.diasRestantes < 0 ? '<span class="late">' + s.atraso + '</span>' : '0');
+    return '<tr class="clickable" data-vaga="' + esc(x.ID) + '"><td><span class="sdot ' + s.nivel + '" title="' + esc(s.nivel) + '"></span></td>' +
+      '<td><b>' + esc(x.Cargo) + '</b><br><span class="code">' + esc(x.Codigo) + '</span></td><td>' + esc(x.Analista) + '</td>' +
+      '<td>' + fmtDate(x.DataAbertura) + '</td><td>' + (s.iniciado ? fmtDate(s.prazoAjustado) : '<span class="muted">aguarda aprovação</span>') + '</td>' +
+      '<td>' + atraso + '</td><td>' + (s.iniciado && s.diasRestantes >= 0 ? s.diasRestantes : '—') + '</td>' +
+      '<td>' + esc(x.Departamento) + '</td><td>' + esc(x.Unidade) + '</td><td>' + x.posicoesAbertas + '/' + x.posicoesTotal + '</td>' +
+      '<td style="min-width:110px">' + (s.iniciado ? '<span class="muted">' + s.diasEfetivos + '/' + s.limite + ' d.u.</span>' + progressBar(s) : '') + '</td></tr>';
+  }).join('') : '<tr><td colspan="11"><div class="empty">Nenhuma vaga nesta situação.</div></td></tr>';
+  $('#dashPrazos').innerHTML = '<div class="table-wrap"><div class="table-head"><h3>Vagas por data limite — ' + esc(tile.label) + '</h3><span class="muted">' + rows.length + ' vaga(s)</span><input id="prazoBusca" placeholder="Pesquisar…" value="' + esc(S.prazoBusca || '') + '"></div>' +
+    '<table><thead><tr><th></th><th>Vaga</th><th>Recrutador</th><th>Abertura</th><th>Data limite</th><th>Atraso (dias)</th><th>Restam</th><th>Departamento</th><th>Unidade</th><th>Posições</th><th>SLA</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+  var inp = $('#prazoBusca');
+  inp.addEventListener('input', function () { S.prazoBusca = inp.value; var pos = inp.selectionStart; renderPrazos(); var n = $('#prazoBusca'); n.focus(); n.setSelectionRange(pos, pos); });
+  bindVagaLinks($('#dashPrazos'));
+}
+
 function alertsTable(list) {
-  if (!list.length) return '<div class="empty">Nenhuma vaga em alerta. 👏</div>';
+  if (!list.length) return '<div class="empty">Nenhuma vaga parada ou aguardando aprovação.</div>';
   return '<div class="table-wrap"><table><thead><tr><th>Vaga</th><th>Etapa atual</th><th>Responsável pela próxima ação</th><th>Parada há</th><th>SLA</th><th>Prazo</th></tr></thead><tbody>' +
     list.map(function (a) {
       return '<tr class="clickable" data-vaga="' + esc(a.ID) + '"><td><span class="code">' + esc(a.Codigo) + '</span><br>' + esc(a.Cargo) + ' <span class="muted">· ' + esc(a.Unidade) + '</span></td>' +
@@ -302,12 +375,12 @@ function chartReady(id, hasData) {
 function baseOptions(o) {
   o = o || {};
   var scales = {
-    x: { stacked: !!o.stacked, grid: { color: '#262626' }, ticks: { color: '#bdbdbd' }, beginAtZero: true },
-    y: { stacked: !!o.stacked, grid: { color: '#262626' }, ticks: { color: '#bdbdbd', autoSkip: false, callback: function (v) { var l = this.getLabelForValue ? this.getLabelForValue(v) : v; return typeof l === 'string' && l.length > 28 ? l.substr(0, 27) + '…' : l; } }, beginAtZero: true }
+    x: { stacked: !!o.stacked, grid: { color: cssVar('--chart-grid') }, ticks: { color: cssVar('--chart-text') }, beginAtZero: true },
+    y: { stacked: !!o.stacked, grid: { color: cssVar('--chart-grid') }, ticks: { color: cssVar('--chart-text'), autoSkip: false, callback: function (v) { var l = this.getLabelForValue ? this.getLabelForValue(v) : v; return typeof l === 'string' && l.length > 28 ? l.substr(0, 27) + '…' : l; } }, beginAtZero: true }
   };
   if (o.indexAxis !== 'y') scales.y.ticks.callback = undefined;
   if (o.max) scales[o.indexAxis === 'y' ? 'x' : 'y'].max = o.max;
-  return { responsive: true, maintainAspectRatio: false, indexAxis: o.indexAxis || 'x', plugins: { legend: { labels: { color: '#e6e6e6', boxWidth: 12 } } }, scales: scales };
+  return { responsive: true, maintainAspectRatio: false, indexAxis: o.indexAxis || 'x', plugins: { legend: { labels: { color: cssVar('--chart-text'), boxWidth: 12 } } }, scales: scales };
 }
 function barChart(id, labels, datasets, o) {
   var hasData = labels.length && datasets.some(function (ds) { return ds.data.some(function (v) { return v; }); });
@@ -328,8 +401,8 @@ function doughnut(id, labels, data, colors) {
   if (!canvas) return;
   S.charts[id] = new Chart(canvas, {
     type: 'doughnut',
-    data: { labels: labels, datasets: [{ data: data, backgroundColor: colors || ['#f2c200', '#e8e8e8', '#8f8f8f', '#f08a24', '#3fb46b', '#5a5a5a', '#e5484d', '#b5b5b5'], borderColor: '#1b1b1b', borderWidth: 3 }] },
-    options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'right', labels: { color: '#e6e6e6', boxWidth: 12 } } } }
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: colors || ['#f2c200', cssVar('--chart-alt'), '#8f8f8f', '#f08a24', '#3fb46b', cssVar('--chart-alt-2'), '#e5484d', '#b5b5b5'], borderColor: cssVar('--surface'), borderWidth: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'right', labels: { color: cssVar('--chart-text'), boxWidth: 12 } } } }
   });
 }
 function slaDoughnut(id, s) {
@@ -476,21 +549,66 @@ function openVaga(id) {
 function renderVagaDetail(v) {
   var s = v.sla;
   var final = ['Concluída / contratada', 'Cancelada'].indexOf(v.Status) >= 0;
+  var c = v.candidatos || {};
   var actions = '';
   if (v.podeEditar) {
-    if (!final) actions += '<button class="btn small" id="actEdit">Editar</button>';
-    actions += '<button class="btn small primary" id="actStatus">Alterar status</button>';
-    if (isAdmin() && s.iniciado && !final) actions += '<button class="btn small" id="actExc">Exceção de SLA</button>';
-    actions += '<button class="btn small" id="actDup">Nova requisição a partir desta</button>';
+    actions += '<button id="actStatus">Alterar status</button>';
+    if (!final) actions += '<button id="actEdit">Editar dados da vaga</button>';
+    if (isAdmin() && s.iniciado && !final) actions += '<button id="actExc">Registrar exceção de SLA</button>';
+    actions += '<button id="actDup">Nova requisição a partir desta</button>';
   }
-  var slaHtml = s.iniciado ?
-    '<div class="sla-panel">' +
-    card('Dias úteis decorridos', s.diasEfetivos + '<small> / ' + s.limite + '</small>', s.nivel === 'vermelho' ? 'red' : (s.nivel === 'verde' ? 'green' : 'orange'), s.diasPausados ? s.diasPausados + ' pausado(s) por suspensão' : '') +
-    card(s.fechado ? 'Resultado' : 'Dias úteis restantes', s.fechado ? (s.cumprido ? 'No prazo' : 'Atraso ' + s.atraso + 'd') : (s.diasRestantes < 0 ? '−' + s.atraso : s.diasRestantes), '') +
-    card('Prazo original', fmtDate(s.prazoOriginal), '', 'aprovação ' + fmtDate(s.inicio)) +
-    card('Prazo ajustado', fmtDate(s.prazoAjustado), '', s.diasAdicionais ? '+' + s.diasAdicionais + ' por exceção' : 'sem exceções') +
-    card('SLA consumido', s.percentual + '%', '', progressBar(s)) +
-    '</div>' : '<div class="empty" style="margin-bottom:16px">SLA ainda não iniciado: a vaga aguarda aprovação. A contagem de ' + esc(S.lk.config.SLA_DIAS_UTEIS) + ' dias úteis começa na data oficial de aprovação.</div>';
+
+  // Etapas macro do processo (ref.: Triar › Convocar › Selecionar › Contratar)
+  var STEPS = [
+    { label: 'Aprovação', st: ['Aguardando aprovação'] },
+    { label: 'Divulgação', st: ['Aprovada / aguardando divulgação', 'Aberta / recebendo candidaturas'], n: c.total, u: 'candidatura(s)' },
+    { label: 'Triagem', st: ['Triagem de currículos'], n: c.triados, u: 'triado(s)' },
+    { label: 'Entrevistas', st: ['Entrevistas com RH', 'Entrevistas com gestor', 'Entrevistas com direção', 'Etapa de testes ou avaliações', 'Aguardando retorno'], n: c.entrevistados, u: 'entrevistado(s)' },
+    { label: 'Proposta', st: ['Proposta enviada'], n: c.aprovados, u: 'aprovado(s)' },
+    { label: 'Admissão', st: ['Processo admissional'], n: c.admissao, u: 'em admissão' },
+    { label: 'Contratação', st: ['Concluída / contratada'], n: v.posicoesPreenchidas, u: 'de ' + v.posicoesTotal + ' posição(ões)' }
+  ];
+  var statusRef = v.Status;
+  if (v.Status === 'Suspensa' || v.Status === 'Cancelada') {
+    var prev = v.historico.filter(function (h) { return h.Tipo === 'Vaga' && h.Para && h.Para !== 'Suspensa' && h.Para !== 'Cancelada'; })[0];
+    statusRef = prev ? prev.Para : 'Aguardando aprovação';
+  }
+  var cur = STEPS.findIndex(function (st) { return st.st.indexOf(statusRef) >= 0; });
+  var stepper = '<div class="stepper">' + STEPS.map(function (st, i) {
+    var cls = i < cur || (i === cur && v.Status === 'Concluída / contratada') ? 'done' : (i === cur ? 'current' : '');
+    var sub = st.n !== undefined ? st.n + ' ' + st.u : (v.DataAprovacao ? 'em ' + fmtDate(v.DataAprovacao) : 'pendente');
+    return '<div class="step ' + cls + '">' + (i < cur ? '✓ ' : '') + esc(st.label) + '<small>' + sub + '</small></div>';
+  }).join('') + '</div>';
+
+  var initials = String(v.Analista || '?').split(/\s+/).map(function (w) { return w.charAt(0); }).slice(0, 2).join('').toUpperCase();
+  var infoCard = '<div class="info-card"><div class="avatar" title="Analista responsável">' + esc(initials) + '</div>' +
+    '<div class="info-item">' + icon('users') + '<div>Analista: <b>' + esc(v.Analista) + '</b><br>Aberta por: ' + esc(v.CriadoPor || '—') + '</div></div>' +
+    '<div class="info-item">' + icon('file') + '<div>Contrato: <b>' + esc(v.TipoContrato) + ' · ' + esc(v.Modalidade || '') + '</b><br>Salário: <b>' + esc(v.SalarioACombinar === 'Sim' ? 'A combinar' : (v.Salario || '—')) + '</b></div></div>' +
+    '<div class="info-item">' + icon('building') + '<div>Gestor: <b>' + esc(v.Gestor) + '</b><br>' + esc(v.Empresa) + ' · ' + esc(v.Departamento) + ' · ' + esc(v.Unidade) + '</div></div>' +
+    (actions ? '<div class="menu-wrap"><button class="btn primary" id="actMenu">Ações ' + icon('chevron') + '</button><div class="menu-pop hidden" id="actPop">' + actions + '</div></div>' : '<div></div>') +
+    '</div>';
+
+  var nivelCls = { verde: 'green', amarelo: 'orange', laranja: 'orange', vermelho: 'red' }[s.nivel] || '';
+  function kpi(ic, value, label, cls) { return '<div class="kpi ' + (cls || '') + '"><div class="k-ic">' + icon(ic) + '</div><strong>' + value + '</strong><span>' + label + '</span></div>'; }
+  var kpis = '<div class="kpis">' +
+    kpi('calendar', fmtDate(v.DataAbertura), 'Data de abertura') +
+    kpi('clock', s.iniciado ? s.diasEfetivos + ' de ' + s.limite : '—', s.iniciado ? 'Dias úteis transcorridos' : 'SLA não iniciado', nivelCls) +
+    kpi('flag', s.iniciado ? fmtDate(s.prazoAjustado) : '—', s.iniciado ? (s.fechado ? (s.cumprido ? 'Concluída no prazo' : 'Atraso de ' + s.atraso + ' d.u.') : (s.diasRestantes < 0 ? 'Vencida há ' + s.atraso + ' d.u.' : 'Data limite · resta(m) ' + s.diasRestantes)) : 'Data limite', nivelCls) +
+    kpi('briefcase', v.posicoesPreenchidas + ' de ' + v.posicoesTotal, 'Posições preenchidas') +
+    kpi('users', c.total || 0, 'Candidatos totais') +
+    kpi('chat', c.entrevistados || 0, 'Entrevistados') +
+    kpi('userCheck', c.aprovados || 0, 'Aprovados', 'green') +
+    '</div>';
+
+  var slaHtml = s.iniciado
+    ? '<div class="panel" style="margin-bottom:14px;padding:12px 16px"><div style="display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;font-size:13px">' +
+      '<span>' + slaBadge(s) + '</span><span class="muted">Aprovação: <b>' + fmtDate(s.inicio) + '</b></span>' +
+      '<span class="muted">Prazo original: <b>' + fmtDate(s.prazoOriginal) + '</b></span><span class="muted">Prazo ajustado: <b>' + fmtDate(s.prazoAjustado) + '</b></span>' +
+      (s.diasPausados ? '<span class="muted">Pausados por suspensão: <b>' + s.diasPausados + ' d.u.</b></span>' : '') +
+      (s.diasAdicionais ? '<span class="muted">Exceções: <b>+' + s.diasAdicionais + ' d.u.</b></span>' : '') +
+      '<span class="muted">Responsável pela próxima ação: <b>' + esc(v.responsavelAcao || '—') + '</b></span>' +
+      '<span style="flex:1 1 160px">' + progressBar(s) + '</span><b>' + s.percentual + '%</b></div></div>'
+    : '<div class="empty" style="margin-bottom:14px">SLA ainda não iniciado: a vaga aguarda aprovação. A contagem de ' + esc(S.lk.config.SLA_DIAS_UTEIS) + ' dias úteis começa na data oficial de aprovação.</div>';
 
   var posRows = v.posicoes.map(function (p) {
     var ps = (s.posicoes || []).filter(function (x) { return x.posicaoId === p.ID; })[0];
@@ -526,9 +644,9 @@ function renderVagaDetail(v) {
     '<h3 class="section-title">Exceções de SLA</h3>' + (v.excecoes.length ? '<div class="table-wrap"><table><thead><tr><th>Data</th><th>Dias adicionais</th><th>Justificativa</th><th>Usuário</th></tr></thead><tbody>' +
     v.excecoes.map(function (x) { return '<tr><td>' + fmtDate(x.CriadoEm) + '</td><td>+' + esc(x.DiasAdicionais) + '</td><td>' + esc(x.Justificativa) + '</td><td class="muted">' + esc(x.Usuario) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">Nenhuma exceção. O prazo original permanece sempre registrado.</div>');
 
-  var html = '<div class="dlg-head"><div><p class="eyebrow">' + esc(v.Codigo || v.ID) + ' · ' + esc(v.Empresa) + '</p><h3>' + esc(v.Cargo) + '</h3></div>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto">' + statusBadge(v.Status) + slaBadge(s) + '</div><button class="btn small" data-close>Fechar</button></div>' +
-    '<div class="dlg-body"><div class="toolbar">' + actions + '</div>' + slaHtml +
+  var html = '<div class="dlg-head"><div><p class="eyebrow">' + esc(v.Codigo || v.ID) + ' · ' + esc(v.Empresa) + '</p><h3># ' + esc(v.Cargo) + ' — ' + v.posicoesTotal + ' posição(ões) em ' + esc(v.Unidade) + '</h3></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto">' + statusBadge(v.Status) + '<span class="badge prio-' + esc(v.Prioridade) + '">● ' + esc(v.Prioridade) + '</span></div><button class="btn small" data-close>Fechar</button></div>' +
+    stepper + '<div class="dlg-body">' + infoCard + kpis + slaHtml +
     '<div class="tabs"><button class="active" data-tab="pos">Posições (' + v.posicoes.length + ')</button><button data-tab="dados">Dados da vaga</button><button data-tab="hist">Histórico (' + v.historico.length + ')</button><button data-tab="susp">Suspensões e exceções</button></div>' +
     '<div data-pane="pos"><div class="table-wrap"><table><thead><tr><th>Posição</th><th>Status</th><th>Contratado</th><th>Fechamento</th><th>SLA da posição</th><th></th></tr></thead><tbody>' + posRows + '</tbody></table></div></div>' +
     '<div data-pane="dados" class="hidden"><div class="kv">' + dados + '</div></div>' +
@@ -543,6 +661,10 @@ function renderVagaDetail(v) {
     });
   });
   function after(updated, msg) { toast(msg); renderVagaDetail(updated); refresh(); }
+  if ($('#actMenu', d)) {
+    $('#actMenu', d).addEventListener('click', function (ev) { ev.stopPropagation(); $('#actPop', d).classList.toggle('hidden'); });
+    d.addEventListener('click', function () { var pop = $('#actPop', d); if (pop) pop.classList.add('hidden'); });
+  }
   if ($('#actEdit', d)) $('#actEdit', d).addEventListener('click', function () { vagaForm(v); });
   if ($('#actDup', d)) $('#actDup', d).addEventListener('click', function () {
     var copy = {}; Object.keys(v).forEach(function (k) { copy[k] = v[k]; });
@@ -703,12 +825,27 @@ function applyBranding(m) {
   }
 }
 
+function readTheme() { try { return localStorage.getItem('vt-theme') || 'light'; } catch (e) { return 'light'; } }
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  $('#themeBtn').textContent = t === 'dark' ? 'Tema claro' : 'Tema escuro';
+  if (window.Chart) Chart.defaults.color = cssVar('--chart-text');
+}
+
 function init() {
   $$('#nav button').forEach(function (b) { b.addEventListener('click', function () { showView(b.dataset.view); }); });
   $('#menuBtn').addEventListener('click', function () { $('#sidebar').classList.toggle('open'); });
   $('#refreshBtn').addEventListener('click', refresh);
   $('#cfgNovo').addEventListener('click', function () { cadastroForm(null); });
-  if (window.Chart) { Chart.defaults.color = '#cfcfcf'; Chart.defaults.font.family = 'Inter, Segoe UI, Roboto, sans-serif'; }
+  $$('[data-icon]').forEach(function (el) { el.outerHTML = icon(el.dataset.icon); });
+  applyTheme(readTheme());
+  $('#themeBtn').addEventListener('click', function () {
+    var next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('vt-theme', next); } catch (e) { /* armazenamento indisponível */ }
+    applyTheme(next);
+    refresh();
+  });
+  if (window.Chart) { Chart.defaults.font.family = 'Inter, Segoe UI, Roboto, sans-serif'; }
 
   api('bootstrap').then(function (b) {
     S.user = b.usuario; S.lk = b.lookups; S.marca = b.marca || {};
