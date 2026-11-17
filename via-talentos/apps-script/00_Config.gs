@@ -105,6 +105,10 @@ var VT = {
     PRAZO_ACAO_DIAS: '2',
     ALERTAS_EMAIL: 'Não',
     ALERTAS_HORA: '7',
+    CODIGO_CULTURA: '',
+    GPTW_DRIVE_ID: '',
+    GPTW_VIGENTE_ATE: '',
+    BENEFICIOS_PADRAO: 'Vale-refeição;Vale-alimentação;Plano de saúde;Plano odontológico;Seguro de vida;Convênio farmácia;Participação nos resultados;TotalPass',
     CURRICULOS_PASTA_ID: ''
   },
 
@@ -154,6 +158,8 @@ var SCHEMA = {
   Entrevistas: ['ID', 'CandidaturaID', 'Tipo', 'Agendamento', 'Realizacao', 'Entrevistador',
     'Resultado', 'Parecer', 'MotivoReprovacao', 'ProximaEtapa', 'RetornoPrevisto', 'CriadoEm', 'CriadoPor'],
   EtapasCandidatura: ['ID', 'CandidaturaID', 'Etapa', 'Entrada', 'Saida', 'Responsavel', 'MotivoAtraso', 'Usuario'],
+  Artes: ['ID', 'VagaID', 'Modelo', 'Formato', 'ArquivoId', 'Versao', 'Status', 'AprovadoPor', 'CriadoEm', 'CriadoPor',
+    'AprovadoEm', 'PublicadoEm', 'Canal', 'Dados', 'Largura', 'Altura', 'Observacao'],
   Indicacoes: ['ID', 'CandidatoID', 'CandidaturaID', 'Indicador', 'EmpresaIndicador',
     'DepartamentoIndicador', 'DataIndicacao', 'Resultado', 'DataContratacao', 'CargoPretendido',
     'Observacoes', 'CriadoEm', 'CriadoPor']

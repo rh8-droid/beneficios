@@ -6,7 +6,7 @@ Portal de Gestão Estratégica de Recrutamento e Seleção, Grupo Via Dupla (Via
 * Código do sistema (Google Apps Script): [`apps-script/`](apps-script)
 * Testes automatizados e servidor local de demonstração: [`tests/`](tests), [`dev/`](dev)
 
-## Entregas: Fases 1, 2 e 3
+## Entregas: Fases 1 a 4 (projeto completo)
 
 | Módulo | O que funciona |
 |---|---|
@@ -40,6 +40,15 @@ Portal de Gestão Estratégica de Recrutamento e Seleção, Grupo Via Dupla (Via
 | Alertas | Sino no topo com contador: vagas vencendo/vencidas, sem movimentação, aguardando aprovação, candidatos aguardando retorno, decisões pendentes do gestor, aprovados aguardando admissão e entrevistas de hoje/amanhã — no formato "Vaga / Aberta há / Etapa crítica / Tempo de espera / Responsável / SLA restante". Envio diário por e-mail (dias úteis), configurável em Configurações → Alertas por e-mail. |
 | Importação | Configurações → Importar planilha antiga: lê as abas antigas (ex.: RECRUTAMENTO, Página6) com cabeçalho mesclado, pré-visualiza, converte os status e importa sem duplicar. |
 
+**Fase 4 — Gerador de Artes**
+
+| Módulo | O que funciona |
+|---|---|
+| Identidade visual | Configurações → Identidade visual: envio do **logotipo oficial**, da **foto da sede** e do **selo GPTW** (com data de vigência), texto do **Código de Cultura**, site de candidatura e benefícios padrão. Os arquivos ficam no Drive e são reutilizados — nada é recriado por IA. |
+| Gerador | Preenchimento automático com os dados da vaga aprovada; edição dos textos; escolha dos benefícios; opção de ocultar salário; selo GPTW só quando vigente; 3 modelos (Institucional com foto da sede, Destaque amarelo, Compacto); ajuste automático do tamanho da fonte; pré-visualização ao vivo. |
+| Formatos | PNG alta qualidade (2160×2700), Instagram (1080×1350), LinkedIn (1200×1200), WhatsApp/status (1080×1920) e PDF A4. |
+| Aprovação e histórico | Cada geração vira uma versão "Aguardando aprovação"; Administrador RH ou Direção aprova/reprova (com motivo); o download para divulgação só é liberado após aprovação; registro da publicação (canal e data) — a primeira publicação muda a vaga para "Aberta / recebendo candidaturas"; aviso de arte **desatualizada** quando a vaga é editada; "Regenerar" reabre a versão no editor. |
+
 ## Como publicar (planilha "Processo de Contratação - VD")
 
 Basta copiar e colar **2 arquivos** da pasta [`dist/`](dist):
@@ -63,12 +72,9 @@ Os arquivos de `dist/` são gerados a partir de `apps-script/` com `node dev/bui
 
 ```bash
 cd via-talentos/dev && npm install
-npm test                       # 32 testes do back-end (SLA, feriados, suspensão, perfis, dashboard…)
+npm test                       # 34 testes do back-end (SLA, feriados, suspensão, perfis, dashboard…)
 node server.js --demo          # http://localhost:8080 com dados FICTÍCIOS de demonstração
 ```
 
 O servidor local executa os mesmos arquivos `.gs` sobre uma planilha em memória (`tests/fake-gas.js`). Os dados de demonstração existem só nesse ambiente.
 
-## Próximas fases
-
-* **Fase 4:** Gerador de Artes (PNG/LinkedIn/Instagram/WhatsApp/PDF) com aprovação manual.

@@ -183,9 +183,7 @@ var TITLES = {
   entrevistas: 'Entrevistas', indicacoes: 'Indicações', sla: 'SLA e Gargalos', relatorios: 'Indicadores e Relatórios',
   artes: 'Gerador de Artes', config: 'Configurações'
 };
-var FUTURE = {
-  artes: { fase: 4, itens: ['Arte preenchida com os dados da vaga, no modelo institucional', 'Versões PNG, LinkedIn, Instagram, WhatsApp e PDF', 'Histórico, regeneração e aprovação manual antes da divulgação'] }
-};
+var FUTURE = {};
 
 function showView(view) {
   S.view = view;
@@ -215,6 +213,7 @@ function refresh() {
   if (S.view === 'entrevistas') return loadEntrevistas();
   if (S.view === 'indicacoes') return loadIndicacoes();
   if (S.view === 'relatorios') return loadRelatoriosView();
+  if (S.view === 'artes') return loadArtesView();
 }
 
 function setSync(text) { $('#syncStatus').textContent = text; }
@@ -564,6 +563,7 @@ function renderVagaDetail(v) {
     actions += '<button id="actDup">Nova requisição a partir desta</button>';
   }
   if (!final) actions = '<button id="actKanban">Abrir Kanban da vaga</button>' + actions;
+  if (!final && s.iniciado) actions += '<button id="actArte">Gerar arte de divulgação</button>';
 
   // Etapas macro do processo (ref.: Triar › Convocar › Selecionar › Contratar)
   var STEPS = [
@@ -674,6 +674,7 @@ function renderVagaDetail(v) {
     d.addEventListener('click', function () { var pop = $('#actPop', d); if (pop) pop.classList.add('hidden'); });
   }
   if ($('#actEdit', d)) $('#actEdit', d).addEventListener('click', function () { vagaForm(v); });
+  if ($('#actArte', d)) $('#actArte', d).addEventListener('click', function () { d.close(); S.arteVaga = v.ID; showView('artes'); });
   if ($('#actKanban', d)) $('#actKanban', d).addEventListener('click', function () { d.close(); S.kbVaga = v.ID; showView('kanban'); });
   bindCandidaturaLinks(d);
   if ($('#actDup', d)) $('#actDup', d).addEventListener('click', function () {

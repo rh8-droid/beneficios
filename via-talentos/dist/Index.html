@@ -5,6 +5,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Via Talentos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,700;0,800;0,900;1,500&display=swap" rel="stylesheet">
   <style>
 /* ===== Tema claro (padrão) — menu lateral sempre preto/grafite ===== */
 :root {
@@ -320,9 +322,24 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
 .alert-item.vermelho { border-left-color: var(--red); } .alert-item.laranja { border-left-color: var(--orange); } .alert-item.amarelo { border-left-color: var(--yellow); } .alert-item.info { border-left-color: var(--blue); }
 .alert-item p { margin: 4px 0 0; white-space: pre-line; font-size: 12px; color: var(--text-2); }
 
+/* ---------- gerador de artes ---------- */
+.arte-layout { display: grid; grid-template-columns: minmax(320px, 440px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.arte-preview { position: sticky; top: 90px; }
+.canvas-wrap { background: repeating-conic-gradient(var(--surface-3) 0% 25%, var(--surface) 0% 50%) 50% / 24px 24px; border-radius: 12px; padding: 12px; display: grid; place-items: center; max-height: calc(100vh - 260px); overflow: auto; }
+#arteCanvas { max-width: 100%; max-height: calc(100vh - 290px); height: auto; width: auto; box-shadow: var(--shadow-lg); border-radius: 6px; }
+.arte-form { display: grid; gap: 10px; }
+.benef-list { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.asset-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.asset { border: 1px solid var(--line-2); border-radius: 12px; padding: 12px; background: var(--surface-2); display: grid; gap: 8px; }
+.asset .thumb { height: 140px; border-radius: 8px; background: repeating-conic-gradient(var(--surface-3) 0% 25%, var(--surface) 0% 50%) 50% / 16px 16px; display: grid; place-items: center; overflow: hidden; }
+.asset .thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
 /* ---------- responsive ---------- */
 @media (max-width: 1100px) {
   .grid.two, .grid.three { grid-template-columns: 1fr; }
+  .arte-layout { grid-template-columns: 1fr; }
+  .arte-preview { position: static; }
+  .asset-grid { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .info-card { grid-template-columns: auto 1fr 1fr; }
   .info-card .menu-wrap { grid-column: 1 / -1; }
@@ -373,7 +390,7 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
         <button data-view="indicacoes"><i data-icon="handshake"></i>Indicações</button>
         <button data-view="sla"><i data-icon="clock"></i>SLA e Gargalos</button>
         <button data-view="relatorios"><i data-icon="chart"></i>Indicadores e Relatórios</button>
-        <button data-view="artes"><i data-icon="image"></i>Gerador de Artes<span class="tag">Fase 4</span></button>
+        <button data-view="artes"><i data-icon="image"></i>Gerador de Artes</button>
         <button data-view="config"><i data-icon="gear"></i>Configurações</button>
       </nav>
       <div class="sidebar-foot">
@@ -547,6 +564,31 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
         </div>
       </section>
 
+      <!-- GERADOR DE ARTES -->
+      <section class="view hidden" id="view-artes">
+        <div id="arteAviso"></div>
+        <div class="arte-layout">
+          <div class="panel"><h2>Dados da arte</h2><p class="sub">Preenchidos a partir da vaga. Ajuste os textos e escolha os benefícios aplicáveis.</p><div id="arteForm"></div></div>
+          <div class="panel arte-preview">
+            <div class="toolbar">
+              <select id="arteModelo"></select>
+              <select id="arteFormato"></select>
+              <span class="muted" id="arteDim"></span>
+            </div>
+            <div class="canvas-wrap"><canvas id="arteCanvas"></canvas></div>
+            <div class="toolbar" style="margin-top:12px">
+              <button class="btn primary" id="arteSalvar">Salvar este formato para aprovação</button>
+              <button class="btn" id="arteTodos">Gerar todos os formatos</button>
+            </div>
+            <p class="muted">A arte só pode ser baixada para divulgação depois de aprovada (Administrador RH ou Direção).</p>
+          </div>
+        </div>
+        <h3 class="section-title" id="artePendTitulo">Artes aguardando aprovação</h3>
+        <div id="artePend"></div>
+        <h3 class="section-title">Histórico de artes da vaga</h3>
+        <div id="arteHist"></div>
+      </section>
+
       <!-- CONFIGURAÇÕES -->
       <section class="view hidden" id="view-config">
         <div class="tabs" id="cfgTabs"></div>
@@ -565,6 +607,7 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
 /* =========================================================================
    VIA TALENTOS — aplicação cliente
@@ -750,9 +793,7 @@ var TITLES = {
   entrevistas: 'Entrevistas', indicacoes: 'Indicações', sla: 'SLA e Gargalos', relatorios: 'Indicadores e Relatórios',
   artes: 'Gerador de Artes', config: 'Configurações'
 };
-var FUTURE = {
-  artes: { fase: 4, itens: ['Arte preenchida com os dados da vaga, no modelo institucional', 'Versões PNG, LinkedIn, Instagram, WhatsApp e PDF', 'Histórico, regeneração e aprovação manual antes da divulgação'] }
-};
+var FUTURE = {};
 
 function showView(view) {
   S.view = view;
@@ -782,6 +823,7 @@ function refresh() {
   if (S.view === 'entrevistas') return loadEntrevistas();
   if (S.view === 'indicacoes') return loadIndicacoes();
   if (S.view === 'relatorios') return loadRelatoriosView();
+  if (S.view === 'artes') return loadArtesView();
 }
 
 function setSync(text) { $('#syncStatus').textContent = text; }
@@ -1131,6 +1173,7 @@ function renderVagaDetail(v) {
     actions += '<button id="actDup">Nova requisição a partir desta</button>';
   }
   if (!final) actions = '<button id="actKanban">Abrir Kanban da vaga</button>' + actions;
+  if (!final && s.iniciado) actions += '<button id="actArte">Gerar arte de divulgação</button>';
 
   // Etapas macro do processo (ref.: Triar › Convocar › Selecionar › Contratar)
   var STEPS = [
@@ -1241,6 +1284,7 @@ function renderVagaDetail(v) {
     d.addEventListener('click', function () { var pop = $('#actPop', d); if (pop) pop.classList.add('hidden'); });
   }
   if ($('#actEdit', d)) $('#actEdit', d).addEventListener('click', function () { vagaForm(v); });
+  if ($('#actArte', d)) $('#actArte', d).addEventListener('click', function () { d.close(); S.arteVaga = v.ID; showView('artes'); });
   if ($('#actKanban', d)) $('#actKanban', d).addEventListener('click', function () { d.close(); S.kbVaga = v.ID; showView('kanban'); });
   bindCandidaturaLinks(d);
   if ($('#actDup', d)) $('#actDup', d).addEventListener('click', function () {
@@ -2297,6 +2341,480 @@ function renderCfgImportacao() {
   $('#alertBtn').addEventListener('click', abrirAlertas);
   loadAlertas();
   setInterval(function () { if (!document.hidden) loadAlertas(); }, 300000);
+})();
+</script>
+
+  <script>
+/* =========================================================================
+   VIA TALENTOS — FASE 4: Gerador de Artes
+   A arte é desenhada em <canvas> com os arquivos oficiais (logo, foto da sede,
+   selo GPTW) enviados em Configurações → Identidade visual. Nada é gerado por IA.
+   ========================================================================= */
+var ARTE = { assets: null, vagaId: '', vaga: null, dados: null, artes: [], imgCache: {}, timer: null };
+var AMARELO = '#F2C200', PRETO = '#0f0f0f';
+var FONTE = 'Montserrat, "Segoe UI", Arial, sans-serif';
+
+/* ------------------------------ utilitários de desenho ------------------------------ */
+function loadImg(src) {
+  if (!src) return Promise.resolve(null);
+  if (ARTE.imgCache[src]) return ARTE.imgCache[src];
+  ARTE.imgCache[src] = new Promise(function (res) { var i = new Image(); i.onload = function () { res(i); }; i.onerror = function () { res(null); }; i.src = src; });
+  return ARTE.imgCache[src];
+}
+function fnt(peso, tam, italico) { return (italico ? 'italic ' : '') + peso + ' ' + Math.round(tam) + 'px ' + FONTE; }
+function itens(txt) { return String(txt || '').split(/\n|;|•/).map(function (s) { return s.replace(/^[-–*\s]+/, '').trim(); }).filter(Boolean); }
+function wrapText(ctx, text, maxW) {
+  var words = String(text).split(/\s+/), lines = [], line = '';
+  words.forEach(function (w) {
+    var test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width <= maxW) { line = test; return; }
+    if (line) lines.push(line);
+    while (ctx.measureText(w).width > maxW && w.length > 1) {          // palavra maior que a linha
+      var k = w.length; while (k > 1 && ctx.measureText(w.substr(0, k) + '-').width > maxW) k--;
+      lines.push(w.substr(0, k) + '-'); w = w.substr(k);
+    }
+    line = w;
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function drawCover(ctx, img, x, y, w, h) {
+  var s = Math.max(w / img.width, h / img.height), sw = w / s, sh = h / s;
+  ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, x, y, w, h);
+}
+function drawContain(ctx, img, x, y, maxW, maxH, alinhar) {
+  var s = Math.min(maxW / img.width, maxH / img.height), w = img.width * s, h = img.height * s;
+  var dx = alinhar === 'right' ? x + maxW - w : x;
+  ctx.drawImage(img, dx, y, w, h);
+  return { w: w, h: h };
+}
+function spacing(ctx, px) { if ('letterSpacing' in ctx) ctx.letterSpacing = px + 'px'; }
+
+/* ------------------------------ modelos ------------------------------ */
+var TEMAS = {
+  institucional: { bg: PRETO, texto: '#ffffff', sub: '#d6d6d6', secao: AMARELO, bullet: AMARELO, pill: 'rgba(242,194,0,.9)', pillTxt: '#ffffff', rodape: AMARELO, rodapeTxt: PRETO, cabecalho: 'foto', titulo: '#ffffff', tag: AMARELO, tagTxt: PRETO },
+  compacto: { bg: PRETO, texto: '#ffffff', sub: '#d6d6d6', secao: AMARELO, bullet: AMARELO, pill: 'rgba(242,194,0,.9)', pillTxt: '#ffffff', rodape: AMARELO, rodapeTxt: PRETO, cabecalho: 'foto', titulo: '#ffffff', tag: AMARELO, tagTxt: PRETO, semAtribuicoes: true },
+  amarelo: { bg: '#ffffff', texto: '#161616', sub: '#3d3d3a', secao: '#161616', bullet: AMARELO, pill: '#161616', pillTxt: '#161616', rodape: PRETO, rodapeTxt: AMARELO, cabecalho: 'amarelo', titulo: '#111111', tag: PRETO, tagTxt: AMARELO }
+};
+
+/**
+ * Desenha a arte. d = dados (titulo, local, atribuicoes, requisitos, beneficios[], salario, ocultarSalario,
+ * horario, site, cultura, gptw, codigo). Retorna Promise.
+ */
+function desenharArte(canvas, modelo, W, H, d, assets) {
+  var T = TEMAS[modelo] || TEMAS.institucional;
+  return Promise.all([loadImg(assets.logo), loadImg(assets.foto), loadImg(d.gptw ? assets.gptw : ''),
+    document.fonts && document.fonts.load ? Promise.all([document.fonts.load('900 40px Montserrat'), document.fonts.load('600 20px Montserrat'), document.fonts.load('italic 500 20px Montserrat')]).catch(function () {}) : null
+  ]).then(function (imgs) {
+    var logo = imgs[0], foto = imgs[1], selo = imgs[2];
+    canvas.width = W; canvas.height = H;
+    var ctx = canvas.getContext('2d');
+    var u = W / 1080, pad = 64 * u, ratio = H / W;
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
+
+    /* ---- título (definido antes para dimensionar o cabeçalho) ---- */
+    var headerH = H * (ratio > 1.5 ? 0.33 : ratio > 1.1 ? 0.37 : 0.40);
+    var fotoLateral = T.cabecalho === 'amarelo' && foto;
+    var tituloW = (fotoLateral ? W * 0.58 : W) - 2 * pad;
+    var tamTitulo = (modelo === 'compacto' ? 104 : 92) * u, linhasTitulo;
+    var palavras = String(d.titulo || '').toUpperCase().split(/\s+/);
+    function palavraNaoCabe() { return palavras.some(function (w) { return ctx.measureText(w).width > tituloW; }); }
+    do { ctx.font = fnt(900, tamTitulo); linhasTitulo = wrapText(ctx, String(d.titulo || '').toUpperCase(), tituloW); tamTitulo -= 2 * u; }
+    while ((linhasTitulo.length > 3 || linhasTitulo.length * tamTitulo * 1.05 > headerH * 0.48 || palavraNaoCabe()) && tamTitulo > 40 * u);
+    tamTitulo += 2 * u;
+    var altTitulo = linhasTitulo.length * tamTitulo * 1.05;
+
+    /* ---- cabeçalho ---- */
+    if (T.cabecalho === 'foto') {
+      if (foto) drawCover(ctx, foto, 0, 0, W, headerH);
+      else { var gr = ctx.createLinearGradient(0, 0, W, headerH); gr.addColorStop(0, '#2a2a2a'); gr.addColorStop(1, '#0f0f0f'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, headerH); }
+      var ov = ctx.createLinearGradient(0, 0, 0, headerH);
+      ov.addColorStop(0, 'rgba(15,15,15,.35)'); ov.addColorStop(0.45, 'rgba(15,15,15,.35)'); ov.addColorStop(0.96, 'rgba(15,15,15,1)'); ov.addColorStop(1, 'rgba(15,15,15,1)');
+      ctx.fillStyle = ov; ctx.fillRect(0, 0, W, headerH + 2);
+      ctx.fillStyle = AMARELO; ctx.fillRect(0, 0, W, 10 * u);
+    } else {
+      ctx.fillStyle = AMARELO; ctx.fillRect(0, 0, W, headerH);
+      if (fotoLateral) {
+        var fx = W * 0.6, fy = pad * 1.6, fw = W - fx - pad, fh = headerH - fy - pad * 0.6;
+        ctx.save(); roundRect(ctx, fx, fy, fw, fh, 28 * u); ctx.clip(); drawCover(ctx, foto, fx, fy, fw, fh); ctx.restore();
+      }
+      ctx.fillStyle = PRETO;
+      ctx.beginPath(); ctx.moveTo(W * 0.72, headerH); ctx.lineTo(W, headerH - 70 * u); ctx.lineTo(W, headerH); ctx.closePath(); ctx.fill();
+    }
+    // logotipo oficial (ou nome em texto, se ainda não enviado)
+    if (logo) drawContain(ctx, logo, pad, pad * 0.8, 300 * u, 96 * u);
+    else { ctx.font = fnt(900, 46 * u); ctx.fillStyle = T.cabecalho === 'foto' ? AMARELO : PRETO; spacing(ctx, 3 * u); ctx.fillText('VIA DUPLA', pad, pad * 0.9); spacing(ctx, 0); }
+    if (selo) drawContain(ctx, selo, W - pad - 150 * u, pad * 0.7, 150 * u, 170 * u, 'right');
+
+    var yTitulo = headerH - altTitulo - 40 * u;
+    // etiqueta
+    ctx.font = fnt(800, 26 * u); spacing(ctx, 3 * u);
+    var tag = 'ESTAMOS CONTRATANDO', tw = ctx.measureText(tag).width + 40 * u, th = 52 * u, ty = yTitulo - th - 22 * u;
+    ctx.fillStyle = T.tag; roundRect(ctx, pad, ty, tw, th, 26 * u); ctx.fill();
+    ctx.fillStyle = T.tagTxt; ctx.fillText(tag, pad + 20 * u, ty + 13 * u); spacing(ctx, 0);
+    ctx.fillStyle = T.titulo; ctx.font = fnt(900, tamTitulo);
+    linhasTitulo.forEach(function (l, i) { ctx.fillText(l, pad, yTitulo + i * tamTitulo * 1.05); });
+
+    /* ---- local ---- */
+    var y = headerH + 26 * u;
+    if (d.local) {
+      ctx.fillStyle = T.cabecalho === 'foto' ? AMARELO : PRETO;
+      var px = pad + 14 * u, py = y + 14 * u;
+      ctx.beginPath(); ctx.arc(px, py, 13 * u, Math.PI, 0); ctx.lineTo(px, py + 26 * u); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = T.bg; ctx.beginPath(); ctx.arc(px, py, 5 * u, 0, 2 * Math.PI); ctx.fill();
+      ctx.fillStyle = T.texto; ctx.font = fnt(700, 34 * u); ctx.fillText(d.local, pad + 40 * u, y);
+      y += 62 * u;
+    }
+
+    /* ---- rodapé, Código de Cultura e informações (de baixo para cima) ---- */
+    var rodapeH = 128 * u;
+    ctx.fillStyle = T.rodape; ctx.fillRect(0, H - rodapeH, W, rodapeH);
+    ctx.fillStyle = T.rodapeTxt;
+    ctx.font = fnt(800, 24 * u); spacing(ctx, 3 * u); ctx.fillText('CANDIDATE-SE', pad, H - rodapeH + 24 * u); spacing(ctx, 0);
+    var site = String(d.site || '').replace(/^https?:\/\//, '');
+    var tamSite = 40 * u; ctx.font = fnt(900, tamSite);
+    while (ctx.measureText(site).width > W - 2 * pad - 200 * u && tamSite > 22 * u) { tamSite -= 2 * u; ctx.font = fnt(900, tamSite); }
+    ctx.fillText(site, pad, H - rodapeH + 58 * u);
+    if (d.codigo) { ctx.font = fnt(700, 22 * u); ctx.textAlign = 'right'; ctx.fillText('Vaga ' + d.codigo, W - pad, H - rodapeH + 30 * u); ctx.textAlign = 'left'; }
+
+    var yBase = H - rodapeH - 28 * u;
+    if (d.cultura) {
+      ctx.font = fnt(500, 24 * u, true);
+      var lc = wrapText(ctx, d.cultura, W - 2 * pad).slice(0, 3);
+      yBase -= lc.length * 32 * u;
+      ctx.fillStyle = T.sub;
+      lc.forEach(function (l, i) { ctx.fillText(l, pad, yBase + i * 32 * u); });
+      ctx.fillStyle = AMARELO; ctx.fillRect(pad, yBase - 18 * u, 70 * u, 5 * u);
+      yBase -= 36 * u;
+    }
+    // pílulas: salário, horário, contrato
+    var pills = [];
+    if (!d.ocultarSalario && d.salario) pills.push('Salário: ' + d.salario);
+    if (d.horario) pills.push('Horário: ' + d.horario);
+    if (d.contrato) pills.push(d.contrato + (d.modalidade ? ' · ' + d.modalidade : ''));
+    ctx.font = fnt(700, 26 * u);
+    var linhasPill = [[]], lw = 0, maxPW = W - 2 * pad;
+    pills.forEach(function (p) {
+      var w = Math.min(ctx.measureText(p).width + 44 * u, maxPW);
+      if (lw + w > maxPW && linhasPill[linhasPill.length - 1].length) { linhasPill.push([]); lw = 0; }
+      linhasPill[linhasPill.length - 1].push({ t: p, w: w }); lw += w + 14 * u;
+    });
+    var pillH = 56 * u;
+    if (pills.length) {
+      yBase -= linhasPill.length * (pillH + 12 * u);
+      linhasPill.forEach(function (lin, li) {
+        var x = pad;
+        lin.forEach(function (p) {
+          var yy = yBase + li * (pillH + 12 * u);
+          ctx.lineWidth = 3 * u; ctx.strokeStyle = modelo === 'amarelo' ? PRETO : AMARELO;
+          roundRect(ctx, x, yy, p.w, pillH, pillH / 2); ctx.stroke();
+          ctx.fillStyle = T.pillTxt; ctx.fillText(p.t, x + 22 * u, yy + 14 * u, p.w - 44 * u);
+          x += p.w + 14 * u;
+        });
+      });
+      yBase -= 26 * u;
+    }
+
+    /* ---- corpo: atribuições, requisitos, benefícios (fonte ajustada ao espaço) ---- */
+    var secoes = [];
+    if (!T.semAtribuicoes && itens(d.atribuicoes).length) secoes.push({ t: 'ATRIBUIÇÕES', it: itens(d.atribuicoes) });
+    if (itens(d.requisitos).length) secoes.push({ t: 'REQUISITOS', it: itens(d.requisitos) });
+    if ((d.beneficios || []).length) secoes.push({ t: 'BENEFÍCIOS', it: d.beneficios, ben: true });
+    var duasCol = W / H >= 0.9 && secoes.length > 1;
+    var colW = duasCol ? (W - 2 * pad - 50 * u) / 2 : W - 2 * pad;
+    var cols = duasCol ? [secoes.filter(function (s) { return !s.ben; }), secoes.filter(function (s) { return s.ben; })] : [secoes];
+    if (duasCol && !cols[1].length) cols = [secoes.slice(0, 1), secoes.slice(1)];
+    var area = yBase - y - 10 * u;
+    function medir(tam, desenhar, x0, lista) {
+      var yy = 0, lh = tam * 1.32;
+      lista.forEach(function (s, si) {
+        if (si) yy += tam * 0.9;
+        if (desenhar) { ctx.font = fnt(800, tam * 0.92); spacing(ctx, 2.5 * u); ctx.fillStyle = T.secao; ctx.fillText(s.t, x0, y + yy); spacing(ctx, 0);
+          if (modelo === 'amarelo') { ctx.fillStyle = AMARELO; ctx.fillRect(x0, y + yy + tam * 1.1, 60 * u, 5 * u); } }
+        yy += tam * 1.55;
+        ctx.font = fnt(500, tam);
+        s.it.forEach(function (item) {
+          var ls = wrapText(ctx, item, colW - 34 * u);
+          ls.forEach(function (l, li) {
+            if (desenhar && y + yy + lh <= yBase) {
+              if (!li) { ctx.fillStyle = T.bullet; if (s.ben) { ctx.beginPath(); ctx.arc(x0 + 9 * u, y + yy + tam * 0.55, 8 * u, 0, 2 * Math.PI); ctx.fill(); } else ctx.fillRect(x0 + 2 * u, y + yy + tam * 0.4, 13 * u, 13 * u); }
+              ctx.fillStyle = T.texto; ctx.font = fnt(500, tam); ctx.fillText(l, x0 + 34 * u, y + yy);
+            }
+            yy += lh;
+          });
+        });
+      });
+      return yy;
+    }
+    var tam = (modelo === 'compacto' ? 36 : 32) * u;
+    while (tam > 17 * u && Math.max.apply(null, cols.map(function (c) { return medir(tam, false, 0, c); })) > area) tam -= 1 * u;
+    cols.forEach(function (c, i) { medir(tam, true, pad + i * (colW + 50 * u), c); });
+    if (Math.max.apply(null, cols.map(function (c) { return medir(tam, false, 0, c); })) > area) {
+      ctx.fillStyle = T.sub; ctx.font = fnt(600, 20 * u); ctx.fillText('… texto resumido — revise os campos', pad, yBase - 24 * u);
+    }
+    return canvas;
+  });
+}
+
+/* ------------------------------ tela do gerador ------------------------------ */
+function initArtes() {
+  ARTE.ready = api('assetsArte').then(function (a) {
+    ARTE.assets = a;
+    $('#arteModelo').innerHTML = options(Object.keys(a.modelos).map(function (k) { return { value: k, label: 'Modelo: ' + a.modelos[k] }; }), 'institucional');
+    $('#arteFormato').innerHTML = options(Object.keys(a.formatos).map(function (k) { return { value: k, label: a.formatos[k].nome + ' — ' + a.formatos[k].w + '×' + a.formatos[k].h }; }), 'Instagram');
+    if (a.foto) applyBranding({ FOTO_DRIVE_ID: a.foto });
+  }).catch(fail);
+  $('#arteModelo').addEventListener('change', previewArte);
+  $('#arteFormato').addEventListener('change', previewArte);
+  $('#arteSalvar').addEventListener('click', function () { salvarArtes([$('#arteFormato').value]); });
+  $('#arteTodos').addEventListener('click', function () { salvarArtes(Object.keys(ARTE.assets.formatos)); });
+}
+
+function loadArtesView() {
+  return ARTE.ready.then(function () {
+    var a = ARTE.assets;
+    var falta = [];
+    if (!a.logo) falta.push('logotipo oficial');
+    if (!a.foto) falta.push('foto da sede');
+    if (!a.cultura) falta.push('texto do Código de Cultura');
+    $('#arteAviso').innerHTML = falta.length ? '<div class="form-error" style="color:var(--text);background:var(--accent-soft);border-color:var(--accent)">Falta cadastrar: <b>' + falta.join(', ') + '</b>. ' +
+      (isAdmin() ? 'Envie em <b>Configurações → Identidade visual</b>.' : 'Peça ao Administrador RH para enviar em Configurações → Identidade visual.') + ' Os elementos oficiais são usados como arquivos — não são recriados.</div>' : '';
+    return vagasAtivas(true);
+  }).then(function (vagas) {
+    ARTE.vagasLista = vagas;
+    if (!ARTE.vagaId || S.arteVaga) ARTE.vagaId = S.arteVaga || (vagas[0] && vagas[0].ID) || '';
+    S.arteVaga = null;
+    renderArteForm();
+    loadPendentesArte();
+    if (ARTE.vagaId) return carregarDadosArte(ARTE.vagaId);
+    $('#arteForm').insertAdjacentHTML('beforeend', '<div class="empty">Nenhuma vaga aprovada em aberto.</div>');
+  }).catch(fail);
+}
+
+function renderArteForm() {
+  var a = ARTE.assets, d = ARTE.dados || {};
+  var bens = []; (a.beneficiosPadrao || []).concat(d.beneficiosVaga || []).forEach(function (b) { if (bens.indexOf(b) < 0) bens.push(b); });
+  var sel = d.beneficios || [];
+  $('#arteForm').innerHTML = '<div class="arte-form">' +
+    '<label class="field">Vaga<select data-a="vaga">' + options(ARTE.vagasLista.map(function (v) { return { value: v.ID, label: (v.Codigo || v.ID) + ' · ' + v.Cargo + ' · ' + v.Unidade }; }), ARTE.vagaId) + '</select></label>' +
+    '<label class="field">Nome da vaga (destaque)<input data-a="titulo" value="' + esc(d.titulo || '') + '"></label>' +
+    '<label class="field">Cidade e estado<input data-a="local" value="' + esc(d.local || '') + '"></label>' +
+    '<label class="field">Atribuições (uma por linha)<textarea data-a="atribuicoes">' + esc(d.atribuicoes || '') + '</textarea></label>' +
+    '<label class="field">Requisitos (um por linha)<textarea data-a="requisitos">' + esc(d.requisitos || '') + '</textarea></label>' +
+    '<div class="field"><span>Benefícios aplicáveis</span><div class="benef-list">' + bens.map(function (b) { return '<label class="check"><input type="checkbox" data-ben value="' + esc(b) + '"' + (sel.indexOf(b) >= 0 ? ' checked' : '') + '> ' + esc(b) + '</label>'; }).join('') + '</div>' +
+    '<input data-a="beneficiosExtra" placeholder="Outros benefícios (separados por ;)" value="' + esc(d.beneficiosExtra || '') + '" style="margin-top:6px"></div>' +
+    '<div class="form-grid" style="grid-template-columns:1fr 1fr"><label class="field">Salário<input data-a="salario" value="' + esc(d.salario || '') + '"></label><label class="field">Horário<input data-a="horario" value="' + esc(d.horario || '') + '"></label></div>' +
+    '<label class="check"><input type="checkbox" data-a="ocultarSalario"' + (d.ocultarSalario ? ' checked' : '') + '> Ocultar salário na arte</label>' +
+    '<label class="field">Site ou link de candidatura<input data-a="site" value="' + esc(d.site || a.site || '') + '"></label>' +
+    '<label class="field">Código de Cultura<textarea data-a="cultura" style="min-height:60px">' + esc(d.cultura !== undefined ? d.cultura : (a.cultura || '')) + '</textarea></label>' +
+    '<label class="check"><input type="checkbox" data-a="gptw"' + (a.gptwVigente ? (d.gptw === false ? '' : ' checked') : ' disabled') + '> Exibir selo GPTW ' +
+    (a.gptwVigente ? '(vigente até ' + fmtDate(a.gptwAte) + ')' : (a.temGptw ? '(vigência expirada ou não informada)' : '(selo não cadastrado)')) + '</label>' +
+    '<button class="btn" id="arteRecarregar">Recarregar dados da vaga</button></div>';
+  $('[data-a="vaga"]').addEventListener('change', function (e) { ARTE.vagaId = e.target.value; carregarDadosArte(ARTE.vagaId); });
+  $('#arteRecarregar').addEventListener('click', function () { carregarDadosArte(ARTE.vagaId); });
+  $$('#arteForm [data-a], #arteForm [data-ben]').forEach(function (el) {
+    if (el.dataset.a === 'vaga') return;
+    el.addEventListener('input', agendarPreview); el.addEventListener('change', agendarPreview);
+  });
+}
+
+function lerFormArte() {
+  var g = function (k) { var el = $('#arteForm [data-a="' + k + '"]'); return el ? (el.type === 'checkbox' ? el.checked : el.value.trim()) : ''; };
+  var ben = $$('#arteForm [data-ben]:checked').map(function (i) { return i.value; }).concat(itens(g('beneficiosExtra')));
+  return {
+    titulo: g('titulo'), local: g('local'), atribuicoes: g('atribuicoes'), requisitos: g('requisitos'), beneficios: ben, beneficiosExtra: g('beneficiosExtra'),
+    salario: g('salario'), ocultarSalario: g('ocultarSalario'), horario: g('horario'), site: g('site'), cultura: g('cultura'),
+    gptw: !!g('gptw'), codigo: ARTE.dados ? ARTE.dados.codigo : '', contrato: ARTE.dados ? ARTE.dados.contrato : '', modalidade: ARTE.dados ? ARTE.dados.modalidade : ''
+  };
+}
+
+function carregarDadosArte(vagaId, dadosSalvos) {
+  return api('dadosArte', { vagaId: vagaId }).then(function (r) {
+    ARTE.vaga = r.vaga; ARTE.artes = r.artes; ARTE.podeEditar = r.podeEditar;
+    var d = r.dados;
+    d.beneficiosVaga = d.beneficios.slice();
+    ARTE.dados = dadosSalvos ? Object.assign({}, d, dadosSalvos, { beneficiosVaga: d.beneficiosVaga.concat(dadosSalvos.beneficios || []) }) : d;
+    renderArteForm();
+    $('#arteSalvar').disabled = $('#arteTodos').disabled = !(r.podeEditar && r.vaga.aprovada);
+    renderHistoricoArte();
+    previewArte();
+  }).catch(fail);
+}
+
+function agendarPreview() { clearTimeout(ARTE.timer); ARTE.timer = setTimeout(previewArte, 250); }
+
+function previewArte() {
+  if (!ARTE.assets || !ARTE.dados) return;
+  var f = ARTE.assets.formatos[$('#arteFormato').value];
+  $('#arteDim').textContent = f.w + ' × ' + f.h + ' px';
+  return desenharArte($('#arteCanvas'), $('#arteModelo').value, f.w, f.h, lerFormArte(), ARTE.assets);
+}
+
+function gerarArquivoArte(formato, modelo, dados) {
+  var f = ARTE.assets.formatos[formato];
+  var c = document.createElement('canvas');
+  return desenharArte(c, modelo, f.w, f.h, dados, ARTE.assets).then(function () {
+    var png = c.toDataURL('image/png');
+    if (formato !== 'PDF') return png.split(',')[1];
+    if (!window.jspdf) throw new Error('Biblioteca de PDF indisponível. Verifique a conexão e recarregue a página.');
+    var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    doc.addImage(png, 'PNG', 0, 0, 210, 297);
+    doc.setProperties({ title: 'Vaga ' + (dados.codigo || '') + ' — ' + dados.titulo, creator: 'Via Talentos' });
+    return doc.output('datauristring').split(',')[1];
+  });
+}
+
+function salvarArtes(formatos) {
+  var modelo = $('#arteModelo').value, dados = lerFormArte();
+  if (!dados.titulo) return toast('Informe o nome da vaga.', true);
+  $('#arteSalvar').disabled = $('#arteTodos').disabled = true;
+  setSync('Gerando arte(s)…');
+  var cadeia = Promise.resolve(), salvos = [];
+  formatos.forEach(function (fmt) {
+    cadeia = cadeia.then(function () { return gerarArquivoArte(fmt, modelo, dados); })
+      .then(function (b64) { return api('saveArte', { vagaId: ARTE.vagaId, modelo: modelo, formato: fmt, base64: b64, dados: dados }); })
+      .then(function (r) { salvos.push(fmt + ' v' + r.versao); ARTE.artes = r.artes; });
+  });
+  cadeia.then(function () {
+    toast('Enviada(s) para aprovação: ' + salvos.join(', '));
+    renderHistoricoArte(); loadPendentesArte(); setSync('Artes salvas');
+  }).catch(fail).then(function () { $('#arteSalvar').disabled = $('#arteTodos').disabled = false; });
+}
+
+/* ------------------------------ histórico e aprovação ------------------------------ */
+function arteStatusBadge(a) {
+  var cls = { 'Aprovada': 'sla-verde', 'Publicada': 'sla-verde', 'Reprovada': 'sla-vermelho', 'Aguardando aprovação': 'sla-amarelo' }[a.Status] || '';
+  return '<span class="badge ' + cls + '">' + esc(a.Status) + '</span>' + (a.desatualizada ? ' <span class="badge sla-laranja" title="A vaga foi editada depois desta arte">desatualizada</span>' : '');
+}
+function tabelaArtes(list, mostrarVaga) {
+  if (!list.length) return '<div class="empty">Nenhuma arte.</div>';
+  var aprovador = S.user.perfil === 'Administrador RH' || S.user.perfil === 'Direção';
+  return '<div class="table-wrap"><table><thead><tr><th>Gerada em</th>' + (mostrarVaga ? '<th>Vaga</th>' : '') + '<th>Formato</th><th>Versão</th><th>Modelo</th><th>Situação</th><th>Aprovação</th><th>Publicação</th><th></th></tr></thead><tbody>' +
+    list.map(function (a) {
+      var acts = '<button class="btn small" data-ver="' + a.ID + '">Ver</button> ';
+      if (a.Status === 'Aguardando aprovação' && aprovador) acts += '<button class="btn small primary" data-aprovar="' + a.ID + '">Aprovar</button> <button class="btn small danger" data-reprovar="' + a.ID + '">Reprovar</button> ';
+      if (a.Status === 'Aprovada' || a.Status === 'Publicada') acts += '<button class="btn small" data-baixar="' + a.ID + '">Baixar</button> ';
+      if ((a.Status === 'Aprovada' || a.Status === 'Publicada') && canWrite()) acts += '<button class="btn small" data-publicar="' + a.ID + '">Registrar publicação</button> ';
+      if (canWrite() && !mostrarVaga) acts += '<button class="btn small" data-reabrir="' + a.ID + '">Regenerar</button>';
+      return '<tr><td>' + fmtDate(a.CriadoEm) + '<br><span class="muted">' + esc(a.CriadoPor) + '</span></td>' + (mostrarVaga ? '<td><span class="code">' + esc(a.vagaCodigo) + '</span><br>' + esc(a.vagaCargo) + '</td>' : '') +
+        '<td>' + esc(a.Formato) + '</td><td>v' + esc(a.Versao) + '</td><td>' + esc((ARTE.assets.modelos || {})[a.Modelo] || a.Modelo) + '</td><td>' + arteStatusBadge(a) + '</td>' +
+        '<td>' + (a.AprovadoEm ? fmtDate(a.AprovadoEm) + '<br><span class="muted">' + esc(a.AprovadoPor) + (a.Observacao ? ' — ' + esc(a.Observacao) : '') + '</span>' : '—') + '</td>' +
+        '<td>' + (a.PublicadoEm ? fmtDate(a.PublicadoEm) + '<br><span class="muted">' + esc(a.Canal) + '</span>' : '—') + '</td><td style="white-space:nowrap">' + acts + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+}
+function bindArtes(root) {
+  $$('[data-ver]', root).forEach(function (b) { b.addEventListener('click', function () { verArte(b.dataset.ver); }); });
+  $$('[data-baixar]', root).forEach(function (b) { b.addEventListener('click', function () { baixarArte(b.dataset.baixar); }); });
+  $$('[data-aprovar]', root).forEach(function (b) { b.addEventListener('click', function () { decidirArte(b.dataset.aprovar, true); }); });
+  $$('[data-reprovar]', root).forEach(function (b) { b.addEventListener('click', function () { decidirArte(b.dataset.reprovar, false); }); });
+  $$('[data-publicar]', root).forEach(function (b) {
+    b.addEventListener('click', function () {
+      formDialog({ title: 'Registrar publicação', fields: [{ k: 'canal', label: 'Canal', datalist: ['LinkedIn', 'Instagram', 'WhatsApp', 'Site', 'Indeed', 'Mural interno'], req: true, span: 4 }],
+        onSubmit: function (x) { return api('publicarArte', { id: b.dataset.publicar, canal: x.canal }).then(function (l) { toast('Publicação registrada.'); afterDecisao(l); }); } });
+    });
+  });
+  $$('[data-reabrir]', root).forEach(function (b) {
+    b.addEventListener('click', function () {
+      api('arteDados', { id: b.dataset.reabrir }).then(function (r) {
+        $('#arteModelo').value = r.modelo; $('#arteFormato').value = r.formato;
+        return carregarDadosArte(r.vagaId, r.dados);
+      }).then(function () { toast('Arte carregada no editor. Ajuste e salve uma nova versão.'); window.scrollTo(0, 0); }).catch(fail);
+    });
+  });
+}
+function renderHistoricoArte() {
+  $('#arteHist').innerHTML = tabelaArtes(ARTE.artes || [], false);
+  bindArtes($('#arteHist'));
+}
+function loadPendentesArte() {
+  var aprovador = S.user.perfil === 'Administrador RH' || S.user.perfil === 'Direção';
+  $('#artePendTitulo').classList.toggle('hidden', !aprovador);
+  $('#artePend').classList.toggle('hidden', !aprovador);
+  if (!aprovador) return;
+  api('listArtes', {}).then(function (l) {
+    $('#artePend').innerHTML = tabelaArtes(l.filter(function (a) { return a.Status === 'Aguardando aprovação'; }), true);
+    bindArtes($('#artePend'));
+  }).catch(fail);
+}
+function afterDecisao(lista) {
+  if (lista && lista.length && lista[0].VagaID === ARTE.vagaId) ARTE.artes = lista;
+  renderHistoricoArte(); loadPendentesArte();
+}
+function decidirArte(id, aprovar) {
+  if (aprovar) return api('aprovarArte', { id: id, aprovar: true }).then(function (l) { toast('Arte aprovada para divulgação.'); afterDecisao(l); }).catch(fail);
+  formDialog({ title: 'Reprovar arte', fields: [{ k: 'observacao', label: 'O que precisa ser ajustado?', type: 'textarea', req: true, span: 4 }], submit: 'Reprovar',
+    onSubmit: function (x) { return api('aprovarArte', { id: id, aprovar: false, observacao: x.observacao }).then(function (l) { toast('Arte reprovada.'); afterDecisao(l); }); } });
+}
+function verArte(id) {
+  api('arteArquivo', { id: id }).then(function (r) {
+    var src = 'data:' + r.tipo + ';base64,' + r.base64;
+    var corpo = r.tipo === 'application/pdf' ? '<iframe src="' + src + '" style="width:100%;height:70vh;border:0"></iframe>' : '<img src="' + src + '" style="max-width:100%;max-height:72vh;display:block;margin:auto;border-radius:8px">';
+    openDialog('#dlg', '<div class="dlg-head"><div><p class="eyebrow">' + esc(r.status) + '</p><h3>' + esc(r.nome) + '</h3></div><button class="btn small x" data-close>Fechar</button></div><div class="dlg-body">' + corpo +
+      (r.status === 'Aguardando aprovação' ? '<p class="muted" style="text-align:center">Pré-visualização para aprovação — não divulgar.</p>' : '') + '</div>');
+  }).catch(fail);
+}
+function baixarArte(id) {
+  api('arteArquivo', { id: id, finalidade: 'divulgar' }).then(function (r) {
+    var bin = atob(r.base64), arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([arr], { type: r.tipo })); a.download = r.nome; a.click();
+  }).catch(fail);
+}
+
+/* ------------------------------ configurações: identidade visual ------------------------------ */
+CFG.Identidade = { titulo: 'Identidade visual', admin: true, custom: renderCfgIdentidade };
+
+function renderCfgIdentidade() {
+  $('#cfgTable').innerHTML = '<div class="panel"><p class="muted">Carregando…</p></div>';
+  api('assetsArte').then(function (a) {
+    ARTE.assets = a;
+    function bloco(tipo, titulo, src, dica) {
+      return '<div class="asset"><b>' + titulo + '</b><div class="thumb">' + (src ? '<img src="' + src + '" alt="">' : '<span class="muted">Não enviado</span>') + '</div><span class="muted">' + dica + '</span><button class="btn small" data-up="' + tipo + '">' + (src ? 'Substituir' : 'Enviar arquivo') + '</button></div>';
+    }
+    var gptwSrc = a.gptw || '';
+    $('#cfgTable').innerHTML = '<div class="panel"><h2>Arquivos oficiais</h2><p class="sub">Usados no Gerador de Artes e no painel. São guardados na pasta "Via Talentos — Identidade visual" do Drive e reutilizados, sem recriação por IA.</p>' +
+      '<div class="asset-grid">' + bloco('logo', 'Logotipo oficial', a.logo, 'PNG com fundo transparente, de preferência.') + bloco('foto', 'Foto da sede', a.foto, 'JPG horizontal em boa resolução (mín. 2000 px).') +
+      bloco('gptw', 'Selo GPTW', gptwSrc, a.temGptw ? (a.gptwVigente ? 'Vigente até ' + fmtDate(a.gptwAte) : 'Enviado — informe a vigência abaixo.') : 'Só aparece na arte quando vigente.') + '</div></div>' +
+      '<div class="panel" style="margin-top:16px"><h2>Textos institucionais</h2><div class="form-grid" style="grid-template-columns:1fr 1fr">' +
+      '<label class="field span-4" style="grid-column:1/-1">Código de Cultura (texto exibido na arte)<textarea id="idCultura">' + esc(a.cultura || '') + '</textarea></label>' +
+      '<label class="field">Site / link de candidatura<input id="idSite" value="' + esc(a.site || '') + '"></label>' +
+      '<label class="field">Selo GPTW válido até<input type="date" id="idGptw" value="' + esc(a.gptwAte || '') + '"></label>' +
+      '<label class="field" style="grid-column:1/-1">Benefícios padrão (um por linha)<textarea id="idBen">' + esc((a.beneficiosPadrao || []).join('\n')) + '</textarea></label></div>' +
+      '<div class="toolbar" style="margin-top:12px"><button class="btn primary" id="idSalvar">Salvar textos</button></div></div>';
+    $$('[data-up]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/webp,image/svg+xml';
+        inp.onchange = function () {
+          var f = inp.files[0]; if (!f) return;
+          if (f.size > 10 * 1024 * 1024) return toast('Imagem acima de 10 MB.', true);
+          var rd = new FileReader();
+          rd.onload = function () {
+            setSync('Enviando…');
+            api('uploadAsset', { tipo: b.dataset.up, arquivo: { nome: f.name, tipo: f.type, base64: String(rd.result).split(',')[1] } })
+              .then(function (na) { ARTE.assets = na; ARTE.imgCache = {}; toast('Arquivo atualizado.'); if (na.foto) applyBranding({ FOTO_DRIVE_ID: na.foto }); renderCfgIdentidade(); setSync(''); }).catch(fail);
+          };
+          rd.readAsDataURL(f);
+        };
+        inp.click();
+      });
+    });
+    $('#idSalvar').addEventListener('click', function () {
+      api('setConfigValues', { valores: { CODIGO_CULTURA: $('#idCultura').value, SITE_CANDIDATURA: $('#idSite').value, GPTW_VIGENTE_ATE: $('#idGptw').value, BENEFICIOS_PADRAO: $('#idBen').value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean).join(';') } })
+        .then(function (cfg) { S.lk.config = cfg; toast('Textos salvos.'); renderCfgIdentidade(); return api('assetsArte'); }).then(function (na) { ARTE.assets = na; }).catch(fail);
+    });
+  }).catch(fail);
+}
+
+/* ------------------------------ inicialização da Fase 4 ------------------------------ */
+(function aguardarBootstrap4() {
+  if (!S.lk) return setTimeout(aguardarBootstrap4, 120);
+  initArtes();
+  renderCfgTabs();
 })();
 </script>
 

@@ -24,6 +24,7 @@ function render() {
   html = html.replace(/<\?!= include\('(\w+)'\); \?>/g, (_, f) => fs.readFileSync(path.join(SRC, f + '.html'), 'utf8'));
   html = html.replace('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js', '/chart.js');
   html = html.replace('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', '/xlsx.js');
+  html = html.replace('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', '/jspdf.js');
   const shim = `<script>
   window.google = { script: { get run() {
     const h = { ok: null, fail: null };
@@ -52,6 +53,10 @@ http.createServer((req, res) => {
       res.end(backend.ctx.api(action, payload));
     });
     return;
+  }
+  if (req.url === '/jspdf.js') {
+    res.writeHead(200, { 'Content-Type': 'text/javascript' });
+    return fs.createReadStream(path.join(__dirname, 'node_modules/jspdf/dist/jspdf.umd.min.js')).pipe(res);
   }
   if (req.url === '/xlsx.js') {
     res.writeHead(200, { 'Content-Type': 'text/javascript' });

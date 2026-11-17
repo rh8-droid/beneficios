@@ -54,7 +54,18 @@ var API_ROUTES = {
   configurarAlertasEmail: function (p) { return configurarAlertasEmail(p.ativar, p.hora); },
   listAbasPlanilha: function () { return listAbasPlanilha(); },
   previewImportacao: function (p) { return previewImportacao(p.aba, p.empresa); },
-  executarImportacao: function (p) { return executarImportacao(p.aba, p.empresa); }
+  executarImportacao: function (p) { return executarImportacao(p.aba, p.empresa); },
+  // Fase 4
+  assetsArte: function () { return getAssetsArte(); },
+  uploadAsset: function (p) { return uploadAsset(p.tipo, p.arquivo); },
+  dadosArte: function (p) { return getDadosArte(p.vagaId); },
+  listArtes: function (p) { return listArtes(p.vagaId); },
+  saveArte: function (p) { return saveArte(p); },
+  arteArquivo: function (p) { return getArteArquivo(p.id, p.finalidade); },
+  arteDados: function (p) { return getArteDados(p.id); },
+  aprovarArte: function (p) { return aprovarArte(p.id, p.aprovar, p.observacao); },
+  publicarArte: function (p) { return publicarArte(p.id, p.canal); },
+  setConfigValues: function (p) { return setConfigValues(p.valores); }
 };
 
 /** Chamado pelo navegador: google.script.run.api(acao, dados). */
@@ -84,7 +95,7 @@ function bootstrap_() {
 function branding_() {
   var cache = CacheService.getScriptCache();
   var out = {};
-  ['LOGO_DRIVE_ID', 'FOTO_DRIVE_ID'].forEach(function (key) {
+  ['LOGO_DRIVE_ID'].forEach(function (key) {
     var id = Db.config(key);
     if (!id) return;
     var cacheKey = 'img:' + id;

@@ -121,3 +121,21 @@ function deleteCadastro(tabela, key) {
     return listCadastro(tabela);
   });
 }
+
+var CONFIG_EDITAVEIS = ['CODIGO_CULTURA', 'SITE_CANDIDATURA', 'BENEFICIOS_PADRAO', 'GPTW_VIGENTE_ATE'];
+
+/** Grava vários parâmetros de identidade visual de uma vez (Administrador RH). */
+function setConfigValues(valores) {
+  Auth.require('Administrador RH');
+  return Db.withLock(function () {
+    Object.keys(valores || {}).forEach(function (k) {
+      if (CONFIG_EDITAVEIS.indexOf(k) < 0) throw UserError('Parâmetro não permitido: ' + k);
+      var v = Util.str(valores[k]);
+      if (k === 'GPTW_VIGENTE_ATE' && v && !Util.isIsoDate(Util.toIsoDate(v))) throw UserError('Data de vigência do GPTW inválida.');
+      if (k === 'GPTW_VIGENTE_ATE') v = Util.toIsoDate(v);
+      if (Db.find('Config', k)) Db.update('Config', k, { Valor: v }); else Db.insert('Config', { Chave: k, Valor: v });
+    });
+    logHistory_('Config', 'Identidade', '', '', 'Parâmetros de identidade visual atualizados: ' + Object.keys(valores || {}).join(', '));
+    return configMap_();
+  });
+}
