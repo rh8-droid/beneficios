@@ -2,6 +2,12 @@
   "name": "via-talentos-dev",
   "private": true,
   "description": "Servidor local de demonstração do Via Talentos (back-end real .gs em memória).",
-  "scripts": { "start": "node server.js", "test": "node --test ../tests/*.test.js" },
-  "dependencies": { "chart.js": "4.4.1" }
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test ../tests/*.test.js"
+  },
+  "dependencies": {
+    "chart.js": "4.4.1",
+    "xlsx": "^0.18.5"
+  }
 }

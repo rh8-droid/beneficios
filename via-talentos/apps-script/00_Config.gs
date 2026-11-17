@@ -103,6 +103,8 @@ var VT = {
     FOTO_DRIVE_ID: '',
     RETENCAO_MESES: '24',
     PRAZO_ACAO_DIAS: '2',
+    ALERTAS_EMAIL: 'Não',
+    ALERTAS_HORA: '7',
     CURRICULOS_PASTA_ID: ''
   },
 
@@ -126,7 +128,7 @@ var SCHEMA = {
     'QtdPosicoes', 'DataAbertura', 'DataAprovacao', 'MotivoAbertura', 'ColaboradorSubstituido',
     'TipoContrato', 'Modalidade', 'Horario', 'Salario', 'SalarioACombinar', 'Requisitos',
     'Atribuicoes', 'Beneficios', 'Observacoes', 'Prioridade', 'Status', 'DataFechamento',
-    'Reaberturas', 'ReaberturaDe', 'Etapas', 'CriadoEm', 'CriadoPor', 'AtualizadoEm', 'AtualizadoPor'],
+    'Reaberturas', 'ReaberturaDe', 'Etapas', 'CriadoEm', 'CriadoPor', 'AtualizadoEm', 'AtualizadoPor', 'ImportKey'],
   Posicoes: ['ID', 'VagaID', 'Numero', 'Status', 'DataFechamento', 'CandidatoID', 'NomeContratado', 'Reaberturas'],
   Suspensoes: ['ID', 'VagaID', 'Inicio', 'Fim', 'Justificativa', 'PausaSLA', 'Usuario', 'CriadoEm'],
   ExcecoesSLA: ['ID', 'VagaID', 'DiasAdicionais', 'Justificativa', 'Usuario', 'CriadoEm'],

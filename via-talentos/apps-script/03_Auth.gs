@@ -74,5 +74,8 @@ var Auth = (function () {
 
   function reset() { current = null; }
 
-  return { email: email, user: user, is: is, require: require, canSeeVaga: canSeeVaga, canEditVaga: canEditVaga, reset: reset };
+  /** Execução por gatilho (sem usuário na sessão): acesso de leitura total. */
+  function asSystem() { current = { email: email() || 'sistema', nome: 'Sistema', perfil: 'Administrador RH' }; }
+
+  return { asSystem: asSystem, email: email, user: user, is: is, require: require, canSeeVaga: canSeeVaga, canEditVaga: canEditVaga, reset: reset };
 })();

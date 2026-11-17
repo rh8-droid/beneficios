@@ -6,7 +6,7 @@ Portal de Gestão Estratégica de Recrutamento e Seleção, Grupo Via Dupla (Via
 * Código do sistema (Google Apps Script): [`apps-script/`](apps-script)
 * Testes automatizados e servidor local de demonstração: [`tests/`](tests), [`dev/`](dev)
 
-## Entregas: Fase 1 e Fase 2
+## Entregas: Fases 1, 2 e 3
 
 | Módulo | O que funciona |
 |---|---|
@@ -29,6 +29,16 @@ Portal de Gestão Estratégica de Recrutamento e Seleção, Grupo Via Dupla (Via
 | Indicações | Cadastro do indicado e do colaborador indicador (empresa e departamento), vínculo opcional a uma vaga, reaproveitamento de cadastro existente, taxa de conversão, cargos com mais indicações e contratações por origem. |
 | Tempo por etapa | Entrada, saída, tempo em dias úteis, responsável e motivo do atraso de cada etapa do candidato; ranking de espera por etapa e ações vencidas por responsável em **SLA e Gargalos**. |
 | Perfis | Gestor só vê candidatos já encaminhados (a partir da entrevista com gestor) das suas vagas; observações e pretensão salarial ficam restritas ao RH. |
+
+**Fase 3 — inteligência gerencial**
+
+| Módulo | O que funciona |
+|---|---|
+| Relatórios | 11 relatórios (geral, mensal, por analista, SLA, gargalos, candidatos por etapa, motivos de reprovação, indicações, recorrência, produtividade, canceladas/suspensas) com os filtros do dashboard, exportação em **Excel (.xlsx)** e **PDF** (gerado pelo Google, A4 paisagem). |
+| Produtividade | Por analista: vagas, posições abertas/preenchidas, candidaturas, entrevistas, encaminhados ao gestor, contratações, tempo médio, % SLA, pendências — com a espera em etapas do RH separada da espera em gestor/direção. |
+| Recorrência por cargo | Requisições × posições solicitadas × preenchidas × reaberturas, aberturas por mês, motivo e gestor mais frequentes, e comparação entre dois períodos. |
+| Alertas | Sino no topo com contador: vagas vencendo/vencidas, sem movimentação, aguardando aprovação, candidatos aguardando retorno, decisões pendentes do gestor, aprovados aguardando admissão e entrevistas de hoje/amanhã — no formato "Vaga / Aberta há / Etapa crítica / Tempo de espera / Responsável / SLA restante". Envio diário por e-mail (dias úteis), configurável em Configurações → Alertas por e-mail. |
+| Importação | Configurações → Importar planilha antiga: lê as abas antigas (ex.: RECRUTAMENTO, Página6) com cabeçalho mesclado, pré-visualiza, converte os status e importa sem duplicar. |
 
 ## Como publicar (planilha "Processo de Contratação - VD")
 
@@ -53,7 +63,7 @@ Os arquivos de `dist/` são gerados a partir de `apps-script/` com `node dev/bui
 
 ```bash
 cd via-talentos/dev && npm install
-npm test                       # 26 testes do back-end (SLA, feriados, suspensão, perfis, dashboard…)
+npm test                       # 32 testes do back-end (SLA, feriados, suspensão, perfis, dashboard…)
 node server.js --demo          # http://localhost:8080 com dados FICTÍCIOS de demonstração
 ```
 
@@ -61,5 +71,4 @@ O servidor local executa os mesmos arquivos `.gs` sobre uma planilha em memória
 
 ## Próximas fases
 
-* **Fase 3:** relatórios Excel/PDF, produtividade por analista, recorrência por cargo, alertas por e-mail, importação das planilhas antigas.
 * **Fase 4:** Gerador de Artes (PNG/LinkedIn/Instagram/WhatsApp/PDF) com aprovação manual.

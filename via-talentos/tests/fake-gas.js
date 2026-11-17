@@ -45,6 +45,7 @@ class FakeSheet {
     return 0;
   }
   getLastColumn() { return this.data.reduce((m, r) => Math.max(m, (r || []).length), 0); }
+  getDataRange() { return this.getRange(1, 1, Math.max(1, this.getLastRow()), Math.max(1, this.getLastColumn())); }
   deleteRow(n) { this.data.splice(n - 1, 1); }
   setFrozenRows() {}
 }
@@ -53,6 +54,7 @@ class FakeSpreadsheet {
   constructor() { this.sheets = {}; }
   getSheetByName(n) { return this.sheets[n] || null; }
   insertSheet(n) { this.sheets[n] = new FakeSheet(n); return this.sheets[n]; }
+  getSheets() { return Object.values(this.sheets); }
   toJSON() { const o = {}; for (const k in this.sheets) o[k] = this.sheets[k].data; return o; }
   static fromJSON(obj) { const ss = new FakeSpreadsheet(); for (const k in obj) ss.sheets[k] = new FakeSheet(k, obj[k]); return ss; }
 }
@@ -106,7 +108,17 @@ function createBackend(opts = {}) {
         getFileById(id) { if (!files[id]) throw new Error('arquivo inexistente'); return files[id]; }
       };
     })(),
-    HtmlService: {}
+    HtmlService: { createHtmlOutput: (html) => ({ getBlob: () => ({ getAs: () => ({ getBytes: () => Array.from(Buffer.from('%PDF-1.4\n' + html)) }) }) }) },
+    MailApp: { sent: [], getRemainingDailyQuota: () => 100, sendEmail(o) { this.sent.push(o); } },
+    ScriptApp: (() => {
+      const triggers = [];
+      return {
+        _triggers: triggers,
+        getProjectTriggers: () => triggers.slice(),
+        deleteTrigger: (t) => { triggers.splice(triggers.indexOf(t), 1); },
+        newTrigger: (fn) => { const b = { timeBased: () => b, everyDays: () => b, atHour: (h) => { b.h = h; return b; }, create: () => { const t = { getHandlerFunction: () => fn, hour: b.h }; triggers.push(t); return t; } }; return b; }
+      };
+    })()
   };
   vm.createContext(sandbox);
   const dir = opts.dir || path.join(__dirname, '..', 'apps-script');

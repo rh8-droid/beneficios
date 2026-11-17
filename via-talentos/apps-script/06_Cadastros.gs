@@ -34,6 +34,7 @@ function getLookups() {
     etapasKanban: VT.ETAPAS_KANBAN,
     motivosReprovacao: VT.MOTIVOS_REPROVACAO,
     origens: VT.ORIGENS_CANDIDATURA,
+    relatorios: RELATORIOS,
     tiposEntrevista: VT.TIPOS_ENTREVISTA,
     resultadosEntrevista: VT.RESULTADOS_ENTREVISTA,
     perfis: VT.PERFIS,

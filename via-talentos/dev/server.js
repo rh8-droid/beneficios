@@ -23,6 +23,7 @@ function render() {
   let html = fs.readFileSync(path.join(SRC, 'Index.html'), 'utf8');
   html = html.replace(/<\?!= include\('(\w+)'\); \?>/g, (_, f) => fs.readFileSync(path.join(SRC, f + '.html'), 'utf8'));
   html = html.replace('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js', '/chart.js');
+  html = html.replace('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', '/xlsx.js');
   const shim = `<script>
   window.google = { script: { get run() {
     const h = { ok: null, fail: null };
@@ -51,6 +52,10 @@ http.createServer((req, res) => {
       res.end(backend.ctx.api(action, payload));
     });
     return;
+  }
+  if (req.url === '/xlsx.js') {
+    res.writeHead(200, { 'Content-Type': 'text/javascript' });
+    return fs.createReadStream(path.join(__dirname, 'node_modules/xlsx/dist/xlsx.full.min.js')).pipe(res);
   }
   if (req.url === '/chart.js') {
     res.writeHead(200, { 'Content-Type': 'text/javascript' });

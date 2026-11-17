@@ -223,5 +223,5 @@ Usuário não cadastrado em **Usuarios** (ou inativo) não acessa o sistema.
 |---|---|---|
 | 1 | Layout institucional, cadastros (empresas, unidades, departamentos, cargos, gestores, analistas, feriados, usuários, parâmetros), gestão de vagas e posições, histórico, SLA automático, dashboard | **Entregue** |
 | 2 | Candidatos (sem duplicidade), candidaturas, entrevistas, Kanban arrastar-e-soltar, reprovações, indicações, tempo por etapa | **Entregue** |
-| 3 | Relatórios Excel/PDF, gargalos, produtividade por analista, recorrência por cargo, alertas por e-mail | Próxima |
-| 4 | Gerador de Artes (PNG/LinkedIn/Instagram/WhatsApp/PDF), templates, histórico e aprovação | — |
+| 3 | Relatórios Excel/PDF, gargalos, produtividade por analista, recorrência por cargo, alertas por e-mail, importação de planilhas | **Entregue** |
+| 4 | Gerador de Artes (PNG/LinkedIn/Instagram/WhatsApp/PDF), templates, histórico e aprovação | Próxima |

@@ -311,6 +311,15 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
 .kcard .late-txt { color: var(--red); font-weight: 700; }
 .pill { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; background: var(--accent-soft); color: var(--accent-text); }
 
+/* ---------- alertas ---------- */
+#alertBtn { position: relative; padding: 8px 11px; }
+#alertBtn svg.i { width: 20px; height: 20px; }
+.bell-count { position: absolute; top: -6px; right: -6px; background: var(--red); color: #fff; border-radius: 999px; font-size: 11px; font-weight: 800; padding: 1px 6px; min-width: 20px; text-align: center; }
+.alert-item { display: block; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line-2); border-left: 4px solid var(--neutral); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; color: var(--text); }
+.alert-item:hover { background: var(--surface-2); }
+.alert-item.vermelho { border-left-color: var(--red); } .alert-item.laranja { border-left-color: var(--orange); } .alert-item.amarelo { border-left-color: var(--yellow); } .alert-item.info { border-left-color: var(--blue); }
+.alert-item p { margin: 4px 0 0; white-space: pre-line; font-size: 12px; color: var(--text-2); }
+
 /* ---------- responsive ---------- */
 @media (max-width: 1100px) {
   .grid.two, .grid.three { grid-template-columns: 1fr; }
@@ -363,7 +372,7 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
         <button data-view="entrevistas"><i data-icon="chat"></i>Entrevistas</button>
         <button data-view="indicacoes"><i data-icon="handshake"></i>Indicações</button>
         <button data-view="sla"><i data-icon="clock"></i>SLA e Gargalos</button>
-        <button data-view="relatorios"><i data-icon="chart"></i>Indicadores e Relatórios<span class="tag">Fase 3</span></button>
+        <button data-view="relatorios"><i data-icon="chart"></i>Indicadores e Relatórios</button>
         <button data-view="artes"><i data-icon="image"></i>Gerador de Artes<span class="tag">Fase 4</span></button>
         <button data-view="config"><i data-icon="gear"></i>Configurações</button>
       </nav>
@@ -384,6 +393,7 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
         </div>
         <div class="top-actions">
           <span id="syncStatus"></span>
+          <button class="btn" id="alertBtn" title="Alertas"><i data-icon="bell"></i><span class="bell-count hidden" id="alertCount">0</span></button>
           <button class="btn" id="refreshBtn">Atualizar</button>
         </div>
       </header>
@@ -502,6 +512,41 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
         <div id="indTable"></div>
       </section>
 
+      <!-- INDICADORES E RELATÓRIOS -->
+      <section class="view hidden" id="view-relatorios">
+        <div class="tabs" id="relTabs">
+          <button class="active" data-rtab="rel">Relatórios</button>
+          <button data-rtab="prod">Produtividade dos analistas</button>
+          <button data-rtab="rec">Recorrência por cargo</button>
+        </div>
+        <div data-rpane="rel">
+          <div class="filters" id="relFilters"></div>
+          <div class="toolbar">
+            <button class="btn primary" id="relGerar">Gerar relatório</button>
+            <button class="btn" id="relExcel">Exportar Excel</button>
+            <button class="btn" id="relPdf">Exportar PDF</button>
+            <span class="muted" id="relInfo"></span>
+          </div>
+          <div class="cards" id="relResumo"></div>
+          <div id="relTabela"></div>
+        </div>
+        <div data-rpane="prod" class="hidden">
+          <div class="filters" id="prodFilters"></div>
+          <div class="grid two" style="margin-bottom:16px">
+            <section class="panel"><h2>Tempo médio de fechamento e % do SLA</h2><p class="sub">Por analista responsável (posições preenchidas).</p><div class="chart-box"><canvas id="chProdSla"></canvas></div></section>
+            <section class="panel"><h2>Espera em etapas do RH × áreas externas</h2><p class="sub">Dias úteis médios por etapa do candidato. A espera em gestor/direção não é atribuída ao analista.</p><div class="chart-box"><canvas id="chProdEspera"></canvas></div></section>
+          </div>
+          <div id="prodTabela"></div>
+        </div>
+        <div data-rpane="rec" class="hidden">
+          <div class="filters" id="recFilters"></div>
+          <div class="cards" id="recResumo"></div>
+          <section class="panel" style="margin-bottom:16px"><h2>Aberturas por mês — cargos mais recorrentes</h2><p class="sub">Quantidade de requisições abertas por mês (até 6 cargos).</p><div class="chart-box"><canvas id="chRec"></canvas></div></section>
+          <div id="recTabela"></div>
+          <div id="recComparacao" style="margin-top:16px"></div>
+        </div>
+      </section>
+
       <!-- CONFIGURAÇÕES -->
       <section class="view hidden" id="view-config">
         <div class="tabs" id="cfgTabs"></div>
@@ -519,6 +564,7 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
   <div class="toast-area" id="toasts"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
 /* =========================================================================
    VIA TALENTOS — aplicação cliente
@@ -548,7 +594,9 @@ var ICONS = {
   file: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
   money: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>',
   building: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10 21v-3h4v3"/>',
-  chevron: '<path d="M6 9l6 6 6-6"/>'
+  chevron: '<path d="M6 9l6 6 6-6"/>',
+  bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/>',
+  download: '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>'
 };
 function icon(name) { return '<svg class="i" viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[name] || ICONS.chart) + '</svg>'; }
 function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -703,7 +751,6 @@ var TITLES = {
   artes: 'Gerador de Artes', config: 'Configurações'
 };
 var FUTURE = {
-  relatorios: { fase: 3, itens: ['11 relatórios com filtros e exportação para Excel e PDF', 'Produtividade por analista separada da espera de outras áreas', 'Recorrência por cargo (requisições, posições, preenchidas e reaberturas)', 'Alertas automáticos por e-mail'] },
   artes: { fase: 4, itens: ['Arte preenchida com os dados da vaga, no modelo institucional', 'Versões PNG, LinkedIn, Instagram, WhatsApp e PDF', 'Histórico, regeneração e aprovação manual antes da divulgação'] }
 };
 
@@ -734,6 +781,7 @@ function refresh() {
   if (S.view === 'kanban') return loadKanban();
   if (S.view === 'entrevistas') return loadEntrevistas();
   if (S.view === 'indicacoes') return loadIndicacoes();
+  if (S.view === 'relatorios') return loadRelatoriosView();
 }
 
 function setSync(text) { $('#syncStatus').textContent = text; }
@@ -1303,6 +1351,8 @@ function renderCfgTabs() {
 
 function loadCadastro() {
   var tab = S.cfgTab, def = CFG[tab];
+  $('#cfgNovo').classList.toggle('hidden', !isAdmin() || !!def.custom);
+  if (def.custom) { $('#cfgHint').textContent = ''; return def.custom(); }
   $('#cfgHint').textContent = def.hint || (isAdmin() ? '' : 'Somente o Administrador RH altera cadastros.');
   return api('listCadastro', { tabela: tab }).then(function (rows) {
     S.cfgRows = rows;
@@ -1984,6 +2034,269 @@ function indicacaoForm() {
 (function aguardarBootstrap() {
   if (!S.lk) return setTimeout(aguardarBootstrap, 100);
   initCandidatos(); initKanban(); initEntrevistas(); initIndicacoes();
+})();
+</script>
+
+  <script>
+/* =========================================================================
+   VIA TALENTOS — FASE 3: relatórios, produtividade, recorrência, alertas e importação
+   ========================================================================= */
+
+/* ------------------------------ filtros reutilizáveis ------------------------------ */
+function buildFilters(container, extra, onChange) {
+  var fields = (extra || []).concat(DASH_FILTERS);
+  container.innerHTML = fields.map(function (f) {
+    var input = f.type === 'date' ? '<input type="date" data-f="' + f.k + '"' + (f.value ? ' value="' + f.value + '"' : '') + '>' :
+      (f.type === 'select-fixed' ? '<select data-f="' + f.k + '">' + options(f.options, f.value || '', f.placeholder) + '</select>' :
+        '<select data-f="' + f.k + '">' + options(f.list(), '', 'Todos') + '</select>');
+    return '<label>' + esc(f.label) + input + '</label>';
+  }).join('');
+  if (onChange) $$('[data-f]', container).forEach(function (el) { el.addEventListener('change', onChange); });
+}
+function filterValues(container) {
+  var f = {};
+  $$('[data-f]', container).forEach(function (el) { if (el.value) f[el.dataset.f] = el.value; });
+  return f;
+}
+
+/* ------------------------------ view: indicadores e relatórios ------------------------------ */
+var REL = { aba: 'rel', ultimo: null };
+
+function initRelatorios() {
+  var tipos = Object.keys(S.lk.relatorios).map(function (k) { return { value: k, label: S.lk.relatorios[k] }; });
+  buildFilters($('#relFilters'), [{ k: 'tipo', label: 'Relatório', type: 'select-fixed', options: tipos, value: 'geral', placeholder: undefined }]);
+  $('[data-f="tipo"]', $('#relFilters')).closest('label').style.gridColumn = 'span 2';
+  $('#relGerar').addEventListener('click', gerarRelatorio);
+  $('#relExcel').addEventListener('click', exportarExcel);
+  $('#relPdf').addEventListener('click', exportarPdf);
+  buildFilters($('#prodFilters'), [], loadProdutividade);
+  var hoje = todayIso();
+  var ini = new Date(); ini.setMonth(ini.getMonth() - 5); ini.setDate(1);
+  var iniIso = ini.getFullYear() + '-' + String(ini.getMonth() + 1).padStart(2, '0') + '-01';
+  $('#recFilters').innerHTML =
+    '<label>Período A — de<input type="date" data-f="de" value="' + iniIso + '"></label><label>até<input type="date" data-f="ate" value="' + hoje + '"></label>' +
+    '<label>Comparar com — de<input type="date" data-f="deB"></label><label>até<input type="date" data-f="ateB"></label>' +
+    ['Empresa', 'Unidade', 'Gestor', 'Departamento'].map(function (k) { var f = DASH_FILTERS.filter(function (x) { return x.k === k; })[0]; return '<label>' + f.label + '<select data-f="' + k + '">' + options(f.list(), '', 'Todos') + '</select></label>'; }).join('');
+  $$('[data-f]', $('#recFilters')).forEach(function (el) { el.addEventListener('change', loadRecorrencia); });
+  $$('[data-rtab]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      REL.aba = b.dataset.rtab;
+      $$('[data-rtab]').forEach(function (x) { x.classList.toggle('active', x === b); });
+      $$('[data-rpane]').forEach(function (p) { p.classList.toggle('hidden', p.dataset.rpane !== REL.aba); });
+      loadRelatoriosView();
+    });
+  });
+}
+
+function loadRelatoriosView() {
+  if (REL.aba === 'rel') return REL.ultimo ? null : gerarRelatorio();
+  if (REL.aba === 'prod') return loadProdutividade();
+  return loadRecorrencia();
+}
+
+function relParams() {
+  var f = filterValues($('#relFilters'));
+  var tipo = f.tipo || 'geral';
+  delete f.tipo;
+  return { tipo: tipo, filtros: f };
+}
+
+function gerarRelatorio() {
+  var p = relParams();
+  setSync('Gerando relatório…');
+  return api('relatorio', p).then(function (r) {
+    REL.ultimo = r;
+    $('#relInfo').textContent = r.linhas.length + ' linha(s) · ' + r.filtros;
+    $('#relResumo').innerHTML = (r.resumo || []).map(function (x) { return card(x.label, esc(x.valor), '', '', 'chart'); }).join('');
+    $('#relTabela').innerHTML = (r.nota ? '<p class="muted">' + esc(r.nota) + '</p>' : '') + (r.linhas.length ?
+      '<div class="table-wrap"><div class="table-head"><h3>' + esc(r.titulo) + '</h3><span class="muted">Gerado em ' + fmtDate(r.geradoEm) + '</span></div><table><thead><tr>' +
+      r.colunas.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      r.linhas.map(function (l) { return '<tr>' + l.map(function (c) { return '<td>' + (typeof c === 'number' ? num(c) : esc(c)) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>' :
+      '<div class="empty">Nenhum registro para os filtros selecionados.</div>');
+    setSync('Relatório gerado');
+  }).catch(fail);
+}
+
+function nomeArquivo(ext) { return 'via-talentos-' + (REL.ultimo ? REL.ultimo.tipo : 'relatorio') + '-' + todayIso() + '.' + ext; }
+
+function exportarExcel() {
+  var go = REL.ultimo && JSON.stringify(relParams()) === REL.ultimoParams ? Promise.resolve(REL.ultimo) : gerarRelatorio().then(function () { return REL.ultimo; });
+  REL.ultimoParams = JSON.stringify(relParams());
+  go.then(function (r) {
+    if (!r) return;
+    var linhas = [r.colunas].concat(r.linhas);
+    if (window.XLSX) {
+      var wb = XLSX.utils.book_new();
+      var ws = XLSX.utils.aoa_to_sheet(linhas);
+      ws['!cols'] = r.colunas.map(function (c, i) { var w = Math.max(String(c).length, ...r.linhas.slice(0, 200).map(function (l) { return String(l[i] === undefined ? '' : l[i]).length; })); return { wch: Math.min(60, Math.max(8, w + 2)) }; });
+      XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+      var info = [['Relatório', r.titulo], ['Filtros', r.filtros], ['Gerado em', fmtDate(r.geradoEm)], ['Gerado por', r.geradoPor], []].concat((r.resumo || []).map(function (x) { return [x.label, x.valor]; }));
+      if (r.nota) info.push([], ['Observação', r.nota]);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(info), 'Resumo');
+      XLSX.writeFile(wb, nomeArquivo('xlsx'));
+    } else {
+      var csv = '﻿' + linhas.map(function (l) { return l.map(function (c) { var s = c === undefined || c === null ? '' : String(c); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(';'); }).join('\n');
+      var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = nomeArquivo('csv'); a.click();
+      toast('Biblioteca do Excel indisponível: exportado em CSV (abre no Excel).');
+    }
+  }).catch(fail);
+}
+
+function exportarPdf() {
+  var p = relParams();
+  setSync('Gerando PDF…');
+  api('relatorioPdf', p).then(function (r) {
+    var bin = atob(r.base64), arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([arr], { type: 'application/pdf' })); a.download = r.nome; a.click();
+    setSync('PDF gerado');
+  }).catch(fail);
+}
+
+/* ------------------------------ produtividade ------------------------------ */
+function loadProdutividade() {
+  setSync('Calculando produtividade…');
+  return api('produtividade', filterValues($('#prodFilters'))).then(function (r) {
+    var a = r.analistas;
+    var labels = a.map(function (x) { return x.analista; });
+    var num = function (v) { return v === '—' ? null : Number(v); };
+    if (window.Chart && a.length) {
+      var box = resetCanvas('chProdSla'); box.dataset.id = 'chProdSla';
+      S.charts.chProdSla = new Chart(document.getElementById('chProdSla'), {
+        data: { labels: labels, datasets: [
+          { type: 'bar', label: 'Tempo médio (d.u.)', data: a.map(function (x) { return num(x.tempoMedio); }), backgroundColor: '#f2c200', borderRadius: 6, yAxisID: 'y' },
+          { type: 'line', label: '% SLA cumprido', data: a.map(function (x) { return x.slaNum; }), borderColor: cssVar('--chart-alt'), backgroundColor: cssVar('--chart-alt'), yAxisID: 'y2' }
+        ] },
+        options: Object.assign(baseOptions(), { scales: {
+          x: { grid: { color: cssVar('--chart-grid') }, ticks: { color: cssVar('--chart-text') } },
+          y: { beginAtZero: true, grid: { color: cssVar('--chart-grid') }, ticks: { color: cssVar('--chart-text') }, title: { display: true, text: 'dias úteis', color: cssVar('--chart-text') } },
+          y2: { beginAtZero: true, max: 100, position: 'right', grid: { display: false }, ticks: { color: cssVar('--chart-text'), callback: function (v) { return v + '%'; } } } } })
+      });
+    } else chartReady('chProdSla', false);
+    barChart('chProdEspera', labels, [
+      { label: 'Etapas do RH', data: a.map(function (x) { return num(x.esperaRH) || 0; }), backgroundColor: '#f2c200' },
+      { label: 'Gestor / direção', data: a.map(function (x) { return num(x.esperaExterna) || 0; }), backgroundColor: cssVar('--chart-alt') }
+    ]);
+    $('#prodTabela').innerHTML = a.length ? '<div class="table-wrap"><table><thead><tr><th>Analista</th><th>Vagas</th><th>Posições abertas</th><th>Concluídas</th><th>Preenchidas</th><th>Candidaturas</th><th>Entrevistas</th><th>Encaminhados ao gestor</th><th>Contratações</th><th>Tempo médio</th><th>% SLA</th><th>Pendências</th><th>Espera RH</th><th>Espera gestor/direção</th></tr></thead><tbody>' +
+      a.map(function (x) {
+        return '<tr><td><b>' + esc(x.analista) + '</b><br><span class="muted">' + x.ativas + ' ativa(s)</span></td><td>' + x.vagas + '</td><td>' + x.posicoesAbertas + '</td><td>' + x.concluidas + '</td><td>' + x.preenchidas + '</td><td>' + x.candidaturas + '</td><td>' + x.entrevistas + '</td><td>' + x.encaminhados + '</td><td>' + x.contratacoes + '</td>' +
+          '<td>' + num(x.tempoMedio) + (x.tempoMedio !== '—' ? ' d.u.' : '') + '</td><td><b>' + esc(x.sla) + '</b></td><td>' + (x.pendencias ? '<span class="late">' + x.pendencias + '</span>' : '0') + '</td><td>' + num(x.esperaRH) + '</td><td>' + num(x.esperaExterna) + '</td></tr>';
+      }).join('') + '</tbody></table></div><p class="muted">Pendências = candidaturas com próxima ação vencida + vagas vencidas em aberto. A espera em gestor/direção é tempo de outras áreas e não entra na produtividade do analista.</p>' : '<div class="empty">Sem dados.</div>';
+    setSync(r.filtros);
+  }).catch(fail);
+}
+
+/* ------------------------------ recorrência ------------------------------ */
+function loadRecorrencia() {
+  setSync('Calculando recorrência…');
+  return api('recorrencia', filterValues($('#recFilters'))).then(function (r) {
+    var t = r.total;
+    $('#recResumo').innerHTML = card('Requisições de vagas', t.requisicoes, 'accent', '', 'file') + card('Posições solicitadas', t.posicoes, '', '', 'target') +
+      card('Posições preenchidas', t.preenchidas, 'green', '', 'userCheck') + card('Reaberturas', t.reaberturas, t.reaberturas ? 'orange' : '', 'da mesma requisição', 'alert') +
+      card('Cargos distintos', r.cargos.length, '', '', 'briefcase');
+    var top = r.cargos.slice(0, 6);
+    var cores = ['#f2c200', cssVar('--chart-alt'), '#e57a12', '#3fb46b', '#2b6cb0', '#8f8f8f'];
+    var labels = r.meses.map(function (m) { return m.substr(5) + '/' + m.substr(2, 2); });
+    var canvas = chartReady('chRec', top.length > 0);
+    if (canvas) S.charts.chRec = new Chart(canvas, { type: 'line', data: { labels: labels, datasets: top.map(function (c, i) { return { label: c.cargo, data: r.meses.map(function (m) { return c.porMes[m] || 0; }), borderColor: cores[i], backgroundColor: cores[i], tension: .25 }; }) }, options: baseOptions() });
+    $('#recTabela').innerHTML = r.cargos.length ? '<div class="table-wrap"><div class="table-head"><h3>Histórico por cargo</h3></div><table><thead><tr><th>Cargo</th><th>Requisições</th><th>Posições solicitadas</th><th>Posições preenchidas</th><th>Reaberturas</th><th>Tempo médio</th><th>Principal motivo</th><th>Gestor que mais solicitou</th>' +
+      r.meses.map(function (m) { return '<th>' + m.substr(5) + '/' + m.substr(2, 2) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      r.cargos.map(function (c) { return '<tr><td><b>' + esc(c.cargo) + '</b></td><td>' + c.requisicoes + '</td><td>' + c.posicoes + '</td><td>' + c.preenchidas + '</td><td>' + c.reaberturas + '</td><td>' + num(c.tempoMedio) + (c.tempoMedio !== '—' ? ' d.u.' : '') + '</td><td>' + esc(c.motivo) + '</td><td>' + esc(c.gestor) + '</td>' +
+        r.meses.map(function (m) { return '<td>' + (c.porMes[m] || '·') + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">Nenhuma requisição no período.</div>';
+    $('#recComparacao').innerHTML = r.comparacao ? '<div class="table-wrap"><div class="table-head"><h3>Comparação de períodos (A × B)</h3><span class="muted">Requisições A: ' + t.requisicoes + ' · B: ' + r.totalB.requisicoes + '</span></div><table><thead><tr><th>Cargo</th><th>Requisições A</th><th>Requisições B</th><th>Variação (B − A)</th><th>Posições A</th><th>Posições B</th><th>Preenchidas A</th><th>Preenchidas B</th></tr></thead><tbody>' +
+      r.comparacao.map(function (c) { return '<tr><td>' + esc(c.cargo) + '</td><td>' + c.reqA + '</td><td>' + c.reqB + '</td><td><b style="color:' + (c.variacao > 0 ? 'var(--red)' : c.variacao < 0 ? 'var(--green)' : 'inherit') + '">' + (c.variacao > 0 ? '+' : '') + c.variacao + '</b></td><td>' + c.posA + '</td><td>' + c.posB + '</td><td>' + c.preA + '</td><td>' + c.preB + '</td></tr>'; }).join('') + '</tbody></table></div>' :
+      '<p class="muted">Preencha "Comparar com" para comparar dois períodos.</p>';
+    setSync(r.filtros);
+  }).catch(fail);
+}
+
+/* ------------------------------ alertas (sino) ------------------------------ */
+var ALERTAS = { dados: null, aba: 'meus' };
+function loadAlertas() {
+  return api('alertas').then(function (r) {
+    ALERTAS.dados = r;
+    var n = r.meus;
+    $('#alertCount').textContent = n > 99 ? '99+' : n;
+    $('#alertCount').classList.toggle('hidden', !n);
+  }).catch(function () { /* silencioso no sino */ });
+}
+function abrirAlertas() {
+  var r = ALERTAS.dados;
+  if (!r) return loadAlertas().then(abrirAlertas);
+  var lista = ALERTAS.aba === 'meus' ? r.alertas.filter(function (a) { return a.meu; }) : r.alertas;
+  var html = '<div class="dlg-head"><h3>Alertas</h3><button class="btn small x" data-close>Fechar</button></div><div class="dlg-body">' +
+    '<div class="tabs"><button data-al="meus" class="' + (ALERTAS.aba === 'meus' ? 'active' : '') + '">Para mim (' + r.meus + ')</button><button data-al="todos" class="' + (ALERTAS.aba === 'todos' ? 'active' : '') + '">Todos (' + r.total + ')</button></div>' +
+    (lista.length ? lista.map(function (a, i) { return '<button class="alert-item ' + a.nivel + '" data-ai="' + i + '"><b>' + esc(a.titulo) + '</b><p>' + esc(a.texto) + '</p></button>'; }).join('') : '<div class="empty">Nenhum alerta. 👏</div>') + '</div>';
+  var d = openDialog('#dlg2', html);
+  $$('[data-al]', d).forEach(function (b) { b.addEventListener('click', function () { ALERTAS.aba = b.dataset.al; abrirAlertas(); }); });
+  $$('[data-ai]', d).forEach(function (b) {
+    b.addEventListener('click', function () {
+      var a = lista[+b.dataset.ai];
+      d.close();
+      if (a.candidaturaId) openCandidatura(a.candidaturaId); else openVaga(a.vagaId);
+    });
+  });
+}
+
+/* ------------------------------ configurações: alertas e importação ------------------------------ */
+CFG.AlertasEmail = { titulo: 'Alertas por e-mail', admin: true, custom: renderCfgAlertas };
+CFG.Importacao = { titulo: 'Importar planilha antiga', admin: true, custom: renderCfgImportacao };
+
+function renderCfgAlertas() {
+  var ativo = (S.lk.config.ALERTAS_EMAIL || 'Não') === 'Sim';
+  $('#cfgTable').innerHTML = '<div class="panel"><h2>Envio diário de alertas por e-mail</h2><p class="sub">Nos dias úteis, cada usuário ativo recebe os alertas do seu perfil: analistas recebem os das suas vagas, gestores as decisões pendentes, a direção as vagas vencidas e o Administrador RH todos.</p>' +
+    '<div class="form-grid" style="max-width:640px"><label class="field span-2">Envio automático<select id="alAtivo">' + options(['Sim', 'Não'], ativo ? 'Sim' : 'Não') + '</select></label>' +
+    '<label class="field span-2">Horário (hora cheia)<select id="alHora">' + options(Array.from({ length: 24 }, function (_, h) { return { value: String(h), label: String(h).padStart(2, '0') + ':00' }; }), S.lk.config.ALERTAS_HORA || '7') + '</select></label></div>' +
+    '<div class="toolbar" style="margin-top:14px"><button class="btn primary" id="alSalvar">Salvar configuração</button><button class="btn" id="alTeste">Enviar alertas agora</button></div>' +
+    '<p class="muted">Último envio: ' + fmtDate(S.lk.config.ULTIMO_ENVIO_ALERTAS) + '. O Google pedirá autorização para enviar e-mails e criar o agendamento na primeira vez.</p></div>';
+  $('#alSalvar').addEventListener('click', function () {
+    api('configurarAlertasEmail', { ativar: $('#alAtivo').value === 'Sim', hora: $('#alHora').value }).then(function (r) {
+      toast(r.ativo ? 'Alertas diários ativados às ' + r.hora + 'h.' : 'Envio diário desativado.');
+      return api('lookups').then(function (lk) { S.lk = lk; });
+    }).catch(fail);
+  });
+  $('#alTeste').addEventListener('click', function () { api('enviarAlertasAgora').then(function (m) { toast(m); }).catch(fail); });
+}
+
+function renderCfgImportacao() {
+  $('#cfgTable').innerHTML = '<div class="panel"><h2>Importar vagas de planilha antiga</h2><p class="sub">Lê uma aba desta mesma planilha (ex.: <b>RECRUTAMENTO</b> ou <b>Página6</b>) com as colunas ABERTURA DA VAGA, ANALISTA RESPONSÁVEL, FUNÇÃO, SETOR, VAGAS, STATUS DO PROCESSO, Vagas fechadas, Data Aprovação e Candidato Aprovado. ' +
+    'Cada linha vira uma vaga com posições; linhas já importadas são ignoradas. Unidade e gestor ficam como "Não informado" para ajuste posterior.</p>' +
+    '<div class="form-grid" style="max-width:720px"><label class="field span-2">Aba<select id="impAba"><option>Carregando…</option></select></label><label class="field span-2">Empresa<select id="impEmp">' + options(names(S.lk.empresas), 'Via Dupla') + '</select></label></div>' +
+    '<div class="toolbar" style="margin-top:14px"><button class="btn" id="impPrev">Pré-visualizar</button><button class="btn primary" id="impExec" disabled>Importar</button></div><div id="impResultado"></div></div>';
+  api('listAbasPlanilha').then(function (abas) {
+    $('#impAba').innerHTML = options(abas, abas.indexOf('RECRUTAMENTO') >= 0 ? 'RECRUTAMENTO' : abas[0]);
+  }).catch(fail);
+  $('#impPrev').addEventListener('click', function () {
+    $('#impResultado').innerHTML = '<p class="muted">Lendo a aba…</p>';
+    api('previewImportacao', { aba: $('#impAba').value, empresa: $('#impEmp').value }).then(function (r) {
+      $('#impExec').disabled = !r.novas;
+      $('#impResultado').innerHTML = '<div class="cards" style="margin-top:12px">' + card('Vagas a importar', r.novas, 'accent', '', 'file') + card('Já importadas', r.ignoradas, '', 'serão ignoradas', 'check') + card('Linhas com problema', r.invalidas.length, r.invalidas.length ? 'orange' : '', '', 'alert') + '</div>' +
+        '<p class="muted">Status convertidos: ' + r.porStatus.map(function (x) { return esc(x.label) + ' (' + x.valor + ')'; }).join(' · ') + '</p>' +
+        (r.invalidas.length ? '<p class="muted">Problemas: ' + r.invalidas.slice(0, 20).map(function (x) { return 'linha ' + x.linha + ': ' + esc(x.motivo); }).join(' · ') + '</p>' : '') +
+        (r.amostra.length ? '<div class="table-wrap"><table><thead><tr><th>Linha</th><th>Abertura</th><th>Cargo</th><th>Analista</th><th>Posições</th><th>Status original</th><th>Status no sistema</th><th>Preenchidas</th><th>Fechamento</th><th>Contratado</th></tr></thead><tbody>' +
+          r.amostra.map(function (x) { return '<tr><td>' + x.linha + '</td><td>' + fmtDate(x.abertura) + '</td><td>' + esc(x.cargo) + '</td><td>' + esc(x.analista) + '</td><td>' + x.qtd + '</td><td>' + esc(x.statusOriginal) + '</td><td>' + statusBadge(x.status) + '</td><td>' + x.fechadas + '</td><td>' + fmtDate(x.fechamento) + '</td><td>' + esc(x.contratado) + '</td></tr>'; }).join('') +
+          '</tbody></table></div><p class="muted">Mostrando as primeiras ' + r.amostra.length + ' linhas.</p>' : '');
+    }).catch(function (e) { $('#impResultado').innerHTML = '<div class="form-error">' + esc(e.message) + '</div>'; });
+  });
+  $('#impExec').addEventListener('click', function () {
+    if (!confirm('Importar as vagas da aba "' + $('#impAba').value + '"?')) return;
+    $('#impExec').disabled = true;
+    $('#impResultado').insertAdjacentHTML('afterbegin', '<p class="muted">Importando… isso pode levar alguns segundos.</p>');
+    api('executarImportacao', { aba: $('#impAba').value, empresa: $('#impEmp').value }).then(function (r) {
+      toast(r.importadas + ' vaga(s) importada(s). ' + r.ignoradas + ' já existiam.');
+      $('#impPrev').click();
+    }).catch(fail);
+  });
+}
+
+/* ------------------------------ inicialização da Fase 3 ------------------------------ */
+(function aguardarBootstrap3() {
+  if (!S.lk) return setTimeout(aguardarBootstrap3, 120);
+  initRelatorios();
+  renderCfgTabs();
+  $('#alertBtn').addEventListener('click', abrirAlertas);
+  loadAlertas();
+  setInterval(function () { if (!document.hidden) loadAlertas(); }, 300000);
 })();
 </script>
 

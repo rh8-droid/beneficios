@@ -304,6 +304,15 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
 .kcard .late-txt { color: var(--red); font-weight: 700; }
 .pill { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; background: var(--accent-soft); color: var(--accent-text); }
 
+/* ---------- alertas ---------- */
+#alertBtn { position: relative; padding: 8px 11px; }
+#alertBtn svg.i { width: 20px; height: 20px; }
+.bell-count { position: absolute; top: -6px; right: -6px; background: var(--red); color: #fff; border-radius: 999px; font-size: 11px; font-weight: 800; padding: 1px 6px; min-width: 20px; text-align: center; }
+.alert-item { display: block; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line-2); border-left: 4px solid var(--neutral); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; color: var(--text); }
+.alert-item:hover { background: var(--surface-2); }
+.alert-item.vermelho { border-left-color: var(--red); } .alert-item.laranja { border-left-color: var(--orange); } .alert-item.amarelo { border-left-color: var(--yellow); } .alert-item.info { border-left-color: var(--blue); }
+.alert-item p { margin: 4px 0 0; white-space: pre-line; font-size: 12px; color: var(--text-2); }
+
 /* ---------- responsive ---------- */
 @media (max-width: 1100px) {
   .grid.two, .grid.three { grid-template-columns: 1fr; }

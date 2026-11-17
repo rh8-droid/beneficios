@@ -27,7 +27,7 @@
         <button data-view="entrevistas"><i data-icon="chat"></i>Entrevistas</button>
         <button data-view="indicacoes"><i data-icon="handshake"></i>Indicações</button>
         <button data-view="sla"><i data-icon="clock"></i>SLA e Gargalos</button>
-        <button data-view="relatorios"><i data-icon="chart"></i>Indicadores e Relatórios<span class="tag">Fase 3</span></button>
+        <button data-view="relatorios"><i data-icon="chart"></i>Indicadores e Relatórios</button>
         <button data-view="artes"><i data-icon="image"></i>Gerador de Artes<span class="tag">Fase 4</span></button>
         <button data-view="config"><i data-icon="gear"></i>Configurações</button>
       </nav>
@@ -48,6 +48,7 @@
         </div>
         <div class="top-actions">
           <span id="syncStatus"></span>
+          <button class="btn" id="alertBtn" title="Alertas"><i data-icon="bell"></i><span class="bell-count hidden" id="alertCount">0</span></button>
           <button class="btn" id="refreshBtn">Atualizar</button>
         </div>
       </header>
@@ -166,6 +167,41 @@
         <div id="indTable"></div>
       </section>
 
+      <!-- INDICADORES E RELATÓRIOS -->
+      <section class="view hidden" id="view-relatorios">
+        <div class="tabs" id="relTabs">
+          <button class="active" data-rtab="rel">Relatórios</button>
+          <button data-rtab="prod">Produtividade dos analistas</button>
+          <button data-rtab="rec">Recorrência por cargo</button>
+        </div>
+        <div data-rpane="rel">
+          <div class="filters" id="relFilters"></div>
+          <div class="toolbar">
+            <button class="btn primary" id="relGerar">Gerar relatório</button>
+            <button class="btn" id="relExcel">Exportar Excel</button>
+            <button class="btn" id="relPdf">Exportar PDF</button>
+            <span class="muted" id="relInfo"></span>
+          </div>
+          <div class="cards" id="relResumo"></div>
+          <div id="relTabela"></div>
+        </div>
+        <div data-rpane="prod" class="hidden">
+          <div class="filters" id="prodFilters"></div>
+          <div class="grid two" style="margin-bottom:16px">
+            <section class="panel"><h2>Tempo médio de fechamento e % do SLA</h2><p class="sub">Por analista responsável (posições preenchidas).</p><div class="chart-box"><canvas id="chProdSla"></canvas></div></section>
+            <section class="panel"><h2>Espera em etapas do RH × áreas externas</h2><p class="sub">Dias úteis médios por etapa do candidato. A espera em gestor/direção não é atribuída ao analista.</p><div class="chart-box"><canvas id="chProdEspera"></canvas></div></section>
+          </div>
+          <div id="prodTabela"></div>
+        </div>
+        <div data-rpane="rec" class="hidden">
+          <div class="filters" id="recFilters"></div>
+          <div class="cards" id="recResumo"></div>
+          <section class="panel" style="margin-bottom:16px"><h2>Aberturas por mês — cargos mais recorrentes</h2><p class="sub">Quantidade de requisições abertas por mês (até 6 cargos).</p><div class="chart-box"><canvas id="chRec"></canvas></div></section>
+          <div id="recTabela"></div>
+          <div id="recComparacao" style="margin-top:16px"></div>
+        </div>
+      </section>
+
       <!-- CONFIGURAÇÕES -->
       <section class="view hidden" id="view-config">
         <div class="tabs" id="cfgTabs"></div>
@@ -183,7 +219,9 @@
   <div class="toast-area" id="toasts"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <?!= include('Scripts'); ?>
   <?!= include('Fase2'); ?>
+  <?!= include('Fase3'); ?>
 </body>
 </html>

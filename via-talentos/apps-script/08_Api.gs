@@ -43,7 +43,18 @@ var API_ROUTES = {
   saveEntrevista: function (p) { return saveEntrevista(p); },
   listEntrevistas: function (p) { return listEntrevistas(p); },
   saveIndicacao: function (p) { return saveIndicacao(p); },
-  listIndicacoes: function (p) { return listIndicacoes(p); }
+  listIndicacoes: function (p) { return listIndicacoes(p); },
+  // Fase 3
+  relatorio: function (p) { return getRelatorio(p.tipo, p.filtros); },
+  relatorioPdf: function (p) { return exportRelatorioPdf(p.tipo, p.filtros); },
+  produtividade: function (p) { return getProdutividade(p); },
+  recorrencia: function (p) { return getRecorrencia(p); },
+  alertas: function () { return getAlertas(); },
+  enviarAlertasAgora: function () { return enviarAlertasAgora(); },
+  configurarAlertasEmail: function (p) { return configurarAlertasEmail(p.ativar, p.hora); },
+  listAbasPlanilha: function () { return listAbasPlanilha(); },
+  previewImportacao: function (p) { return previewImportacao(p.aba, p.empresa); },
+  executarImportacao: function (p) { return executarImportacao(p.aba, p.empresa); }
 };
 
 /** Chamado pelo navegador: google.script.run.api(acao, dados). */

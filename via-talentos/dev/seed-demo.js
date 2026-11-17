@@ -72,4 +72,14 @@ module.exports = function seed(b) {
   at('2026-11-14');
   b.ok('saveEntrevista', { CandidaturaID: cards[0].ID, Tipo: 'Gestor', Agendamento: '2026-11-18T14:00', Entrevistador: cards[0].gestor });
   b.ok('saveIndicacao', { Nome: 'Marcos Antônio Teixeira', Telefone: '41988776655', Indicador: 'Colaborador 20', EmpresaIndicador: 'Via Dupla', DepartamentoIndicador: 'Transporte', CargoPretendido: 'Motorista Carreteiro' });
+  const legado = b.state.ss.insertSheet('RECRUTAMENTO');
+  legado.data = [
+    ['', 'VIA DUPLA TRANSPORTES'],
+    ['', 'ABERTURA DA VAGA', 'ANALISTA RESPONSÁVEL', 'FUNÇÃO', 'SETOR', 'VAGAS', 'RECRUTAMENTO E SELEÇÃO'],
+    ['', '', '', '', '', '', 'STATUS DO PROCESSO', 'Vagas fechadas', 'Data Aprovação', 'Candidato Aprovado'],
+    ['', '08/01/2026', 'Ari', 'Assistente de Contabilidade', 'Contabilidade', 1, 'Finalizado', 1, '29/01/2026', 'Pessoa Exemplo 1'],
+    ['', '13/01/2026', 'Ari', 'Supervisor Adm', 'Manutenção Adm', 1, 'Finalizado', 1, '22/01/2026', 'Pessoa Exemplo 2'],
+    ['', '14/01/2026', 'Camila', 'Motorista Carreteiro', 'Transporte', 3, 'Finalizado', 3, '05/02/2026', 'Pessoa Exemplo 3'],
+    ['', '02/03/2026', 'Camila', 'Instrutor', 'Transporte', 1, 'Vaga cancelada', 0, '', '']
+  ];
 };
