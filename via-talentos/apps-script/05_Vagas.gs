@@ -97,6 +97,12 @@ function getVaga(id) {
   full.suspensoes = data.suspensoes.filter(function (s) { return s.VagaID === vaga.ID; }).map(clean_);
   full.excecoes = data.excecoes.filter(function (s) { return s.VagaID === vaga.ID; }).map(clean_);
   full.candidatos = resumoCandidatosVaga_(vaga.ID);
+  var pessoas = {};
+  Db.all('Candidatos').forEach(function (p) { pessoas[p.ID] = p; });
+  var ctxV = Sla.buildContext(data, Util.today());
+  full.candidaturas = candidaturasVisiveis_().filter(function (c) { return c.VagaID === vaga.ID; }).map(function (c) {
+    return cardCandidatura_(c, vaga, pessoas[c.CandidatoID], ctxV, Util.today());
+  });
   return full;
 }
 
@@ -314,28 +320,34 @@ function fillPosition(posId, info) {
     if (!pos) throw UserError('Posição não encontrada.');
     var vaga = Db.find('Vagas', pos.VagaID);
     if (!Auth.canEditVaga(vaga)) throw UserError('Sem permissão para esta vaga.');
-    if (pos.Status !== 'Aberta') throw UserError('A posição não está aberta.');
-    if (!vaga.DataAprovacao) throw UserError('A vaga ainda não foi aprovada.');
-    if (VT.STATUS_FINAIS.indexOf(vaga.Status) >= 0 || vaga.Status === VT.STATUS_SUSPENSA) throw UserError('A vaga está ' + vaga.Status.toLowerCase() + '.');
-    var data = Util.toIsoDate(info.data) || Util.today();
-    if (!Util.isIsoDate(data)) throw UserError('Data inválida.');
-    if (data < vaga.DataAprovacao) throw UserError('O fechamento não pode ser anterior à aprovação (' + vaga.DataAprovacao + ').');
-    if (data > Util.today()) throw UserError('A data de fechamento não pode ser futura.');
-    var nome = Util.str(info.nome);
-    if (!nome) throw UserError('Informe o nome do contratado.');
-    Db.update('Posicoes', pos.ID, { Status: 'Preenchida', DataFechamento: data, NomeContratado: nome, CandidatoID: Util.str(info.candidatoId) });
-    logHistory_('Posicao', pos.ID, 'Aberta', 'Preenchida', 'Posição ' + pos.Numero + ' preenchida por ' + nome + ' em ' + data);
-
-    var restantes = Db.all('Posicoes').filter(function (p) { return p.VagaID === vaga.ID && p.Status === 'Aberta'; });
-    if (!restantes.length) {
-      var datas = Db.all('Posicoes').filter(function (p) { return p.VagaID === vaga.ID && p.Status === 'Preenchida'; })
-        .map(function (p) { return p.DataFechamento; }).sort();
-      var anterior = vaga.Status;
-      Db.update('Vagas', vaga.ID, { Status: VT.STATUS_CONCLUIDA, DataFechamento: datas[datas.length - 1], AtualizadoEm: Util.now(), AtualizadoPor: Auth.email() });
-      logHistory_('Vaga', vaga.ID, anterior, VT.STATUS_CONCLUIDA, 'Conclusão automática: todas as posições preenchidas');
-    }
+    fillPositionCore_(pos, vaga, info);
     return getVaga(vaga.ID);
   });
+}
+
+/** Preenche a posição (sem lock — chamado dentro de Db.withLock). */
+function fillPositionCore_(pos, vaga, info) {
+  if (pos.Status !== 'Aberta') throw UserError('A posição não está aberta.');
+  if (!vaga.DataAprovacao) throw UserError('A vaga ainda não foi aprovada.');
+  if (VT.STATUS_FINAIS.indexOf(vaga.Status) >= 0 || vaga.Status === VT.STATUS_SUSPENSA) throw UserError('A vaga está ' + vaga.Status.toLowerCase() + '.');
+  var data = Util.toIsoDate(info.data) || Util.today();
+  if (!Util.isIsoDate(data)) throw UserError('Data inválida.');
+  if (data < vaga.DataAprovacao) throw UserError('O fechamento não pode ser anterior à aprovação (' + vaga.DataAprovacao + ').');
+  if (data > Util.today()) throw UserError('A data de fechamento não pode ser futura.');
+  var nome = Util.str(info.nome);
+  if (!nome) throw UserError('Informe o nome do contratado.');
+  Db.update('Posicoes', pos.ID, { Status: 'Preenchida', DataFechamento: data, NomeContratado: nome, CandidatoID: Util.str(info.candidatoId) });
+  logHistory_('Posicao', pos.ID, 'Aberta', 'Preenchida', 'Posição ' + pos.Numero + ' preenchida por ' + nome + ' em ' + data);
+
+  var restantes = Db.all('Posicoes').filter(function (p) { return p.VagaID === vaga.ID && p.Status === 'Aberta'; });
+  if (!restantes.length) {
+    var datas = Db.all('Posicoes').filter(function (p) { return p.VagaID === vaga.ID && p.Status === 'Preenchida'; })
+      .map(function (p) { return p.DataFechamento; }).sort();
+    var anterior = vaga.Status;
+    Db.update('Vagas', vaga.ID, { Status: VT.STATUS_CONCLUIDA, DataFechamento: datas[datas.length - 1], AtualizadoEm: Util.now(), AtualizadoPor: Auth.email() });
+    logHistory_('Vaga', vaga.ID, anterior, VT.STATUS_CONCLUIDA, 'Conclusão automática: todas as posições preenchidas');
+  }
+  return data;
 }
 
 /** Reabre uma posição preenchida/cancelada (conta como reabertura da requisição). */

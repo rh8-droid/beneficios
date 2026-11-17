@@ -222,6 +222,8 @@ td .muted, .muted { color: var(--muted); font-size: 12px; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
 .toolbar .search { flex: 1 1 260px; }
 .toolbar select { width: auto; min-width: 150px; }
+.toolbar input[type=date] { width: auto; }
+.card strong .txt { display: block; font-size: 16px; line-height: 1.25; overflow-wrap: anywhere; }
 
 /* ---------- dialogs ---------- */
 dialog { border: 0; border-radius: 18px; padding: 0; background: var(--bg); color: var(--text); width: min(1040px, calc(100vw - 24px)); max-height: calc(100vh - 24px); box-shadow: var(--shadow-lg); }
@@ -289,6 +291,26 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
 .spinner { width: 42px; height: 42px; border-radius: 50%; border: 4px solid var(--line); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ---------- kanban ---------- */
+.board { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; }
+.col { flex: 0 0 272px; background: var(--surface-3); border-radius: 14px; display: flex; flex-direction: column; max-height: calc(100vh - 200px); }
+.col-head { padding: 11px 12px; font-weight: 800; font-size: 13px; display: flex; align-items: center; gap: 8px; border-bottom: 3px solid var(--accent); }
+.col-head .count { margin-left: auto; background: var(--surface); border-radius: 999px; padding: 1px 9px; font-size: 12px; }
+.col.reprovado .col-head { border-color: var(--red); }
+.col.contratado .col-head { border-color: var(--green); }
+.col-body { padding: 8px; overflow-y: auto; display: grid; gap: 8px; min-height: 90px; align-content: start; }
+.col.drag-over { outline: 2px dashed var(--accent); outline-offset: -2px; }
+.kcard { background: var(--surface); border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); border-left: 4px solid var(--accent); cursor: pointer; font-size: 12px; color: var(--text-2); }
+.kcard[draggable="true"] { cursor: grab; }
+.kcard.dragging { opacity: .45; }
+.kcard.late { border-left-color: var(--red); }
+.kcard.done { border-left-color: var(--green); }
+.kcard.rep { border-left-color: var(--neutral); opacity: .85; }
+.kcard h4 { margin: 0 0 2px; font-size: 13px; color: var(--text); }
+.kcard .ln { display: flex; justify-content: space-between; gap: 6px; margin-top: 5px; }
+.kcard .late-txt { color: var(--red); font-weight: 700; }
+.pill { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; background: var(--accent-soft); color: var(--accent-text); }
+
 /* ---------- responsive ---------- */
 @media (max-width: 1100px) {
   .grid.two, .grid.three { grid-template-columns: 1fr; }
@@ -336,10 +358,10 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
       <nav class="nav" id="nav">
         <button data-view="dashboard" class="active"><i data-icon="grid"></i>Dashboard</button>
         <button data-view="vagas"><i data-icon="briefcase"></i>Gestão de Vagas</button>
-        <button data-view="candidatos"><i data-icon="users"></i>Candidatos<span class="tag">Fase 2</span></button>
-        <button data-view="kanban"><i data-icon="columns"></i>Kanban do Recrutamento<span class="tag">Fase 2</span></button>
-        <button data-view="entrevistas"><i data-icon="chat"></i>Entrevistas<span class="tag">Fase 2</span></button>
-        <button data-view="indicacoes"><i data-icon="handshake"></i>Indicações<span class="tag">Fase 2</span></button>
+        <button data-view="candidatos"><i data-icon="users"></i>Candidatos</button>
+        <button data-view="kanban"><i data-icon="columns"></i>Kanban do Recrutamento</button>
+        <button data-view="entrevistas"><i data-icon="chat"></i>Entrevistas</button>
+        <button data-view="indicacoes"><i data-icon="handshake"></i>Indicações</button>
         <button data-view="sla"><i data-icon="clock"></i>SLA e Gargalos</button>
         <button data-view="relatorios"><i data-icon="chart"></i>Indicadores e Relatórios<span class="tag">Fase 3</span></button>
         <button data-view="artes"><i data-icon="image"></i>Gerador de Artes<span class="tag">Fase 4</span></button>
@@ -420,8 +442,64 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
           <section class="panel"><h2>Ranking de etapas com maior tempo de espera</h2><p class="sub">Tempo médio (dias úteis) em cada status, com o responsável típico pela próxima ação. Mede tempo de espera, não produtividade individual.</p><div id="slaRanking"></div></section>
           <section class="panel"><h2>Distribuição do SLA das vagas ativas</h2><p class="sub">Dias úteis efetivos (descontadas suspensões autorizadas).</p><div class="chart-box"><canvas id="chSla2"></canvas></div></section>
         </div>
+        <div class="grid two" style="margin-top:16px">
+          <section class="panel"><h2>Tempo médio aguardando por etapa do candidato</h2><p class="sub">Dias úteis entre a entrada e a saída de cada etapa (etapas em aberto contam até hoje).</p><div id="slaCandEtapas"></div></section>
+          <section class="panel"><h2>Ações pendentes por responsável</h2><p class="sub">Candidaturas com prazo da próxima ação vencido. Indica onde o processo está parado — não mede produtividade individual.</p><div id="slaPendencias"></div></section>
+        </div>
         <h3 class="section-title">Vagas ativas — controle de prazo</h3>
         <div id="slaTable"></div>
+      </section>
+
+      <!-- CANDIDATOS -->
+      <section class="view hidden" id="view-candidatos">
+        <div class="toolbar">
+          <input class="search" id="candBusca" placeholder="Buscar por nome, código, e-mail, CPF ou telefone…">
+          <select id="candOrigem"></select>
+          <button class="btn primary" id="novoCandBtn">+ Novo candidato</button>
+        </div>
+        <div id="candTable"></div>
+      </section>
+
+      <!-- KANBAN -->
+      <section class="view hidden" id="view-kanban">
+        <div class="toolbar">
+          <select id="kbVaga" style="min-width:280px"></select>
+          <select id="kbAnalista"></select>
+          <input class="search" id="kbBusca" placeholder="Filtrar candidato…">
+          <button class="btn primary" id="kbAdd">+ Adicionar candidato</button>
+        </div>
+        <p class="muted" id="kbHint" style="margin:-4px 0 10px"></p>
+        <div class="board" id="kbBoard"></div>
+      </section>
+
+      <!-- ENTREVISTAS -->
+      <section class="view hidden" id="view-entrevistas">
+        <div class="cards" id="entCards"></div>
+        <div class="toolbar">
+          <select id="entSituacao">
+            <option value="">Todas</option><option value="agendadas">Agendadas</option>
+            <option value="pendentes">Sem resultado (data passada)</option><option value="realizadas">Realizadas</option>
+          </select>
+          <select id="entTipo"></select>
+          <input type="date" id="entDe" title="De"><input type="date" id="entAte" title="Até">
+          <input class="search" id="entBusca" placeholder="Candidato, entrevistador ou cargo…">
+          <button class="btn primary" id="entNova">+ Agendar entrevista</button>
+        </div>
+        <div id="entTable"></div>
+      </section>
+
+      <!-- INDICAÇÕES -->
+      <section class="view hidden" id="view-indicacoes">
+        <div class="cards" id="indCards"></div>
+        <div class="grid two" style="margin-bottom:16px">
+          <section class="panel"><h2>Cargos com mais indicações</h2><p class="sub">Cargo pretendido ou cargo da vaga.</p><div class="chart-box"><canvas id="chIndCargos"></canvas></div></section>
+          <section class="panel"><h2>Contratações por origem</h2><p class="sub">Todas as contratações registradas no sistema.</p><div class="chart-box"><canvas id="chIndOrigem"></canvas></div></section>
+        </div>
+        <div class="toolbar">
+          <input class="search" id="indBusca" placeholder="Indicado, colaborador ou cargo…">
+          <button class="btn primary" id="indNova">+ Nova indicação</button>
+        </div>
+        <div id="indTable"></div>
       </section>
 
       <!-- CONFIGURAÇÕES -->
@@ -509,7 +587,10 @@ function api(action, payload) {
     google.script.run
       .withSuccessHandler(function (raw) {
         var res = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        if (res && res.ok) resolve(res.data); else reject(new Error(res ? res.error : 'Falha de comunicação.'));
+        if (res && res.ok) return resolve(res.data);
+        var err = new Error(res ? res.error : 'Falha de comunicação.');
+        if (res && res.duplicadoId) err.duplicadoId = res.duplicadoId;
+        reject(err);
       })
       .withFailureHandler(function (err) { reject(new Error(err && err.message ? err.message : String(err))); })
       .api(action, payload || {});
@@ -610,6 +691,7 @@ function fieldHtml(f) {
     return '<div class="' + cls + '"><span class="field">' + esc(f.label) + '</span><div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px">' +
       f.options.map(function (o) { return '<label class="check"><input type="checkbox" name="' + f.k + '" value="' + esc(o) + '"' + (!v || sel.indexOf(o) >= 0 ? ' checked' : '') + '> ' + esc(o) + '</label>'; }).join('') + '</div></div>';
   }
+  else if (f.datalist) input = '<input name="' + f.k + '" list="dl-' + f.k + '" value="' + esc(v) + '" autocomplete="off"><datalist id="dl-' + f.k + '">' + f.datalist.map(function (o) { return '<option value="' + esc(o) + '">'; }).join('') + '</datalist>';
   else input = '<input name="' + f.k + '" type="' + (f.type || 'text') + '" value="' + esc(v) + '"' + (f.min !== undefined ? ' min="' + f.min + '"' : '') + (f.max !== undefined ? ' max="' + f.max + '"' : '') + '>';
   return '<label class="' + cls + '" data-wrap="' + f.k + '"><span>' + esc(f.label) + req + '</span>' + input + (f.hint ? '<span class="muted">' + esc(f.hint) + '</span>' : '') + '</label>';
 }
@@ -621,10 +703,6 @@ var TITLES = {
   artes: 'Gerador de Artes', config: 'Configurações'
 };
 var FUTURE = {
-  candidatos: { fase: 2, itens: ['Base única de candidatos com bloqueio de duplicidade (CPF, e-mail e telefone)', 'Currículo anexado no Drive com acesso restrito', 'Histórico de participação em outros processos', 'Consentimento e prazo de retenção (LGPD)'] },
-  kanban: { fase: 2, itens: ['Quadro com 12 colunas e arrastar-e-soltar', 'Etapas configuráveis por vaga (já gravadas no cadastro da vaga)', 'Dias úteis aguardando, próxima ação, responsável e prazo em cada card'] },
-  entrevistas: { fase: 2, itens: ['Agenda de entrevistas RH, gestor e direção', 'Parecer, resultado e motivo padronizado de reprovação', 'Próxima etapa e data prevista de retorno'] },
-  indicacoes: { fase: 2, itens: ['Cadastro do indicado e do colaborador indicador', 'Taxa de conversão e cargos com mais indicações', 'Identificação de candidatos que já participaram de processos anteriores'] },
   relatorios: { fase: 3, itens: ['11 relatórios com filtros e exportação para Excel e PDF', 'Produtividade por analista separada da espera de outras áreas', 'Recorrência por cargo (requisições, posições, preenchidas e reaberturas)', 'Alertas automáticos por e-mail'] },
   artes: { fase: 4, itens: ['Arte preenchida com os dados da vaga, no modelo institucional', 'Versões PNG, LinkedIn, Instagram, WhatsApp e PDF', 'Histórico, regeneração e aprovação manual antes da divulgação'] }
 };
@@ -652,6 +730,10 @@ function refresh() {
   if (S.view === 'vagas') return loadVagas();
   if (S.view === 'sla') return loadSla();
   if (S.view === 'config') return loadCadastro();
+  if (S.view === 'candidatos') return loadCandidatos();
+  if (S.view === 'kanban') return loadKanban();
+  if (S.view === 'entrevistas') return loadEntrevistas();
+  if (S.view === 'indicacoes') return loadIndicacoes();
 }
 
 function setSync(text) { $('#syncStatus').textContent = text; }
@@ -1000,6 +1082,7 @@ function renderVagaDetail(v) {
     if (isAdmin() && s.iniciado && !final) actions += '<button id="actExc">Registrar exceção de SLA</button>';
     actions += '<button id="actDup">Nova requisição a partir desta</button>';
   }
+  if (!final) actions = '<button id="actKanban">Abrir Kanban da vaga</button>' + actions;
 
   // Etapas macro do processo (ref.: Triar › Convocar › Selecionar › Contratar)
   var STEPS = [
@@ -1090,8 +1173,9 @@ function renderVagaDetail(v) {
   var html = '<div class="dlg-head"><div><p class="eyebrow">' + esc(v.Codigo || v.ID) + ' · ' + esc(v.Empresa) + '</p><h3># ' + esc(v.Cargo) + ' — ' + v.posicoesTotal + ' posição(ões) em ' + esc(v.Unidade) + '</h3></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto">' + statusBadge(v.Status) + '<span class="badge prio-' + esc(v.Prioridade) + '">● ' + esc(v.Prioridade) + '</span></div><button class="btn small" data-close>Fechar</button></div>' +
     stepper + '<div class="dlg-body">' + infoCard + kpis + slaHtml +
-    '<div class="tabs"><button class="active" data-tab="pos">Posições (' + v.posicoes.length + ')</button><button data-tab="dados">Dados da vaga</button><button data-tab="hist">Histórico (' + v.historico.length + ')</button><button data-tab="susp">Suspensões e exceções</button></div>' +
+    '<div class="tabs"><button class="active" data-tab="pos">Posições (' + v.posicoes.length + ')</button><button data-tab="cands">Candidatos (' + (v.candidaturas || []).length + ')</button><button data-tab="dados">Dados da vaga</button><button data-tab="hist">Histórico (' + v.historico.length + ')</button><button data-tab="susp">Suspensões e exceções</button></div>' +
     '<div data-pane="pos"><div class="table-wrap"><table><thead><tr><th>Posição</th><th>Status</th><th>Contratado</th><th>Fechamento</th><th>SLA da posição</th><th></th></tr></thead><tbody>' + posRows + '</tbody></table></div></div>' +
+    '<div data-pane="cands" class="hidden">' + candidaturasTable(v.candidaturas || [], false) + '</div>' +
     '<div data-pane="dados" class="hidden"><div class="kv">' + dados + '</div></div>' +
     '<div data-pane="hist" class="hidden"><div class="timeline">' + hist + '</div></div>' +
     '<div data-pane="susp" class="hidden">' + susp + '</div></div>';
@@ -1109,6 +1193,8 @@ function renderVagaDetail(v) {
     d.addEventListener('click', function () { var pop = $('#actPop', d); if (pop) pop.classList.add('hidden'); });
   }
   if ($('#actEdit', d)) $('#actEdit', d).addEventListener('click', function () { vagaForm(v); });
+  if ($('#actKanban', d)) $('#actKanban', d).addEventListener('click', function () { d.close(); S.kbVaga = v.ID; showView('kanban'); });
+  bindCandidaturaLinks(d);
   if ($('#actDup', d)) $('#actDup', d).addEventListener('click', function () {
     var copy = {}; Object.keys(v).forEach(function (k) { copy[k] = v[k]; });
     copy.ID = ''; copy.DataAbertura = todayIso(); copy.DataAprovacao = ''; copy.ReaberturaDe = v.ID; copy.ReaberturaDeCodigo = v.Codigo;
@@ -1175,6 +1261,12 @@ function loadSla() {
     $('#slaRanking').innerHTML = rank.length ? '<div class="table-wrap"><table style="min-width:0"><thead><tr><th>#</th><th>Etapa</th><th>Média</th><th>Responsável típico</th><th>Ocorrências</th></tr></thead><tbody>' +
       rank.map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(x.label) + '</td><td><b>' + num(x.valor) + '</b> d.u.</td><td>' + esc(x.responsavel || '—') + '</td><td class="muted">' + x.n + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">Sem movimentações registradas ainda.</div>';
     slaDoughnut('chSla2', dist);
+    var tc = (d.graficos.tempoEtapaCandidato || []).slice().sort(function (a, b) { return b.valor - a.valor; });
+    $('#slaCandEtapas').innerHTML = tc.length ? '<div class="table-wrap"><table style="min-width:0"><thead><tr><th>#</th><th>Etapa</th><th>Média</th><th>Responsável típico</th><th>Registros</th></tr></thead><tbody>' +
+      tc.map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(x.label) + '</td><td><b>' + num(x.valor) + '</b> d.u.</td><td>' + esc(x.responsavel || '—') + '</td><td class="muted">' + x.n + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">Sem movimentação de candidatos ainda.</div>';
+    var pd = d.graficos.pendencias || [];
+    $('#slaPendencias').innerHTML = pd.length ? '<div class="table-wrap"><table style="min-width:0"><thead><tr><th>Responsável</th><th>Ações vencidas</th><th>Mais antiga desde</th></tr></thead><tbody>' +
+      pd.map(function (x) { return '<tr><td>' + esc(x.label) + '</td><td><b class="late">' + x.valor + '</b></td><td>' + fmtDate(x.maisAntigo) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">Nenhuma ação vencida. 👏</div>';
     vagas.sort(function (a, b) { var ra = a.sla.iniciado ? a.sla.diasRestantes : 999, rb = b.sla.iniciado ? b.sla.diasRestantes : 999; return ra - rb; });
     $('#slaTable').innerHTML = vagas.length ? '<div class="table-wrap"><table><thead><tr><th>Vaga</th><th>Status / responsável</th><th>Aprovação</th><th>Prazo original</th><th>Prazo ajustado</th><th>Decorridos</th><th>Restantes</th><th style="width:160px">Consumo</th></tr></thead><tbody>' +
       vagas.map(function (v) {
@@ -1308,6 +1400,591 @@ function init() {
   });
 }
 init();
+</script>
+
+  <script>
+/* =========================================================================
+   VIA TALENTOS — FASE 2: candidatos, Kanban, entrevistas e indicações
+   ========================================================================= */
+var REPROVADO = 'Reprovado / desistente';
+var ETAPA_ENTREVISTA = { 'RH': 'Entrevista RH', 'Gestor': 'Entrevista gestor', 'Direção': 'Entrevista direção' };
+
+function etapaBadge(etapa, status) {
+  var cls = etapa === 'Contratado' ? 'sla-verde' : (etapa === REPROVADO ? 'sla-vermelho' : (etapa === 'Aprovado' || etapa === 'Processo admissional' ? 'sla-verde' : ''));
+  return '<span class="badge ' + cls + '">' + esc(etapa) + (status && etapa === REPROVADO ? ' · ' + esc(status) : '') + '</span>';
+}
+function fmtDT(s) { return s ? fmtDate(String(s).replace('T', ' ')) : '—'; }
+
+function vagasAtivas(force) {
+  if (S.vagasAtivas && !force) return Promise.resolve(S.vagasAtivas);
+  return api('listVagas', { situacao: 'ativas' }).then(function (l) {
+    S.vagasAtivas = l.filter(function (v) { return v.Status !== 'Aguardando aprovação'; });
+    return S.vagasAtivas;
+  });
+}
+function vagaOptions(list) { return list.map(function (v) { return { value: v.ID, label: (v.Codigo || v.ID) + ' · ' + v.Cargo + ' · ' + v.Unidade }; }); }
+
+/* ------------------------------ candidaturas (tabela reutilizável) ------------------------------ */
+function candidaturasTable(list, mostrarVaga) {
+  if (!list.length) return '<div class="empty">Nenhuma candidatura.</div>';
+  return '<div class="table-wrap"><table><thead><tr><th>' + (mostrarVaga ? 'Vaga' : 'Candidato') + '</th><th>Etapa</th><th>Na etapa</th><th>Próxima ação</th><th>Origem</th><th>Inscrição</th></tr></thead><tbody>' +
+    list.map(function (c) {
+      var quem = mostrarVaga ? '<span class="code">' + esc(c.vagaCodigo) + '</span><br>' + esc(c.vagaCargo) : '<b>' + esc(c.nome) + '</b><br><span class="code">' + esc(c.candidatoCodigo) + '</span>';
+      return '<tr class="clickable" data-cand="' + esc(c.ID) + '"><td>' + quem + '</td><td>' + etapaBadge(c.Etapa, c.Status) + (c.MotivoReprovacao ? '<br><span class="muted">' + esc(c.MotivoReprovacao) + '</span>' : '') + '</td>' +
+        '<td>' + (c.diasNaEtapa === null || c.diasNaEtapa === undefined ? '—' : c.diasNaEtapa + ' d.u.') + '</td>' +
+        '<td>' + esc(c.ProximaAcao || '—') + (c.PrazoAcao ? '<br><span class="' + (c.acaoAtrasada ? 'late' : 'muted') + '">' + esc(c.Responsavel || '') + ' · até ' + fmtDate(c.PrazoAcao) + '</span>' : '') + '</td>' +
+        '<td>' + esc(c.Origem) + (c.Indicador ? '<br><span class="muted">por ' + esc(c.Indicador) + '</span>' : '') + '</td><td>' + fmtDate(c.DataCandidatura) + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+}
+function bindCandidaturaLinks(root) {
+  $$('[data-cand]', root).forEach(function (tr) { tr.addEventListener('click', function () { openCandidatura(tr.dataset.cand); }); });
+}
+
+/* ------------------------------ candidatos ------------------------------ */
+function initCandidatos() {
+  $('#candOrigem').innerHTML = options(S.lk.origens, '', 'Origem: todas');
+  var t;
+  $('#candBusca').addEventListener('input', function () { clearTimeout(t); t = setTimeout(loadCandidatos, 300); });
+  $('#candOrigem').addEventListener('change', loadCandidatos);
+  $('#novoCandBtn').classList.toggle('hidden', !canWrite());
+  $('#novoCandBtn').addEventListener('click', function () { candidatoForm(null); });
+}
+
+function loadCandidatos() {
+  setSync('Carregando candidatos…');
+  return api('listCandidatos', { busca: $('#candBusca').value, Origem: $('#candOrigem').value }).then(function (list) {
+    setSync(list.length + ' candidato(s)');
+    if (!list.length) { $('#candTable').innerHTML = '<div class="empty">Nenhum candidato encontrado.</div>'; return; }
+    $('#candTable').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Candidato</th><th>Contato</th><th>Cidade/UF</th><th>Cargo de interesse</th><th>Origem</th><th>Processos</th><th>Situação atual</th><th>Cadastro</th></tr></thead><tbody>' +
+      list.map(function (c) {
+        var u = c.ultimoProcesso;
+        return '<tr class="clickable" data-pessoa="' + esc(c.ID) + '"><td><b>' + esc(c.Nome) + '</b><br><span class="code">' + esc(c.Codigo) + '</span>' + (c.temCurriculo ? ' <span class="pill">CV</span>' : '') + '</td>' +
+          '<td>' + esc(c.Email || '—') + '<br><span class="muted">' + esc(c.Telefone || '') + '</span></td><td>' + esc([c.Cidade, c.UF].filter(Boolean).join('/') || '—') + '</td>' +
+          '<td>' + esc(c.CargoInteresse || '—') + '</td><td>' + esc(c.Origem || '—') + '</td><td>' + c.processos + '</td>' +
+          '<td>' + (u ? etapaBadge(u.Etapa, u.Status) + '<br><span class="muted">' + esc(u.Codigo || '') + ' · ' + esc(u.Vaga || '') + '</span>' : '<span class="muted">Banco de talentos</span>') + '</td>' +
+          '<td>' + fmtDate(c.CriadoEm) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    $$('[data-pessoa]', $('#candTable')).forEach(function (tr) { tr.addEventListener('click', function () { openCandidato(tr.dataset.pessoa); }); });
+  }).catch(fail);
+}
+
+function candidatoFields(c) {
+  c = c || {};
+  return [
+    { type: 'section', label: 'Identificação' },
+    { k: 'Nome', label: 'Nome completo', req: true, value: c.Nome, span: 2 },
+    { k: 'CPF', label: 'CPF', value: c.CPF, hint: 'Opcional — usado para evitar cadastros duplicados' },
+    { k: 'Origem', label: 'Origem da candidatura', type: 'select', options: S.lk.origens, value: c.Origem || 'Site' },
+    { k: 'Email', label: 'E-mail', type: 'email', value: c.Email, span: 2 },
+    { k: 'Telefone', label: 'Telefone (com DDD)', value: c.Telefone },
+    { k: 'Cidade', label: 'Cidade', value: c.Cidade },
+    { k: 'UF', label: 'UF', value: c.UF },
+    { k: 'CargoInteresse', label: 'Cargo de interesse', value: c.CargoInteresse, datalist: names(S.lk.cargos), span: 2 },
+    { k: 'Analista', label: 'Analista responsável', type: 'select', options: names(S.lk.analistas), value: c.Analista },
+    { type: 'section', label: 'Perfil profissional' },
+    { k: 'Formacao', label: 'Formação', type: 'textarea', value: c.Formacao, span: 2 },
+    { k: 'Experiencia', label: 'Experiências profissionais', type: 'textarea', value: c.Experiencia, span: 2 },
+    { k: 'Pretensao', label: 'Pretensão salarial', value: c.Pretensao, span: 2 },
+    { k: 'Disponibilidade', label: 'Disponibilidade', value: c.Disponibilidade, span: 2, hint: 'Ex.: imediata, turno noturno, viagens' },
+    { k: 'ConsentimentoLGPD', label: 'Candidato autorizou o tratamento dos dados pessoais (LGPD)', type: 'checkbox', value: c.ConsentimentoLGPD || 'Sim', span: 4 }
+  ];
+}
+
+function candidatoForm(c, after) {
+  formDialog({
+    title: c ? 'Editar candidato ' + c.Codigo : 'Novo candidato', wide: true,
+    intro: c ? '' : 'Informe e-mail ou telefone. O sistema bloqueia cadastros com o mesmo CPF, e-mail ou telefone.',
+    fields: candidatoFields(c),
+    onSubmit: function (x) {
+      if (c) x.ID = c.ID;
+      return api('saveCandidato', x).then(function (r) {
+        toast(c ? 'Cadastro atualizado.' : 'Candidato ' + r.Codigo + ' cadastrado.');
+        if (S.view === 'candidatos') loadCandidatos();
+        if (after) after(r); else setTimeout(function () { openCandidato(r.ID); }, 50);
+      }).catch(function (e) {
+        if (e.duplicadoId && confirm(e.message + '\n\nAbrir o cadastro existente?')) { $('#dlg').close(); openCandidato(e.duplicadoId); }
+        throw e;
+      });
+    }
+  });
+}
+
+function openCandidato(id) { api('getCandidato', { id: id }).then(renderCandidato).catch(fail); }
+
+function renderCandidato(c) {
+  var acts = '';
+  if (canWrite() && c.Anonimizado !== 'Sim') {
+    acts += '<button id="cInscrever">Inscrever em uma vaga</button><button id="cEditar">Editar cadastro</button><button id="cCv">' + (c.temCurriculo ? 'Substituir currículo' : 'Anexar currículo') + '</button>';
+  }
+  if (c.temCurriculo) acts += '<button id="cBaixar">Baixar currículo</button>';
+  if (isAdmin() && c.Anonimizado !== 'Sim') acts += '<button id="cAnon">Anonimizar (LGPD)</button>';
+  var initials = String(c.Nome || '?').split(/\s+/).map(function (w) { return w.charAt(0); }).slice(0, 2).join('').toUpperCase();
+  var info = '<div class="info-card"><div class="avatar">' + esc(initials) + '</div>' +
+    '<div class="info-item">' + icon('chat') + '<div>E-mail: <b>' + esc(c.Email || '—') + '</b><br>Telefone: <b>' + esc(c.Telefone || '—') + '</b></div></div>' +
+    '<div class="info-item">' + icon('building') + '<div>' + esc([c.Cidade, c.UF].filter(Boolean).join('/') || 'Cidade não informada') + '<br>Origem: <b>' + esc(c.Origem || '—') + '</b>' + (c.CPF ? ' · CPF ' + esc(c.CPF) : '') + '</div></div>' +
+    '<div class="info-item">' + icon('file') + '<div>Interesse: <b>' + esc(c.CargoInteresse || '—') + '</b><br>' + (c.Pretensao ? 'Pretensão: <b>' + esc(c.Pretensao) + '</b> · ' : '') + 'Disponib.: ' + esc(c.Disponibilidade || '—') + '</div></div>' +
+    (acts ? '<div class="menu-wrap"><button class="btn primary" id="actMenu">Ações ' + icon('chevron') + '</button><div class="menu-pop hidden" id="actPop">' + acts + '</div></div>' : '<div></div>') + '</div>';
+  var lgpd = '<p class="muted" style="margin:-6px 0 12px">LGPD: consentimento <b>' + esc(c.ConsentimentoLGPD || 'Não') + '</b> · retenção até <b>' + fmtDate(c.ExcluirApos) + '</b>' + (c.temCurriculo ? ' · currículo anexado (acesso restrito)' : ' · sem currículo') + '</p>';
+  var ents = c.entrevistas.length ? '<div class="table-wrap"><table><thead><tr><th>Data</th><th>Vaga</th><th>Tipo</th><th>Entrevistador</th><th>Resultado</th><th>Parecer</th></tr></thead><tbody>' +
+    c.entrevistas.map(function (e) { return '<tr><td>' + fmtDT(e.Agendamento) + '</td><td>' + esc(e.vagaCodigo || '') + '<br><span class="muted">' + esc(e.vagaCargo || '') + '</span></td><td>' + esc(e.Tipo) + '</td><td>' + esc(e.Entrevistador) + '</td><td>' + resultadoBadge(e.Resultado) + (e.MotivoReprovacao ? '<br><span class="muted">' + esc(e.MotivoReprovacao) + '</span>' : '') + '</td><td>' + esc(e.Parecer || '') + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">Nenhuma entrevista.</div>';
+  var hist = c.historico.map(function (h) { return '<div class="item"><span class="muted">' + fmtDate(h.DataHora) + ' · ' + esc(h.Usuario) + '</span><br>' + (h.Para ? (h.De ? esc(h.De) + ' → ' : '') + '<b>' + esc(h.Para) + '</b><br>' : '') + esc(h.Nota) + '</div>'; }).join('') || '<div class="empty">Sem histórico.</div>';
+  var dados = '<div class="kv"><div class="wide"><span>Formação</span><p>' + esc(c.Formacao || '—') + '</p></div><div class="wide"><span>Experiências profissionais</span><p>' + esc(c.Experiencia || '—') + '</p></div>' +
+    '<div><span>Analista</span><p>' + esc(c.Analista || '—') + '</p></div><div><span>Cadastrado em</span><p>' + fmtDate(c.CriadoEm) + '</p></div><div><span>Indicações</span><p>' + (c.indicacoes.length ? c.indicacoes.map(function (i) { return esc(i.Indicador) + ' (' + fmtDate(i.DataIndicacao) + ')'; }).join(', ') : '—') + '</p></div></div>';
+  var html = '<div class="dlg-head"><div><p class="eyebrow">' + esc(c.Codigo) + ' · Candidato</p><h3>' + esc(c.Nome) + '</h3></div>' +
+    '<div style="margin-left:auto;display:flex;gap:8px">' + (c.candidaturas.length > 1 ? '<span class="badge sla-amarelo">Participou de ' + c.candidaturas.length + ' processos</span>' : '') + '</div><button class="btn small" data-close>Fechar</button></div>' +
+    '<div class="dlg-body">' + info + lgpd +
+    '<div class="tabs"><button class="active" data-tab="proc">Processos (' + c.candidaturas.length + ')</button><button data-tab="ent">Entrevistas (' + c.entrevistas.length + ')</button><button data-tab="dados">Perfil</button><button data-tab="hist">Histórico</button></div>' +
+    '<div data-pane="proc">' + candidaturasTable(c.candidaturas, true) + '</div><div data-pane="ent" class="hidden">' + ents + '</div>' +
+    '<div data-pane="dados" class="hidden">' + dados + '</div><div data-pane="hist" class="hidden"><div class="timeline">' + hist + '</div></div></div>';
+  var d = openDialog('#dlg', html);
+  bindTabs(d); bindMenu(d); bindCandidaturaLinks(d);
+  if ($('#cEditar', d)) $('#cEditar', d).addEventListener('click', function () { candidatoForm(c, function () { openCandidato(c.ID); }); });
+  if ($('#cInscrever', d)) $('#cInscrever', d).addEventListener('click', function () { inscreverForm(c); });
+  if ($('#cCv', d)) $('#cCv', d).addEventListener('click', function () { escolherArquivo(function (arq) { api('uploadCurriculo', { id: c.ID, arquivo: arq }).then(function (r) { toast('Currículo anexado.'); renderCandidato(r); }).catch(fail); }); });
+  if ($('#cBaixar', d)) $('#cBaixar', d).addEventListener('click', function () { baixarCurriculo(c.ID); });
+  if ($('#cAnon', d)) $('#cAnon', d).addEventListener('click', function () {
+    formDialog({ title: 'Anonimizar candidato (LGPD)', intro: 'Remove nome, documentos, contatos, currículo e observações. Os registros estatísticos permanecem. <b>Não pode ser desfeito.</b>',
+      fields: [{ k: 'justificativa', label: 'Justificativa', type: 'textarea', req: true, span: 4 }], submit: 'Anonimizar',
+      onSubmit: function (x) { return api('anonimizarCandidato', { id: c.ID, justificativa: x.justificativa }).then(function () { toast('Cadastro anonimizado.'); openCandidato(c.ID); if (S.view === 'candidatos') loadCandidatos(); }); } });
+  });
+}
+
+function bindTabs(d) {
+  $$('[data-tab]', d).forEach(function (b) {
+    b.addEventListener('click', function () {
+      $$('[data-tab]', d).forEach(function (x) { x.classList.toggle('active', x === b); });
+      $$('[data-pane]', d).forEach(function (p) { p.classList.toggle('hidden', p.dataset.pane !== b.dataset.tab); });
+    });
+  });
+}
+function bindMenu(d) {
+  if (!$('#actMenu', d)) return;
+  $('#actMenu', d).addEventListener('click', function (ev) { ev.stopPropagation(); $('#actPop', d).classList.toggle('hidden'); });
+  d.addEventListener('click', function () { var pop = $('#actPop', d); if (pop) pop.classList.add('hidden'); });
+}
+
+function escolherArquivo(cb) {
+  var inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = '.pdf,.doc,.docx,.jpg,.jpeg,.png';
+  inp.onchange = function () {
+    var f = inp.files[0];
+    if (!f) return;
+    if (f.size > 8 * 1024 * 1024) return toast('Arquivo acima de 8 MB.', true);
+    var r = new FileReader();
+    r.onload = function () { cb({ nome: f.name, tipo: f.type, base64: String(r.result).split(',')[1] }); };
+    r.readAsDataURL(f);
+  };
+  inp.click();
+}
+function baixarCurriculo(id) {
+  api('downloadCurriculo', { id: id }).then(function (r) {
+    var bin = atob(r.base64), arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([arr], { type: r.tipo }));
+    a.download = r.nome; a.click();
+  }).catch(fail);
+}
+
+function inscreverForm(c) {
+  vagasAtivas(true).then(function (vagas) {
+    formDialog({
+      title: 'Inscrever ' + c.Nome + ' em uma vaga',
+      fields: [
+        { k: 'vagaId', label: 'Vaga', type: 'select', options: vagaOptions(vagas), req: true, span: 4 },
+        { k: 'Origem', label: 'Origem desta candidatura', type: 'select', options: S.lk.origens, value: c.Origem || 'Site', span: 4 },
+        { k: 'Indicador', label: 'Colaborador que indicou', span: 4, req: true },
+        { k: 'EmpresaIndicador', label: 'Empresa do indicador', type: 'select', options: names(S.lk.empresas), span: 2 },
+        { k: 'DepartamentoIndicador', label: 'Departamento do indicador', type: 'select', options: names(S.lk.departamentos), span: 2 }
+      ],
+      onRender: indicadorToggle,
+      onSubmit: function (x) {
+        x.candidatoId = c.ID;
+        return api('addCandidatura', x).then(function (r) { toast('Inscrição realizada.'); openCandidatura(r.ID); });
+      }
+    });
+  }).catch(fail);
+}
+function indicadorToggle(form) {
+  function sync() {
+    var ind = form.elements.Origem.value === 'Indicação';
+    ['Indicador', 'EmpresaIndicador', 'DepartamentoIndicador'].forEach(function (k) { var w = $('[data-wrap="' + k + '"]', form); if (w) w.classList.toggle('hidden', !ind); });
+  }
+  form.elements.Origem.addEventListener('change', sync); sync();
+}
+
+/* ------------------------------ candidatura (card) ------------------------------ */
+function resultadoBadge(r) {
+  return '<span class="badge ' + (r === 'Aprovado' ? 'sla-verde' : r === 'Reprovado' ? 'sla-vermelho' : 'sla-amarelo') + '">' + esc(r || 'Pendente') + '</span>';
+}
+
+function openCandidatura(id) { api('getCandidatura', { id: id }).then(renderCandidatura).catch(fail); }
+
+function renderCandidatura(c) {
+  var final = c.Etapa === 'Contratado' || c.Etapa === REPROVADO;
+  var perfil = S.user.perfil;
+  var podeEntrevistar = c.podeEditar || perfil === 'Gestor' || perfil === 'Direção';
+  var acts = '<button id="cdPessoa">Ver cadastro do candidato</button>';
+  if (c.podeEditar && c.Etapa !== 'Contratado') acts = '<button id="cdMover">Mover de etapa</button><button id="cdAcao">Atualizar próxima ação</button>' + acts;
+  if (podeEntrevistar && !final) acts = '<button id="cdEnt">' + (c.podeEditar ? 'Agendar entrevista' : 'Registrar entrevista / parecer') + '</button>' + acts;
+  if (c.candidato && c.candidato.temCurriculo) acts += '<button id="cdCv">Baixar currículo</button>';
+  var steps = c.etapasVaga.filter(function (e) { return e !== REPROVADO; });
+  var cur = steps.indexOf(c.Etapa);
+  var stepper = '<div class="stepper">' + steps.map(function (e, i) {
+    var cls = c.Etapa === REPROVADO ? '' : (i < cur || (c.Etapa === 'Contratado' && i === cur) ? 'done' : (i === cur ? 'current' : ''));
+    return '<div class="step ' + cls + '" style="flex-basis:110px">' + (cls === 'done' ? '✓ ' : '') + esc(e) + '</div>';
+  }).join('') + '</div>';
+  var kpis = '<div class="kpis">' +
+    kpiBox('target', esc(c.Etapa), 'Etapa atual', c.Etapa === REPROVADO ? 'red' : (c.Etapa === 'Contratado' ? 'green' : '')) +
+    kpiBox('clock', c.diasNaEtapa === null ? '—' : c.diasNaEtapa + ' d.u.', 'Aguardando nesta etapa', c.diasNaEtapa > 3 ? 'orange' : '') +
+    kpiBox('flag', esc(c.ProximaAcao || '—'), 'Próxima ação') +
+    kpiBox('users', esc(c.Responsavel || '—'), 'Responsável pelo retorno') +
+    kpiBox('calendar', c.PrazoAcao ? fmtDate(c.PrazoAcao) : '—', c.acaoAtrasada ? 'Prazo vencido' : 'Prazo da próxima ação', c.acaoAtrasada ? 'red' : '') + '</div>';
+  var info = '<div class="info-card" style="grid-template-columns: repeat(3, minmax(0,1fr)) auto">' +
+    '<div class="info-item">' + icon('briefcase') + '<div>Vaga: <b>' + esc(c.vagaCodigo) + ' · ' + esc(c.vagaCargo) + '</b><br>Analista: ' + esc(c.analista) + ' · Gestor: ' + esc(c.gestor) + '</div></div>' +
+    '<div class="info-item">' + icon('handshake') + '<div>Origem: <b>' + esc(c.Origem) + '</b>' + (c.Indicador ? '<br>Indicado(a) por <b>' + esc(c.Indicador) + '</b>' : '') + '</div></div>' +
+    '<div class="info-item">' + icon('calendar') + '<div>Inscrição: <b>' + fmtDate(c.DataCandidatura) + '</b><br>' + (c.outrosProcessos ? '<b>Participou de ' + c.outrosProcessos + ' outro(s) processo(s)</b>' : 'Primeiro processo') + '</div></div>' +
+    '<div class="menu-wrap"><button class="btn primary" id="actMenu">Ações ' + icon('chevron') + '</button><div class="menu-pop hidden" id="actPop">' + acts + '</div></div></div>';
+  var ents = c.entrevistas.length ? '<div class="table-wrap"><table><thead><tr><th>Agendamento</th><th>Tipo</th><th>Entrevistador</th><th>Realização</th><th>Resultado</th><th>Parecer</th><th></th></tr></thead><tbody>' +
+    c.entrevistas.map(function (e, i) {
+      var pode = c.podeEditar || (perfil === 'Gestor' && e.Tipo === 'Gestor') || (perfil === 'Direção' && e.Tipo === 'Direção');
+      return '<tr><td>' + fmtDT(e.Agendamento) + '</td><td>' + esc(e.Tipo) + '</td><td>' + esc(e.Entrevistador) + '</td><td>' + fmtDate(e.Realizacao) + '</td><td>' + resultadoBadge(e.Resultado) + (e.MotivoReprovacao ? '<br><span class="muted">' + esc(e.MotivoReprovacao) + '</span>' : '') + '</td><td>' + esc(e.Parecer || '') + '</td><td>' + (pode ? '<button class="btn small" data-ent="' + i + '">Registrar resultado</button>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table></div>' : '<div class="empty">Nenhuma entrevista registrada.</div>';
+  var tempos = '<div class="table-wrap"><table><thead><tr><th>Etapa</th><th>Entrada</th><th>Saída</th><th>Tempo</th><th>Responsável</th><th>Motivo do atraso</th></tr></thead><tbody>' +
+    c.etapas.map(function (e) { return '<tr><td>' + esc(e.Etapa) + '</td><td>' + fmtDate(e.Entrada) + '</td><td>' + (e.Saida ? fmtDate(e.Saida) : '<span class="badge sla-amarelo">atual</span>') + '</td><td><b>' + e.dias + '</b> d.u.</td><td>' + esc(e.Responsavel || '—') + '</td><td>' + esc(e.MotivoAtraso || '') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+  var hist = c.historico.map(function (h) { return '<div class="item"><span class="muted">' + fmtDate(h.DataHora) + ' · ' + esc(h.Usuario) + '</span><br>' + (h.Para ? (h.De ? esc(h.De) + ' → ' : '') + '<b>' + esc(h.Para) + '</b><br>' : '') + esc(h.Nota) + '</div>'; }).join('');
+  var obs = c.Observacoes !== undefined ? '<button data-tab="obs">Observações (restrito)</button>' : '';
+  var html = '<div class="dlg-head"><div><p class="eyebrow">' + esc(c.candidatoCodigo) + ' · Candidatura</p><h3>' + esc(c.nome) + '</h3></div>' +
+    '<div style="margin-left:auto">' + etapaBadge(c.Etapa, c.Status) + '</div><button class="btn small" data-close>Fechar</button></div>' + stepper +
+    '<div class="dlg-body">' + info + kpis + (c.MotivoReprovacao ? '<div class="form-error">Motivo: ' + esc(c.MotivoReprovacao) + '</div>' : '') +
+    '<div class="tabs"><button class="active" data-tab="ent">Entrevistas (' + c.entrevistas.length + ')</button><button data-tab="tempo">Tempo por etapa</button>' + obs + '<button data-tab="hist">Histórico</button></div>' +
+    '<div data-pane="ent">' + ents + '</div><div data-pane="tempo" class="hidden">' + tempos + '</div>' +
+    (obs ? '<div data-pane="obs" class="hidden"><div class="kv"><div class="wide"><p>' + esc(c.Observacoes || 'Sem observações.') + '</p></div></div></div>' : '') +
+    '<div data-pane="hist" class="hidden"><div class="timeline">' + hist + '</div></div></div>';
+  var d = openDialog('#dlg', html);
+  bindTabs(d); bindMenu(d);
+  function done(r, msg) { toast(msg); renderCandidatura(r); if (S.view === 'kanban') loadKanban(); if (S.view === 'entrevistas') loadEntrevistas(); }
+  $('#cdPessoa', d).addEventListener('click', function () { openCandidato(c.CandidatoID); });
+  if ($('#cdCv', d)) $('#cdCv', d).addEventListener('click', function () { baixarCurriculo(c.CandidatoID); });
+  if ($('#cdMover', d)) $('#cdMover', d).addEventListener('click', function () { moverForm(c, null, function (r) { done(r, 'Candidato movido para ' + r.Etapa + '.'); }); });
+  if ($('#cdAcao', d)) $('#cdAcao', d).addEventListener('click', function () {
+    formDialog({ title: 'Próxima ação — ' + c.nome, fields: [
+      { k: 'proximaAcao', label: 'Próxima ação', value: c.ProximaAcao, req: true, span: 4 },
+      { k: 'responsavel', label: 'Responsável pelo retorno', value: c.Responsavel, req: true, span: 2, datalist: [c.analista, c.gestor, 'Direção', 'Candidato', 'DP'] },
+      { k: 'prazoAcao', label: 'Prazo', type: 'date', value: c.PrazoAcao, req: true, span: 2 },
+      { k: 'observacao', label: 'Observação (restrita ao RH)', type: 'textarea', span: 4 }],
+      onSubmit: function (x) { x.id = c.ID; return api('updateCandidaturaAcao', x).then(function (r) { done(r, 'Próxima ação atualizada.'); }); } });
+  });
+  if ($('#cdEnt', d)) $('#cdEnt', d).addEventListener('click', function () { entrevistaForm(c, null); });
+  $$('[data-ent]', d).forEach(function (b) { b.addEventListener('click', function () { entrevistaForm(c, c.entrevistas[+b.dataset.ent]); }); });
+}
+
+function kpiBox(ic, value, label, cls) { return '<div class="kpi ' + (cls || '') + '"><div class="k-ic">' + icon(ic) + '</div><strong style="font-size:15px">' + value + '</strong><span>' + label + '</span></div>'; }
+
+/** Formulário de movimentação (com motivo de reprovação, data de contratação e motivo de atraso). */
+function moverForm(c, etapaDestino, cb) {
+  var limite = Number(S.lk.config.SEM_MOVIMENTACAO_DIAS || 3);
+  var fields = [
+    { k: 'etapa', label: 'Mover para', type: 'select', options: c.etapasVaga.filter(function (e) { return e !== c.Etapa; }), value: etapaDestino || '', req: true, span: 4 },
+    { k: 'motivoReprovacao', label: 'Motivo da reprovação / desistência', type: 'select', options: S.lk.motivosReprovacao, req: true, span: 4 },
+    { k: 'data', label: 'Data da contratação', type: 'date', value: todayIso(), span: 4, hint: 'Preenche a próxima posição aberta da vaga.' },
+    { k: 'proximaAcao', label: 'Próxima ação', span: 4, hint: 'Deixe vazio para usar a ação padrão da etapa.' },
+    { k: 'prazoAcao', label: 'Prazo da próxima ação', type: 'date', span: 2 },
+    { k: 'responsavel', label: 'Responsável', span: 2, datalist: [c.analista, c.gestor, 'Direção', 'Candidato', 'DP'] },
+    { k: 'motivoAtraso', label: 'Motivo do atraso nesta etapa', span: 4, hint: 'Aguardou ' + (c.diasNaEtapa || 0) + ' dia(s) útil(eis) na etapa atual.' },
+    { k: 'observacao', label: 'Observação (restrita ao RH)', type: 'textarea', span: 4 }
+  ];
+  formDialog({
+    title: 'Mover ' + c.nome, fields: fields, submit: 'Mover',
+    onRender: function (form) {
+      function sync() {
+        var e = form.elements.etapa.value;
+        $('[data-wrap="motivoReprovacao"]', form).classList.toggle('hidden', e !== REPROVADO);
+        $('[data-wrap="data"]', form).classList.toggle('hidden', e !== 'Contratado');
+        ['proximaAcao', 'prazoAcao', 'responsavel'].forEach(function (k) { $('[data-wrap="' + k + '"]', form).classList.toggle('hidden', e === 'Contratado' || e === REPROVADO); });
+        $('[data-wrap="motivoAtraso"]', form).classList.toggle('hidden', !(c.diasNaEtapa > limite));
+      }
+      form.elements.etapa.addEventListener('change', sync); sync();
+    },
+    onSubmit: function (x) { x.id = c.ID; return api('moveCandidatura', x).then(cb); }
+  });
+}
+
+/* ------------------------------ entrevistas ------------------------------ */
+function entrevistaForm(c, e) {
+  var perfil = S.user.perfil;
+  var tipos = c.podeEditar ? S.lk.tiposEntrevista : (perfil === 'Gestor' ? ['Gestor'] : ['Direção']);
+  var tipoInicial = e ? e.Tipo : (tipos.length === 1 ? tipos[0] : ({ 'Entrevista gestor': 'Gestor', 'Entrevista direção': 'Direção' }[c.Etapa] || 'RH'));
+  var entrevistadorPadrao = { RH: c.analista, Gestor: c.gestor, 'Direção': '' };
+  var proximas = c.etapasVaga.filter(function (x) { return x !== REPROVADO && x !== 'Contratado'; });
+  formDialog({
+    title: (e ? 'Entrevista ' + e.Tipo : 'Agendar entrevista') + ' — ' + c.nome, wide: true,
+    intro: e ? '' : 'Ao agendar, o candidato é movido automaticamente para a etapa da entrevista.',
+    fields: [
+      { k: 'Tipo', label: 'Tipo', type: 'select', options: tipos, value: tipoInicial, req: true, placeholder: undefined },
+      { k: 'Agendamento', label: 'Data e horário', type: 'datetime-local', value: e ? String(e.Agendamento).replace(' ', 'T') : '', req: true },
+      { k: 'Entrevistador', label: 'Entrevistador', value: e ? e.Entrevistador : (entrevistadorPadrao[tipoInicial] || (perfil !== 'Administrador RH' && perfil !== 'Analista RH' ? S.user.nome : '')), req: true, span: 2 },
+      { type: 'section', label: 'Resultado (preencha após a entrevista)' },
+      { k: 'Resultado', label: 'Resultado', type: 'select', options: S.lk.resultadosEntrevista, value: e ? e.Resultado : 'Pendente', placeholder: undefined },
+      { k: 'Realizacao', label: 'Data de realização', type: 'date', value: e ? e.Realizacao : '' },
+      { k: 'MotivoReprovacao', label: 'Motivo da reprovação', type: 'select', options: S.lk.motivosReprovacao, value: e ? e.MotivoReprovacao : '', req: true, span: 2 },
+      { k: 'ProximaEtapa', label: 'Próxima etapa', type: 'select', options: proximas, value: e ? e.ProximaEtapa : '', span: 2, hint: 'O candidato é movido automaticamente.' },
+      { k: 'RetornoPrevisto', label: 'Data prevista de retorno', type: 'date', value: e ? e.RetornoPrevisto : '', span: 2 },
+      { k: 'Parecer', label: 'Parecer da entrevista', type: 'textarea', value: e ? e.Parecer : '', span: 4 }
+    ],
+    onRender: function (form) {
+      function sync() {
+        var r = form.elements.Resultado.value;
+        $('[data-wrap="MotivoReprovacao"]', form).classList.toggle('hidden', r !== 'Reprovado');
+        $('[data-wrap="ProximaEtapa"]', form).classList.toggle('hidden', r !== 'Aprovado');
+      }
+      form.elements.Resultado.addEventListener('change', sync);
+      form.elements.Tipo.addEventListener('change', function () { if (!e && entrevistadorPadrao[form.elements.Tipo.value] !== undefined && c.podeEditar) form.elements.Entrevistador.value = entrevistadorPadrao[form.elements.Tipo.value]; });
+      sync();
+    },
+    onSubmit: function (x) {
+      x.CandidaturaID = c.ID;
+      if (e) x.ID = e.ID;
+      return api('saveEntrevista', x).then(function (r) {
+        toast('Entrevista salva.');
+        renderCandidatura(r);
+        if (S.view === 'kanban') loadKanban();
+        if (S.view === 'entrevistas') loadEntrevistas();
+      });
+    }
+  });
+}
+
+function initEntrevistas() {
+  $('#entTipo').innerHTML = options(S.lk.tiposEntrevista, '', 'Tipo: todos');
+  var t;
+  ['#entSituacao', '#entTipo', '#entDe', '#entAte'].forEach(function (s) { $(s).addEventListener('change', loadEntrevistas); });
+  $('#entBusca').addEventListener('input', function () { clearTimeout(t); t = setTimeout(loadEntrevistas, 300); });
+  $('#entNova').addEventListener('click', function () {
+    api('kanban', {}).then(function (k) {
+      var ativos = k.cards.filter(function (c) { return c.Etapa !== 'Contratado' && c.Etapa !== REPROVADO && (c.podeEditar || S.user.perfil !== 'Analista RH'); });
+      if (!ativos.length) return toast('Nenhum candidato em processo para agendar.', true);
+      formDialog({ title: 'Agendar entrevista', fields: [{ k: 'cand', label: 'Candidato', type: 'select', options: ativos.map(function (c) { return { value: c.ID, label: c.nome + ' — ' + c.vagaCodigo + ' · ' + c.vagaCargo + ' (' + c.Etapa + ')' }; }), req: true, span: 4 }], submit: 'Continuar',
+        onSubmit: function (x) { return api('getCandidatura', { id: x.cand }).then(function (c) { setTimeout(function () { entrevistaForm(c, null); }, 30); }); } });
+    }).catch(fail);
+  });
+}
+
+function loadEntrevistas() {
+  setSync('Carregando entrevistas…');
+  var f = { situacao: $('#entSituacao').value, Tipo: $('#entTipo').value, de: $('#entDe').value, ate: $('#entAte').value, busca: $('#entBusca').value };
+  return Promise.all([api('listEntrevistas', f), api('listEntrevistas', {})]).then(function (r) {
+    var list = r[0], todas = r[1];
+    var agora = new Date().toISOString().substr(0, 10);
+    var agendadas = todas.filter(function (e) { return e.Resultado === 'Pendente' && !e.atrasada; }).length;
+    var hoje = todas.filter(function (e) { return (e.Agendamento || '').substr(0, 10) === todayIso(); }).length;
+    var semResultado = todas.filter(function (e) { return e.atrasada; }).length;
+    var realizadas = todas.filter(function (e) { return e.Resultado !== 'Pendente'; });
+    var aprov = realizadas.filter(function (e) { return e.Resultado === 'Aprovado'; }).length;
+    $('#entCards').innerHTML = card('Entrevistas hoje', hoje, 'accent', '', 'calendar') + card('Agendadas', agendadas, '', 'a realizar', 'clock') +
+      card('Sem resultado registrado', semResultado, semResultado ? 'red' : '', 'data já passou', 'alert') + card('Realizadas', realizadas.length, '', '', 'check') +
+      card('Taxa de aprovação', realizadas.length ? Math.round(aprov / realizadas.length * 100) + '%' : '—', 'green', aprov + ' aprovada(s)', 'userCheck');
+    setSync(list.length + ' entrevista(s)');
+    if (!list.length) { $('#entTable').innerHTML = '<div class="empty">Nenhuma entrevista para os filtros.</div>'; return; }
+    $('#entTable').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Data e horário</th><th>Candidato</th><th>Vaga</th><th>Tipo</th><th>Entrevistador</th><th>Resultado</th><th>Etapa atual</th><th>Retorno</th></tr></thead><tbody>' +
+      list.map(function (e) {
+        return '<tr class="clickable" data-cand="' + esc(e.CandidaturaID) + '"><td><b>' + fmtDT(e.Agendamento) + '</b>' + (e.atrasada ? '<br><span class="late">sem resultado</span>' : '') + '</td><td>' + esc(e.nome) + '</td>' +
+          '<td><span class="code">' + esc(e.vagaCodigo || '') + '</span><br>' + esc(e.vagaCargo || '') + '</td><td>' + esc(e.Tipo) + '</td><td>' + esc(e.Entrevistador) + '</td>' +
+          '<td>' + resultadoBadge(e.Resultado) + (e.MotivoReprovacao ? '<br><span class="muted">' + esc(e.MotivoReprovacao) + '</span>' : '') + '</td><td>' + etapaBadge(e.etapaAtual) + '</td><td>' + fmtDate(e.RetornoPrevisto) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    bindCandidaturaLinks($('#entTable'));
+  }).catch(fail);
+}
+
+/* ------------------------------ kanban ------------------------------ */
+function initKanban() {
+  $('#kbAnalista').innerHTML = options(names(S.lk.analistas), '', 'Analista: todos');
+  var t;
+  $('#kbVaga').addEventListener('change', function () { S.kbVaga = $('#kbVaga').value; loadKanban(); });
+  $('#kbAnalista').addEventListener('change', loadKanban);
+  $('#kbBusca').addEventListener('input', function () { clearTimeout(t); t = setTimeout(loadKanban, 250); });
+  $('#kbAdd').addEventListener('click', function () { adicionarNaVaga(S.kbVaga); });
+}
+
+function loadKanban() {
+  setSync('Carregando quadro…');
+  return api('kanban', { vagaId: S.kbVaga || '', Analista: $('#kbAnalista').value, busca: $('#kbBusca').value }).then(function (k) {
+    S.kb = k;
+    $('#kbVaga').innerHTML = '<option value="">Todas as vagas ativas</option>' + options(k.vagasAtivas.map(function (v) { return { value: v.ID, label: v.Codigo + ' · ' + v.Cargo + ' · ' + v.Unidade }; }), S.kbVaga || '');
+    if (S.kbVaga && !k.vagasAtivas.some(function (v) { return v.ID === S.kbVaga; }) && k.vaga) $('#kbVaga').insertAdjacentHTML('beforeend', '<option value="' + esc(k.vaga.ID) + '" selected>' + esc(k.vaga.Codigo + ' · ' + k.vaga.Cargo + ' (' + k.vaga.Status + ')') + '</option>');
+    var podeAdd = canWrite() && k.vaga && k.vaga.podeEditar;
+    $('#kbAdd').classList.toggle('hidden', !podeAdd);
+    $('#kbHint').textContent = k.vaga ? 'Arraste os cards entre as colunas para movimentar. As etapas exibidas são as configuradas para esta vaga.' : 'Mostrando candidatos de todas as vagas ativas. Selecione uma vaga para adicionar candidatos e ver só as etapas dela.';
+    renderBoard(k);
+    setSync(k.cards.length + ' candidato(s) no quadro');
+  }).catch(fail);
+}
+
+function renderBoard(k) {
+  var porEtapa = {};
+  k.cards.forEach(function (c) { (porEtapa[c.Etapa] = porEtapa[c.Etapa] || []).push(c); });
+  $('#kbBoard').innerHTML = k.colunas.map(function (col) {
+    var cards = (porEtapa[col] || []).sort(function (a, b) { return (b.diasNaEtapa || 0) - (a.diasNaEtapa || 0); });
+    var cls = col === REPROVADO ? 'reprovado' : (col === 'Contratado' ? 'contratado' : '');
+    return '<div class="col ' + cls + '" data-col="' + esc(col) + '"><div class="col-head">' + esc(col) + '<span class="count">' + cards.length + '</span></div><div class="col-body">' +
+      cards.map(kcardHtml).join('') + '</div></div>';
+  }).join('');
+  $$('.kcard', $('#kbBoard')).forEach(function (el) {
+    el.addEventListener('click', function () { openCandidatura(el.dataset.id); });
+    el.addEventListener('dragstart', function (ev) { ev.dataTransfer.setData('text/plain', el.dataset.id); el.classList.add('dragging'); });
+    el.addEventListener('dragend', function () { el.classList.remove('dragging'); });
+  });
+  $$('.col', $('#kbBoard')).forEach(function (col) {
+    col.addEventListener('dragover', function (ev) { ev.preventDefault(); col.classList.add('drag-over'); });
+    col.addEventListener('dragleave', function () { col.classList.remove('drag-over'); });
+    col.addEventListener('drop', function (ev) {
+      ev.preventDefault(); col.classList.remove('drag-over');
+      var id = ev.dataTransfer.getData('text/plain');
+      var card = S.kb.cards.filter(function (c) { return c.ID === id; })[0];
+      if (card && card.Etapa !== col.dataset.col) soltarCard(card, col.dataset.col);
+    });
+  });
+}
+
+function kcardHtml(c) {
+  var final = c.Etapa === 'Contratado' || c.Etapa === REPROVADO;
+  var cls = c.Etapa === 'Contratado' ? 'done' : (c.Etapa === REPROVADO ? 'rep' : (c.acaoAtrasada ? 'late' : ''));
+  var arrasta = c.podeEditar && c.Etapa !== 'Contratado';
+  return '<div class="kcard ' + cls + '" data-id="' + esc(c.ID) + '"' + (arrasta ? ' draggable="true"' : '') + '>' +
+    '<h4>' + esc(c.nome) + '</h4>' +
+    (S.kb && S.kb.vaga ? '' : '<div><span class="code">' + esc(c.vagaCodigo) + '</span> · ' + esc(c.vagaCargo) + '</div>') +
+    '<div class="muted">Analista: ' + esc(c.analista) + (c.Origem === 'Indicação' ? ' · <span class="pill">Indicação</span>' : '') + '</div>' +
+    (final ? (c.MotivoReprovacao ? '<div class="ln"><span>' + esc(c.MotivoReprovacao) + '</span></div>' : '<div class="ln"><span>Concluído em ' + fmtDate(c.DataConclusao) + '</span></div>') :
+      '<div class="ln"><span>Desde ' + fmtDate(c.EntradaEtapa).substr(0, 10) + '</span><b' + (c.diasNaEtapa > 3 ? ' class="late-txt"' : '') + '>' + c.diasNaEtapa + ' d.u.</b></div>' +
+      '<div class="ln"><span>▸ ' + esc(c.ProximaAcao || 'Definir próxima ação') + '</span></div>' +
+      '<div class="ln"><span>' + esc(c.Responsavel || '—') + '</span><span class="' + (c.acaoAtrasada ? 'late-txt' : '') + '">' + (c.PrazoAcao ? 'até ' + fmtDate(c.PrazoAcao).substr(0, 5) : '') + '</span></div>') +
+    '</div>';
+}
+
+function soltarCard(card, etapa) {
+  var limite = Number(S.lk.config.SEM_MOVIMENTACAO_DIAS || 3);
+  var precisaForm = etapa === REPROVADO || etapa === 'Contratado' || card.diasNaEtapa > limite;
+  var cdt = { ID: card.ID, nome: card.nome, Etapa: card.Etapa, diasNaEtapa: card.diasNaEtapa, analista: card.analista, gestor: card.gestor,
+    etapasVaga: S.kb.vaga ? S.kb.colunas : S.lk.etapasKanban };
+  if (precisaForm) return moverForm(cdt, etapa, function () { toast('Movido para ' + etapa + '.'); loadKanban(); });
+  api('moveCandidatura', { id: card.ID, etapa: etapa }).then(function () { toast(card.nome + ' → ' + etapa); loadKanban(); }).catch(function (e) { fail(e); loadKanban(); });
+}
+
+/** Adiciona candidato (existente ou novo) à vaga selecionada no Kanban. */
+function adicionarNaVaga(vagaId) {
+  api('listCandidatos', {}).then(function (lista) {
+    var mapa = {};
+    var opcoes = lista.filter(function (c) { return c.Anonimizado !== 'Sim'; }).map(function (c) { var l = c.Nome + ' — ' + c.Codigo; mapa[l] = c.ID; return l; });
+    formDialog({
+      title: 'Adicionar candidato à vaga', wide: true,
+      fields: [
+        { k: 'modo', label: 'Candidato', type: 'select', options: ['Já cadastrado', 'Novo cadastro'], value: opcoes.length ? 'Já cadastrado' : 'Novo cadastro', placeholder: undefined, span: 4 },
+        { k: 'existente', label: 'Buscar candidato cadastrado', datalist: opcoes, req: true, span: 4, hint: 'Digite o nome ou código e escolha da lista.' },
+        { k: 'Nome', label: 'Nome completo', req: true, span: 2 },
+        { k: 'CPF', label: 'CPF' },
+        { k: 'Telefone', label: 'Telefone (com DDD)' },
+        { k: 'Email', label: 'E-mail', type: 'email', span: 2 },
+        { k: 'Cidade', label: 'Cidade' },
+        { k: 'UF', label: 'UF' },
+        { k: 'Origem', label: 'Origem da candidatura', type: 'select', options: S.lk.origens, value: 'Site', placeholder: undefined, span: 4 },
+        { k: 'Indicador', label: 'Colaborador que indicou', req: true, span: 2 },
+        { k: 'EmpresaIndicador', label: 'Empresa do indicador', type: 'select', options: names(S.lk.empresas) },
+        { k: 'DepartamentoIndicador', label: 'Departamento do indicador', type: 'select', options: names(S.lk.departamentos) },
+        { k: 'ConsentimentoLGPD', label: 'Candidato autorizou o tratamento dos dados (LGPD)', type: 'checkbox', value: 'Sim', span: 4 }
+      ],
+      onRender: function (form) {
+        function sync() {
+          var novo = form.elements.modo.value === 'Novo cadastro';
+          $('[data-wrap="existente"]', form).classList.toggle('hidden', novo);
+          ['Nome', 'CPF', 'Telefone', 'Email', 'Cidade', 'UF', 'ConsentimentoLGPD'].forEach(function (k) { $('[data-wrap="' + k + '"]', form).classList.toggle('hidden', !novo); });
+        }
+        form.elements.modo.addEventListener('change', sync); sync();
+        indicadorToggle(form);
+      },
+      onSubmit: function (x) {
+        var p = { vagaId: vagaId, Origem: x.Origem, Indicador: x.Indicador, EmpresaIndicador: x.EmpresaIndicador, DepartamentoIndicador: x.DepartamentoIndicador };
+        if (x.modo === 'Já cadastrado') {
+          p.candidatoId = mapa[x.existente];
+          if (!p.candidatoId) return Promise.reject(new Error('Escolha um candidato da lista.'));
+        } else {
+          p.candidato = { Nome: x.Nome, CPF: x.CPF, Telefone: x.Telefone, Email: x.Email, Cidade: x.Cidade, UF: x.UF, ConsentimentoLGPD: x.ConsentimentoLGPD };
+        }
+        return api('addCandidatura', p).then(function (r) { toast(r.nome + ' adicionado(a) à vaga.'); loadKanban(); })
+          .catch(function (e) { if (e.duplicadoId) e.message += ' Selecione "Já cadastrado" e busque pelo nome.'; throw e; });
+      }
+    });
+  }).catch(fail);
+}
+
+/* ------------------------------ indicações ------------------------------ */
+function initIndicacoes() {
+  var t;
+  $('#indBusca').addEventListener('input', function () { clearTimeout(t); t = setTimeout(loadIndicacoes, 300); });
+  $('#indNova').classList.toggle('hidden', !canWrite());
+  $('#indNova').addEventListener('click', indicacaoForm);
+}
+
+function loadIndicacoes() {
+  if (S.user.perfil === 'Gestor') { $('#indTable').innerHTML = '<div class="empty">Seu perfil não acessa o controle de indicações.</div>'; return; }
+  setSync('Carregando indicações…');
+  return api('listIndicacoes', { busca: $('#indBusca').value }).then(function (r) {
+    var i = r.indicadores;
+    $('#indCards').innerHTML = card('Indicações recebidas', i.total, 'accent', '', 'handshake') + card('Indicados contratados', i.contratados, 'green', '', 'userCheck') +
+      card('Taxa de conversão', i.taxa === null ? '—' : i.taxa + '%', '', 'contratados ÷ indicações', 'chart') + card('Em andamento', i.emAndamento, '', '', 'clock') +
+      card('Colaborador que mais indicou', i.indicadores[0] ? '<span class="txt">' + esc(i.indicadores[0].label) + '</span>' : '—', '', i.indicadores[0] ? i.indicadores[0].valor + ' indicação(ões)' : '', 'users');
+    barChart('chIndCargos', i.cargos.map(function (x) { return x.label; }), [{ label: 'Indicações', data: i.cargos.map(function (x) { return x.valor; }), backgroundColor: '#f2c200' }], { indexAxis: 'y' });
+    doughnut('chIndOrigem', i.origens.map(function (x) { return x.label; }), i.origens.map(function (x) { return x.valor; }));
+    setSync(r.linhas.length + ' indicação(ões)');
+    if (!r.linhas.length) { $('#indTable').innerHTML = '<div class="empty">Nenhuma indicação registrada.</div>'; return; }
+    $('#indTable').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Data</th><th>Indicado</th><th>Cargo pretendido</th><th>Indicado por</th><th>Vaga</th><th>Etapa</th><th>Resultado</th><th>Contratação</th></tr></thead><tbody>' +
+      r.linhas.map(function (x) {
+        return '<tr class="clickable" data-pessoa="' + esc(x.CandidatoID) + '"><td>' + fmtDate(x.DataIndicacao) + '</td><td><b>' + esc(x.nome) + '</b><br><span class="code">' + esc(x.candidatoCodigo || '') + '</span>' +
+          (x.processosAnteriores ? ' <span class="badge sla-amarelo">' + x.processosAnteriores + ' processo(s) anterior(es)</span>' : '') + '</td><td>' + esc(x.cargo || '—') + '</td>' +
+          '<td>' + esc(x.Indicador) + '<br><span class="muted">' + esc([x.EmpresaIndicador, x.DepartamentoIndicador].filter(Boolean).join(' · ')) + '</span></td>' +
+          '<td>' + (x.vagaCodigo ? '<span class="code">' + esc(x.vagaCodigo) + '</span><br>' + esc(x.vagaCargo) : '<span class="muted">Banco de talentos</span>') + '</td>' +
+          '<td>' + (x.etapa ? etapaBadge(x.etapa) : '—') + '</td><td>' + esc(x.Resultado) + '</td><td>' + fmtDate(x.DataContratacao) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    $$('[data-pessoa]', $('#indTable')).forEach(function (tr) { tr.addEventListener('click', function () { openCandidato(tr.dataset.pessoa); }); });
+  }).catch(fail);
+}
+
+function indicacaoForm() {
+  vagasAtivas(true).then(function (vagas) {
+    formDialog({
+      title: 'Nova indicação', wide: true,
+      intro: 'Se o indicado já tiver cadastro (mesmo CPF, e-mail ou telefone), a indicação é vinculada ao cadastro existente.',
+      fields: [
+        { type: 'section', label: 'Indicado' },
+        { k: 'Nome', label: 'Nome completo', req: true, span: 2 },
+        { k: 'Telefone', label: 'Telefone (com DDD)' },
+        { k: 'CPF', label: 'CPF' },
+        { k: 'Email', label: 'E-mail', type: 'email', span: 2 },
+        { k: 'CargoPretendido', label: 'Cargo pretendido', datalist: names(S.lk.cargos), span: 2 },
+        { type: 'section', label: 'Quem indicou' },
+        { k: 'Indicador', label: 'Colaborador que indicou', req: true, span: 2 },
+        { k: 'EmpresaIndicador', label: 'Empresa', type: 'select', options: names(S.lk.empresas) },
+        { k: 'DepartamentoIndicador', label: 'Departamento', type: 'select', options: names(S.lk.departamentos) },
+        { k: 'DataIndicacao', label: 'Data da indicação', type: 'date', value: todayIso() },
+        { k: 'vagaId', label: 'Inscrever já numa vaga (opcional)', type: 'select', options: vagaOptions(vagas), placeholder: 'Não — manter no banco de talentos', span: 3 },
+        { k: 'Observacoes', label: 'Observações', type: 'textarea', span: 4 },
+        { k: 'ConsentimentoLGPD', label: 'Indicado autorizou o tratamento dos dados (LGPD)', type: 'checkbox', value: 'Sim', span: 4 }
+      ],
+      onSubmit: function (x) {
+        return api('saveIndicacao', x).then(function (r) {
+          toast(r.jaExistia ? 'Indicação registrada no cadastro já existente do candidato.' : 'Indicação registrada.');
+          loadIndicacoes();
+        });
+      }
+    });
+  }).catch(fail);
+}
+
+/* ------------------------------ inicialização da Fase 2 ------------------------------ */
+(function aguardarBootstrap() {
+  if (!S.lk) return setTimeout(aguardarBootstrap, 100);
+  initCandidatos(); initKanban(); initEntrevistas(); initIndicacoes();
+})();
 </script>
 
 </body>

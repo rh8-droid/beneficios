@@ -33,6 +33,9 @@ function getLookups() {
     prioridades: VT.PRIORIDADES,
     etapasKanban: VT.ETAPAS_KANBAN,
     motivosReprovacao: VT.MOTIVOS_REPROVACAO,
+    origens: VT.ORIGENS_CANDIDATURA,
+    tiposEntrevista: VT.TIPOS_ENTREVISTA,
+    resultadosEntrevista: VT.RESULTADOS_ENTREVISTA,
     perfis: VT.PERFIS,
     config: configMap_()
   };

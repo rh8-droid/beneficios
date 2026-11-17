@@ -91,9 +91,21 @@ function createBackend(opts = {}) {
     Utilities: {
       formatDate,
       getUuid: () => crypto.randomUUID(),
-      base64Encode: b => Buffer.from(b).toString('base64')
+      base64Encode: b => Buffer.from(b).toString('base64'),
+      base64Decode: s => Array.from(Buffer.from(s, 'base64')),
+      newBlob: (bytes, type, name) => ({ getBytes: () => bytes, getContentType: () => type, getName: () => name })
     },
-    DriveApp: { getFileById() { throw new Error('Drive indisponível no ambiente local'); } },
+    DriveApp: (() => {
+      const files = {}, folders = {};
+      const mkFile = (blob) => { const id = 'F' + crypto.randomUUID().slice(0, 8); const f = { id, blob, trashed: false, getId: () => id, getBlob: () => blob, setTrashed(t) { f.trashed = t; } }; files[id] = f; return f; };
+      const mkFolder = (name) => { const id = 'D' + crypto.randomUUID().slice(0, 8); const d = { id, name, getId: () => id, createFile: mkFile }; folders[id] = d; return d; };
+      return {
+        _files: files,
+        createFolder: mkFolder,
+        getFolderById(id) { if (!folders[id]) throw new Error('pasta inexistente'); return folders[id]; },
+        getFileById(id) { if (!files[id]) throw new Error('arquivo inexistente'); return files[id]; }
+      };
+    })(),
     HtmlService: {}
   };
   vm.createContext(sandbox);

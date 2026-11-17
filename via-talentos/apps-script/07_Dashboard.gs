@@ -77,6 +77,8 @@ function getDashboard(filtros) {
   // 3. Tempo médio em cada etapa (status) da vaga — a partir do histórico
   var tempoEtapa = tempoPorStatus_(vagas, core, today);
 
+  var etapasCand = tempoEtapasCandidato_(ids, core, today);
+
   // 4/7. Funil e conversão por etapa
   var maxEtapa = {};
   cands.forEach(function (c) { var i = idx(c.Etapa); if (i >= 0 && i !== idxReprov) maxEtapa[c.ID] = i; });
@@ -156,6 +158,8 @@ function getDashboard(filtros) {
       mensal: meses.map(function (m) { return { label: m, abertas: abertasMes[m] || 0, fechadas: fechadasMes[m] || 0, canceladas: canceladasMes[m] || 0 }; }),
       tempoCargo: tempoCargo,
       tempoEtapa: tempoEtapa,
+      tempoEtapaCandidato: etapasCand.tempos,
+      pendencias: etapasCand.pendencias,
       funil: funil,
       conversao: conversao,
       motivos: motivos,

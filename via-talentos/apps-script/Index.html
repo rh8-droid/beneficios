@@ -22,10 +22,10 @@
       <nav class="nav" id="nav">
         <button data-view="dashboard" class="active"><i data-icon="grid"></i>Dashboard</button>
         <button data-view="vagas"><i data-icon="briefcase"></i>Gestão de Vagas</button>
-        <button data-view="candidatos"><i data-icon="users"></i>Candidatos<span class="tag">Fase 2</span></button>
-        <button data-view="kanban"><i data-icon="columns"></i>Kanban do Recrutamento<span class="tag">Fase 2</span></button>
-        <button data-view="entrevistas"><i data-icon="chat"></i>Entrevistas<span class="tag">Fase 2</span></button>
-        <button data-view="indicacoes"><i data-icon="handshake"></i>Indicações<span class="tag">Fase 2</span></button>
+        <button data-view="candidatos"><i data-icon="users"></i>Candidatos</button>
+        <button data-view="kanban"><i data-icon="columns"></i>Kanban do Recrutamento</button>
+        <button data-view="entrevistas"><i data-icon="chat"></i>Entrevistas</button>
+        <button data-view="indicacoes"><i data-icon="handshake"></i>Indicações</button>
         <button data-view="sla"><i data-icon="clock"></i>SLA e Gargalos</button>
         <button data-view="relatorios"><i data-icon="chart"></i>Indicadores e Relatórios<span class="tag">Fase 3</span></button>
         <button data-view="artes"><i data-icon="image"></i>Gerador de Artes<span class="tag">Fase 4</span></button>
@@ -106,8 +106,64 @@
           <section class="panel"><h2>Ranking de etapas com maior tempo de espera</h2><p class="sub">Tempo médio (dias úteis) em cada status, com o responsável típico pela próxima ação. Mede tempo de espera, não produtividade individual.</p><div id="slaRanking"></div></section>
           <section class="panel"><h2>Distribuição do SLA das vagas ativas</h2><p class="sub">Dias úteis efetivos (descontadas suspensões autorizadas).</p><div class="chart-box"><canvas id="chSla2"></canvas></div></section>
         </div>
+        <div class="grid two" style="margin-top:16px">
+          <section class="panel"><h2>Tempo médio aguardando por etapa do candidato</h2><p class="sub">Dias úteis entre a entrada e a saída de cada etapa (etapas em aberto contam até hoje).</p><div id="slaCandEtapas"></div></section>
+          <section class="panel"><h2>Ações pendentes por responsável</h2><p class="sub">Candidaturas com prazo da próxima ação vencido. Indica onde o processo está parado — não mede produtividade individual.</p><div id="slaPendencias"></div></section>
+        </div>
         <h3 class="section-title">Vagas ativas — controle de prazo</h3>
         <div id="slaTable"></div>
+      </section>
+
+      <!-- CANDIDATOS -->
+      <section class="view hidden" id="view-candidatos">
+        <div class="toolbar">
+          <input class="search" id="candBusca" placeholder="Buscar por nome, código, e-mail, CPF ou telefone…">
+          <select id="candOrigem"></select>
+          <button class="btn primary" id="novoCandBtn">+ Novo candidato</button>
+        </div>
+        <div id="candTable"></div>
+      </section>
+
+      <!-- KANBAN -->
+      <section class="view hidden" id="view-kanban">
+        <div class="toolbar">
+          <select id="kbVaga" style="min-width:280px"></select>
+          <select id="kbAnalista"></select>
+          <input class="search" id="kbBusca" placeholder="Filtrar candidato…">
+          <button class="btn primary" id="kbAdd">+ Adicionar candidato</button>
+        </div>
+        <p class="muted" id="kbHint" style="margin:-4px 0 10px"></p>
+        <div class="board" id="kbBoard"></div>
+      </section>
+
+      <!-- ENTREVISTAS -->
+      <section class="view hidden" id="view-entrevistas">
+        <div class="cards" id="entCards"></div>
+        <div class="toolbar">
+          <select id="entSituacao">
+            <option value="">Todas</option><option value="agendadas">Agendadas</option>
+            <option value="pendentes">Sem resultado (data passada)</option><option value="realizadas">Realizadas</option>
+          </select>
+          <select id="entTipo"></select>
+          <input type="date" id="entDe" title="De"><input type="date" id="entAte" title="Até">
+          <input class="search" id="entBusca" placeholder="Candidato, entrevistador ou cargo…">
+          <button class="btn primary" id="entNova">+ Agendar entrevista</button>
+        </div>
+        <div id="entTable"></div>
+      </section>
+
+      <!-- INDICAÇÕES -->
+      <section class="view hidden" id="view-indicacoes">
+        <div class="cards" id="indCards"></div>
+        <div class="grid two" style="margin-bottom:16px">
+          <section class="panel"><h2>Cargos com mais indicações</h2><p class="sub">Cargo pretendido ou cargo da vaga.</p><div class="chart-box"><canvas id="chIndCargos"></canvas></div></section>
+          <section class="panel"><h2>Contratações por origem</h2><p class="sub">Todas as contratações registradas no sistema.</p><div class="chart-box"><canvas id="chIndOrigem"></canvas></div></section>
+        </div>
+        <div class="toolbar">
+          <input class="search" id="indBusca" placeholder="Indicado, colaborador ou cargo…">
+          <button class="btn primary" id="indNova">+ Nova indicação</button>
+        </div>
+        <div id="indTable"></div>
       </section>
 
       <!-- CONFIGURAÇÕES -->
@@ -128,5 +184,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <?!= include('Scripts'); ?>
+  <?!= include('Fase2'); ?>
 </body>
 </html>

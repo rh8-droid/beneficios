@@ -27,7 +27,23 @@ var API_ROUTES = {
   lookups: function () { return getLookups(); },
   listCadastro: function (p) { return listCadastro(p.tabela); },
   saveCadastro: function (p) { return saveCadastro(p.tabela, p.registro); },
-  deleteCadastro: function (p) { return deleteCadastro(p.tabela, p.key); }
+  deleteCadastro: function (p) { return deleteCadastro(p.tabela, p.key); },
+  // Fase 2
+  listCandidatos: function (p) { return listCandidatos(p); },
+  getCandidato: function (p) { return getCandidato(p.id); },
+  saveCandidato: function (p) { return saveCandidato(p); },
+  uploadCurriculo: function (p) { return uploadCurriculo(p.id, p.arquivo); },
+  downloadCurriculo: function (p) { return downloadCurriculo(p.id); },
+  anonimizarCandidato: function (p) { return anonimizarCandidato(p.id, p.justificativa); },
+  addCandidatura: function (p) { return addCandidatura(p); },
+  moveCandidatura: function (p) { return moveCandidatura(p.id, p.etapa, p); },
+  updateCandidaturaAcao: function (p) { return updateCandidaturaAcao(p.id, p); },
+  getCandidatura: function (p) { return getCandidatura(p.id); },
+  kanban: function (p) { return getKanban(p); },
+  saveEntrevista: function (p) { return saveEntrevista(p); },
+  listEntrevistas: function (p) { return listEntrevistas(p); },
+  saveIndicacao: function (p) { return saveIndicacao(p); },
+  listIndicacoes: function (p) { return listIndicacoes(p); }
 };
 
 /** Chamado pelo navegador: google.script.run.api(acao, dados). */
@@ -41,7 +57,7 @@ function api(action, payload) {
     return JSON.stringify({ ok: true, data: route(payload || {}) });
   } catch (e) {
     if (!e.userError) console.error(action, e && e.stack ? e.stack : e);
-    return JSON.stringify({ ok: false, error: e.userError ? e.message : 'Erro inesperado: ' + (e && e.message ? e.message : e) });
+    return JSON.stringify({ ok: false, error: e.userError ? e.message : 'Erro inesperado: ' + (e && e.message ? e.message : e), duplicadoId: e && e.duplicadoId ? e.duplicadoId : undefined });
   }
 }
 

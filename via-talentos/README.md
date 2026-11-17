@@ -6,7 +6,7 @@ Portal de Gestão Estratégica de Recrutamento e Seleção, Grupo Via Dupla (Via
 * Código do sistema (Google Apps Script): [`apps-script/`](apps-script)
 * Testes automatizados e servidor local de demonstração: [`tests/`](tests), [`dev/`](dev)
 
-## Entrega atual: Fase 1
+## Entregas: Fase 1 e Fase 2
 
 | Módulo | O que funciona |
 |---|---|
@@ -19,7 +19,16 @@ Portal de Gestão Estratégica de Recrutamento e Seleção, Grupo Via Dupla (Via
 | SLA e Gargalos | Ranking das etapas com maior tempo de espera, responsável típico pela próxima ação e controle de prazo de todas as vagas ativas. |
 | Perfis | Administrador RH, Analista RH (edita as suas vagas), Gestor (vê só as suas) e Direção (leitura consolidada). |
 
-Os cards e gráficos de candidatos (funil, conversão, reprovações, origem) já leem as abas `Candidaturas`/`EtapasCandidatura` e passam a ter dados quando a Fase 2 estiver em uso.
+**Fase 2 — acompanhamento dos candidatos**
+
+| Módulo | O que funciona |
+|---|---|
+| Candidatos | Base única com código `CAN-000001`; bloqueio de duplicidade por CPF (validado), e-mail ou telefone; histórico de participação em vários processos sem duplicar cadastro; currículo (PDF/Word/imagem, até 8 MB) guardado numa pasta restrita do Drive e baixado só pelo sistema; consentimento e prazo de retenção (LGPD) e anonimização pelo Administrador. |
+| Kanban | 12 colunas, arrastar e soltar, etapas configuráveis por vaga; cada card mostra candidato, vaga, analista, data de entrada, dias úteis aguardando, próxima ação, responsável e prazo (vermelho quando vencido). Reprovação exige motivo padronizado; "Contratado" preenche automaticamente a próxima posição da vaga. Parado há mais de 3 dias úteis: pede o motivo do atraso. |
+| Entrevistas | RH, gestor e direção: agendamento, realização, entrevistador, parecer, resultado, motivo de reprovação, próxima etapa e retorno previsto. Agendar move o candidato para a etapa da entrevista; o resultado move para a próxima etapa ou para reprovado. Gestor e Direção registram as entrevistas do seu tipo. |
+| Indicações | Cadastro do indicado e do colaborador indicador (empresa e departamento), vínculo opcional a uma vaga, reaproveitamento de cadastro existente, taxa de conversão, cargos com mais indicações e contratações por origem. |
+| Tempo por etapa | Entrada, saída, tempo em dias úteis, responsável e motivo do atraso de cada etapa do candidato; ranking de espera por etapa e ações vencidas por responsável em **SLA e Gargalos**. |
+| Perfis | Gestor só vê candidatos já encaminhados (a partir da entrevista com gestor) das suas vagas; observações e pretensão salarial ficam restritas ao RH. |
 
 ## Como publicar (planilha "Processo de Contratação - VD")
 
@@ -28,7 +37,7 @@ Basta copiar e colar **2 arquivos** da pasta [`dist/`](dist):
 1. Abra a planilha e vá em **Extensões → Apps Script**.
 2. No arquivo `Código.gs` que já existe, apague tudo e cole o conteúdo de **`dist/Codigo.gs`**.
 3. Clique em **+ → HTML**, dê o nome **`Index`** (sem ".html") e cole o conteúdo de **`dist/Index.html`**.
-4. Salve. No topo, selecione a função **`setup`** e clique em **Executar** (autorize na primeira vez). Ela cria as abas e colunas que faltam sem apagar nada.
+4. Salve. No topo, selecione a função **`setup`** e clique em **Executar** (autorize na primeira vez — e de novo sempre que uma nova fase pedir permissões, como o Drive para currículos). Ela cria as abas e colunas que faltam sem apagar nada.
 5. (Opcional) Execute **`cadastrarFeriadosNacionais`**; cadastre feriados estaduais e municipais pela tela de Configurações.
 6. Confira a aba **Usuarios** (Email, Nome, Perfil, Ativo): só e-mails ativos acessam.
 7. **Implantar → Nova implantação → App da Web** com *Executar como: eu* e *Quem pode acessar: qualquer pessoa em viadupla.com*. Compartilhe o link gerado.
@@ -44,7 +53,7 @@ Os arquivos de `dist/` são gerados a partir de `apps-script/` com `node dev/bui
 
 ```bash
 cd via-talentos/dev && npm install
-npm test                       # 18 testes do back-end (SLA, feriados, suspensão, perfis, dashboard…)
+npm test                       # 26 testes do back-end (SLA, feriados, suspensão, perfis, dashboard…)
 node server.js --demo          # http://localhost:8080 com dados FICTÍCIOS de demonstração
 ```
 
@@ -52,6 +61,5 @@ O servidor local executa os mesmos arquivos `.gs` sobre uma planilha em memória
 
 ## Próximas fases
 
-* **Fase 2:** candidatos (sem duplicidade), candidaturas, entrevistas, Kanban arrastar-e-soltar, reprovações, indicações, tempo por etapa.
 * **Fase 3:** relatórios Excel/PDF, produtividade por analista, recorrência por cargo, alertas por e-mail, importação das planilhas antigas.
 * **Fase 4:** Gerador de Artes (PNG/LinkedIn/Instagram/WhatsApp/PDF) com aprovação manual.

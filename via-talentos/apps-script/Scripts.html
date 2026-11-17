@@ -66,7 +66,10 @@ function api(action, payload) {
     google.script.run
       .withSuccessHandler(function (raw) {
         var res = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        if (res && res.ok) resolve(res.data); else reject(new Error(res ? res.error : 'Falha de comunicação.'));
+        if (res && res.ok) return resolve(res.data);
+        var err = new Error(res ? res.error : 'Falha de comunicação.');
+        if (res && res.duplicadoId) err.duplicadoId = res.duplicadoId;
+        reject(err);
       })
       .withFailureHandler(function (err) { reject(new Error(err && err.message ? err.message : String(err))); })
       .api(action, payload || {});
@@ -167,6 +170,7 @@ function fieldHtml(f) {
     return '<div class="' + cls + '"><span class="field">' + esc(f.label) + '</span><div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px">' +
       f.options.map(function (o) { return '<label class="check"><input type="checkbox" name="' + f.k + '" value="' + esc(o) + '"' + (!v || sel.indexOf(o) >= 0 ? ' checked' : '') + '> ' + esc(o) + '</label>'; }).join('') + '</div></div>';
   }
+  else if (f.datalist) input = '<input name="' + f.k + '" list="dl-' + f.k + '" value="' + esc(v) + '" autocomplete="off"><datalist id="dl-' + f.k + '">' + f.datalist.map(function (o) { return '<option value="' + esc(o) + '">'; }).join('') + '</datalist>';
   else input = '<input name="' + f.k + '" type="' + (f.type || 'text') + '" value="' + esc(v) + '"' + (f.min !== undefined ? ' min="' + f.min + '"' : '') + (f.max !== undefined ? ' max="' + f.max + '"' : '') + '>';
   return '<label class="' + cls + '" data-wrap="' + f.k + '"><span>' + esc(f.label) + req + '</span>' + input + (f.hint ? '<span class="muted">' + esc(f.hint) + '</span>' : '') + '</label>';
 }
@@ -178,10 +182,6 @@ var TITLES = {
   artes: 'Gerador de Artes', config: 'Configurações'
 };
 var FUTURE = {
-  candidatos: { fase: 2, itens: ['Base única de candidatos com bloqueio de duplicidade (CPF, e-mail e telefone)', 'Currículo anexado no Drive com acesso restrito', 'Histórico de participação em outros processos', 'Consentimento e prazo de retenção (LGPD)'] },
-  kanban: { fase: 2, itens: ['Quadro com 12 colunas e arrastar-e-soltar', 'Etapas configuráveis por vaga (já gravadas no cadastro da vaga)', 'Dias úteis aguardando, próxima ação, responsável e prazo em cada card'] },
-  entrevistas: { fase: 2, itens: ['Agenda de entrevistas RH, gestor e direção', 'Parecer, resultado e motivo padronizado de reprovação', 'Próxima etapa e data prevista de retorno'] },
-  indicacoes: { fase: 2, itens: ['Cadastro do indicado e do colaborador indicador', 'Taxa de conversão e cargos com mais indicações', 'Identificação de candidatos que já participaram de processos anteriores'] },
   relatorios: { fase: 3, itens: ['11 relatórios com filtros e exportação para Excel e PDF', 'Produtividade por analista separada da espera de outras áreas', 'Recorrência por cargo (requisições, posições, preenchidas e reaberturas)', 'Alertas automáticos por e-mail'] },
   artes: { fase: 4, itens: ['Arte preenchida com os dados da vaga, no modelo institucional', 'Versões PNG, LinkedIn, Instagram, WhatsApp e PDF', 'Histórico, regeneração e aprovação manual antes da divulgação'] }
 };
@@ -209,6 +209,10 @@ function refresh() {
   if (S.view === 'vagas') return loadVagas();
   if (S.view === 'sla') return loadSla();
   if (S.view === 'config') return loadCadastro();
+  if (S.view === 'candidatos') return loadCandidatos();
+  if (S.view === 'kanban') return loadKanban();
+  if (S.view === 'entrevistas') return loadEntrevistas();
+  if (S.view === 'indicacoes') return loadIndicacoes();
 }
 
 function setSync(text) { $('#syncStatus').textContent = text; }
@@ -557,6 +561,7 @@ function renderVagaDetail(v) {
     if (isAdmin() && s.iniciado && !final) actions += '<button id="actExc">Registrar exceção de SLA</button>';
     actions += '<button id="actDup">Nova requisição a partir desta</button>';
   }
+  if (!final) actions = '<button id="actKanban">Abrir Kanban da vaga</button>' + actions;
 
   // Etapas macro do processo (ref.: Triar › Convocar › Selecionar › Contratar)
   var STEPS = [
@@ -647,8 +652,9 @@ function renderVagaDetail(v) {
   var html = '<div class="dlg-head"><div><p class="eyebrow">' + esc(v.Codigo || v.ID) + ' · ' + esc(v.Empresa) + '</p><h3># ' + esc(v.Cargo) + ' — ' + v.posicoesTotal + ' posição(ões) em ' + esc(v.Unidade) + '</h3></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto">' + statusBadge(v.Status) + '<span class="badge prio-' + esc(v.Prioridade) + '">● ' + esc(v.Prioridade) + '</span></div><button class="btn small" data-close>Fechar</button></div>' +
     stepper + '<div class="dlg-body">' + infoCard + kpis + slaHtml +
-    '<div class="tabs"><button class="active" data-tab="pos">Posições (' + v.posicoes.length + ')</button><button data-tab="dados">Dados da vaga</button><button data-tab="hist">Histórico (' + v.historico.length + ')</button><button data-tab="susp">Suspensões e exceções</button></div>' +
+    '<div class="tabs"><button class="active" data-tab="pos">Posições (' + v.posicoes.length + ')</button><button data-tab="cands">Candidatos (' + (v.candidaturas || []).length + ')</button><button data-tab="dados">Dados da vaga</button><button data-tab="hist">Histórico (' + v.historico.length + ')</button><button data-tab="susp">Suspensões e exceções</button></div>' +
     '<div data-pane="pos"><div class="table-wrap"><table><thead><tr><th>Posição</th><th>Status</th><th>Contratado</th><th>Fechamento</th><th>SLA da posição</th><th></th></tr></thead><tbody>' + posRows + '</tbody></table></div></div>' +
+    '<div data-pane="cands" class="hidden">' + candidaturasTable(v.candidaturas || [], false) + '</div>' +
     '<div data-pane="dados" class="hidden"><div class="kv">' + dados + '</div></div>' +
     '<div data-pane="hist" class="hidden"><div class="timeline">' + hist + '</div></div>' +
     '<div data-pane="susp" class="hidden">' + susp + '</div></div>';
@@ -666,6 +672,8 @@ function renderVagaDetail(v) {
     d.addEventListener('click', function () { var pop = $('#actPop', d); if (pop) pop.classList.add('hidden'); });
   }
   if ($('#actEdit', d)) $('#actEdit', d).addEventListener('click', function () { vagaForm(v); });
+  if ($('#actKanban', d)) $('#actKanban', d).addEventListener('click', function () { d.close(); S.kbVaga = v.ID; showView('kanban'); });
+  bindCandidaturaLinks(d);
   if ($('#actDup', d)) $('#actDup', d).addEventListener('click', function () {
     var copy = {}; Object.keys(v).forEach(function (k) { copy[k] = v[k]; });
     copy.ID = ''; copy.DataAbertura = todayIso(); copy.DataAprovacao = ''; copy.ReaberturaDe = v.ID; copy.ReaberturaDeCodigo = v.Codigo;
@@ -732,6 +740,12 @@ function loadSla() {
     $('#slaRanking').innerHTML = rank.length ? '<div class="table-wrap"><table style="min-width:0"><thead><tr><th>#</th><th>Etapa</th><th>Média</th><th>Responsável típico</th><th>Ocorrências</th></tr></thead><tbody>' +
       rank.map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(x.label) + '</td><td><b>' + num(x.valor) + '</b> d.u.</td><td>' + esc(x.responsavel || '—') + '</td><td class="muted">' + x.n + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">Sem movimentações registradas ainda.</div>';
     slaDoughnut('chSla2', dist);
+    var tc = (d.graficos.tempoEtapaCandidato || []).slice().sort(function (a, b) { return b.valor - a.valor; });
+    $('#slaCandEtapas').innerHTML = tc.length ? '<div class="table-wrap"><table style="min-width:0"><thead><tr><th>#</th><th>Etapa</th><th>Média</th><th>Responsável típico</th><th>Registros</th></tr></thead><tbody>' +
+      tc.map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(x.label) + '</td><td><b>' + num(x.valor) + '</b> d.u.</td><td>' + esc(x.responsavel || '—') + '</td><td class="muted">' + x.n + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">Sem movimentação de candidatos ainda.</div>';
+    var pd = d.graficos.pendencias || [];
+    $('#slaPendencias').innerHTML = pd.length ? '<div class="table-wrap"><table style="min-width:0"><thead><tr><th>Responsável</th><th>Ações vencidas</th><th>Mais antiga desde</th></tr></thead><tbody>' +
+      pd.map(function (x) { return '<tr><td>' + esc(x.label) + '</td><td><b class="late">' + x.valor + '</b></td><td>' + fmtDate(x.maisAntigo) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">Nenhuma ação vencida. 👏</div>';
     vagas.sort(function (a, b) { var ra = a.sla.iniciado ? a.sla.diasRestantes : 999, rb = b.sla.iniciado ? b.sla.diasRestantes : 999; return ra - rb; });
     $('#slaTable').innerHTML = vagas.length ? '<div class="table-wrap"><table><thead><tr><th>Vaga</th><th>Status / responsável</th><th>Aprovação</th><th>Prazo original</th><th>Prazo ajustado</th><th>Decorridos</th><th>Restantes</th><th style="width:160px">Consumo</th></tr></thead><tbody>' +
       vagas.map(function (v) {

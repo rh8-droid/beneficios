@@ -100,7 +100,20 @@ var VT = {
     SEM_MOVIMENTACAO_DIAS: '3',
     SITE_CANDIDATURA: 'https://www.viadupla.com',
     LOGO_DRIVE_ID: '',
-    FOTO_DRIVE_ID: ''
+    FOTO_DRIVE_ID: '',
+    RETENCAO_MESES: '24',
+    PRAZO_ACAO_DIAS: '2',
+    CURRICULOS_PASTA_ID: ''
+  },
+
+  TIPOS_ENTREVISTA: ['RH', 'Gestor', 'Direção'],
+  RESULTADOS_ENTREVISTA: ['Pendente', 'Aprovado', 'Reprovado'],
+  ETAPA_DA_ENTREVISTA: { 'RH': 'Entrevista RH', 'Gestor': 'Entrevista gestor', 'Direção': 'Entrevista direção' },
+  // Responsável padrão pela próxima ação em cada etapa do candidato
+  RESPONSAVEL_ETAPA: {
+    'Candidatura recebida': 'RH', 'Triagem de currículo': 'RH', 'Contato inicial': 'RH', 'Entrevista RH': 'RH',
+    'Entrevista gestor': 'Gestor', 'Entrevista direção': 'Direção', 'Testes / avaliações': 'RH',
+    'Aguardando decisão': 'Gestor', 'Aprovado': 'RH', 'Processo admissional': 'RH / DP'
   }
 };
 
@@ -132,15 +145,16 @@ var SCHEMA = {
   // Fase 2 — estrutura criada desde já para que o dashboard leia dados reais.
   Candidatos: ['ID', 'Codigo', 'Nome', 'CPF', 'Email', 'Telefone', 'Cidade', 'UF', 'CargoInteresse',
     'Origem', 'Formacao', 'Experiencia', 'Pretensao', 'Disponibilidade', 'CurriculoId', 'CurriculoUrl',
-    'Analista', 'ConsentimentoLGPD', 'ExcluirApos', 'CriadoEm'],
+    'Analista', 'ConsentimentoLGPD', 'ExcluirApos', 'CriadoEm', 'CriadoPor', 'AtualizadoEm', 'Anonimizado'],
   Candidaturas: ['ID', 'VagaID', 'CandidatoID', 'Origem', 'Indicador', 'DataCandidatura', 'Etapa',
     'EntradaEtapa', 'Responsavel', 'ProximaAcao', 'PrazoAcao', 'Status', 'MotivoReprovacao',
-    'Observacoes', 'DataConclusao'],
+    'Observacoes', 'DataConclusao', 'CriadoEm', 'CriadoPor'],
   Entrevistas: ['ID', 'CandidaturaID', 'Tipo', 'Agendamento', 'Realizacao', 'Entrevistador',
-    'Resultado', 'Parecer', 'MotivoReprovacao', 'ProximaEtapa', 'RetornoPrevisto'],
-  EtapasCandidatura: ['ID', 'CandidaturaID', 'Etapa', 'Entrada', 'Saida', 'Responsavel', 'MotivoAtraso'],
+    'Resultado', 'Parecer', 'MotivoReprovacao', 'ProximaEtapa', 'RetornoPrevisto', 'CriadoEm', 'CriadoPor'],
+  EtapasCandidatura: ['ID', 'CandidaturaID', 'Etapa', 'Entrada', 'Saida', 'Responsavel', 'MotivoAtraso', 'Usuario'],
   Indicacoes: ['ID', 'CandidatoID', 'CandidaturaID', 'Indicador', 'EmpresaIndicador',
-    'DepartamentoIndicador', 'DataIndicacao', 'Resultado', 'DataContratacao']
+    'DepartamentoIndicador', 'DataIndicacao', 'Resultado', 'DataContratacao', 'CargoPretendido',
+    'Observacoes', 'CriadoEm', 'CriadoPor']
 };
 
 /** Chave usada para localizar registros em cada aba. */

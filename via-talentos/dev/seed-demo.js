@@ -38,4 +38,38 @@ module.exports = function seed(b) {
   }
   at('2026-11-16');
   b.ok('saveVaga', { Empresa: 'Via Dupla', Unidade: 'Guarulhos/SP', Cargo: 'Conferente', Departamento: 'Logística', Gestor: 'Gestor Logística', Analista: 'Analista B', QtdPosicoes: 4, DataAbertura: '2026-11-16', MotivoAbertura: 'Substituição', ColaboradorSubstituido: 'Colaborador X', TipoContrato: 'CLT', Salario: 'R$ 2.400', Prioridade: 'Média' });
+
+  // Candidatos e processo seletivo (Fase 2)
+  const ativas = b.ok('listVagas', { situacao: 'ativas' }).filter(v => v.sla.iniciado);
+  const nomes = ['Ana Paula Ribeiro', 'Bruno Henrique Costa', 'Carla Mendes Souza', 'Diego Fernandes Lima', 'Elisa Rocha Martins', 'Fábio Augusto Pereira',
+    'Gabriela Nunes Alves', 'Hugo Leonardo Dias', 'Isabela Torres Gomes', 'João Victor Moraes', 'Karen Lopes Vieira', 'Lucas Matheus Prado'];
+  const origens = ['LinkedIn', 'Indeed', 'Site', 'Indicação', 'WhatsApp', 'Banco de talentos'];
+  let n = 0;
+  at('2026-11-04');
+  for (const v of ativas) {
+    for (let i = 0; i < 4 && n < nomes.length; i++, n++) {
+      const origem = origens[n % origens.length];
+      b.ok('addCandidatura', {
+        vagaId: v.ID, Origem: origem, Indicador: origem === 'Indicação' ? 'Colaborador ' + (n + 1) : '', EmpresaIndicador: 'Via Dupla',
+        candidato: { Nome: nomes[n], Email: nomes[n].split(' ')[0].toLowerCase() + n + '@exemplo.com', Telefone: '4199000' + String(1000 + n), Cidade: 'Curitiba', UF: 'PR', ConsentimentoLGPD: 'Sim' }
+      });
+    }
+  }
+  const cards = b.ok('kanban', {}).cards;
+  const mv = (c, etapa, extra) => b.ok('moveCandidatura', Object.assign({ id: c.ID, etapa }, extra || {}));
+  at('2026-11-06');
+  cards.forEach((c, i) => { if (i % 4 !== 3) mv(c, 'Triagem de currículo'); });
+  at('2026-11-10');
+  cards.forEach((c, i) => { if (i % 4 === 0) b.ok('saveEntrevista', { CandidaturaID: c.ID, Tipo: 'RH', Agendamento: '2026-11-11T10:00', Entrevistador: c.analista }); });
+  cards.forEach((c, i) => { if (i % 4 === 1) mv(c, 'Reprovado / desistente', { motivoReprovacao: ['Experiência incompatível com a função', 'Pretensão salarial incompatível', 'Não respondeu aos contatos'][i % 3] }); });
+  at('2026-11-12');
+  cards.forEach((c, i) => {
+    if (i % 4 === 0) {
+      const cd = b.ok('getCandidatura', { id: c.ID });
+      b.ok('saveEntrevista', { ID: cd.entrevistas[0].ID, CandidaturaID: c.ID, Tipo: 'RH', Agendamento: '2026-11-11T10:00', Entrevistador: c.analista, Resultado: 'Aprovado', ProximaEtapa: 'Entrevista gestor', Parecer: 'Boa comunicação e experiência compatível.' });
+    }
+  });
+  at('2026-11-14');
+  b.ok('saveEntrevista', { CandidaturaID: cards[0].ID, Tipo: 'Gestor', Agendamento: '2026-11-18T14:00', Entrevistador: cards[0].gestor });
+  b.ok('saveIndicacao', { Nome: 'Marcos Antônio Teixeira', Telefone: '41988776655', Indicador: 'Colaborador 20', EmpresaIndicador: 'Via Dupla', DepartamentoIndicador: 'Transporte', CargoPretendido: 'Motorista Carreteiro' });
 };
