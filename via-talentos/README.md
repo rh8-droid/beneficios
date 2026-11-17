@@ -38,7 +38,7 @@ Portal de Gestão Estratégica de Recrutamento e Seleção, Grupo Via Dupla (Via
 | Produtividade | Por analista: vagas, posições abertas/preenchidas, candidaturas, entrevistas, encaminhados ao gestor, contratações, tempo médio, % SLA, pendências — com a espera em etapas do RH separada da espera em gestor/direção. |
 | Recorrência por cargo | Requisições × posições solicitadas × preenchidas × reaberturas, aberturas por mês, motivo e gestor mais frequentes, e comparação entre dois períodos. |
 | Alertas | Sino no topo com contador: vagas vencendo/vencidas, sem movimentação, aguardando aprovação, candidatos aguardando retorno, decisões pendentes do gestor, aprovados aguardando admissão e entrevistas de hoje/amanhã — no formato "Vaga / Aberta há / Etapa crítica / Tempo de espera / Responsável / SLA restante". Envio diário por e-mail (dias úteis), configurável em Configurações → Alertas por e-mail. |
-| Importação | Configurações → Importar planilha antiga: lê as abas antigas (ex.: RECRUTAMENTO, Página6) com cabeçalho mesclado, pré-visualiza, converte os status e importa sem duplicar. |
+| Importação | Configurações → Importar planilha antiga: lê as abas antigas (ex.: RECRUTAMENTO, Página6) com cabeçalho mesclado, pré-visualiza, converte os status e importa sem duplicar; filtro "somente vagas com movimentação a partir de" (padrão: últimos 3 meses) e botão para desfazer a importação de uma aba. |
 
 **Fase 4 — Gerador de Artes**
 
@@ -72,7 +72,7 @@ Os arquivos de `dist/` são gerados a partir de `apps-script/` com `node dev/bui
 
 ```bash
 cd via-talentos/dev && npm install
-npm test                       # 34 testes do back-end (SLA, feriados, suspensão, perfis, dashboard…)
+npm test                       # 35 testes do back-end (SLA, feriados, suspensão, perfis, dashboard…)
 node server.js --demo          # http://localhost:8080 com dados FICTÍCIOS de demonstração
 ```
 

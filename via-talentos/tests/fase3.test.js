@@ -128,3 +128,28 @@ test('importação da planilha antiga com cabeçalho mesclado, sem duplicar', ()
   b.setUser('ana1@viadupla.com');
   assert.strictEqual(b.call('executarImportacao', { aba: 'RECRUTAMENTO' }).ok, false);
 });
+
+test('importação somente com movimentação no período e desfazer importação', () => {
+  const { b } = setup();
+  const sh = b.state.ss.insertSheet('RECRUTAMENTO');
+  sh.data = [
+    ['', 'ABERTURA DA VAGA', 'ANALISTA RESPONSÁVEL', 'FUNÇÃO', 'SETOR', 'VAGAS', 'RECRUTAMENTO E SELEÇÃO'],
+    ['', '', '', '', '', '', 'STATUS DO PROCESSO', 'Vagas fechadas', 'Data Aprovação'],
+    ['', '10/01/2026', 'Ari', 'Antiga', 'X', 1, 'Finalizado', 1, '20/01/2026'],
+    ['', '07/08/2026', 'Ari', 'Aberta antes, fechada no período', 'X', 1, 'Finalizado', 1, '09/09/2026'],
+    ['', '20/08/2026', 'Ari', 'Aberta no período', 'X', 1, 'Finalizado', 1, '31/08/2026'],
+    ['', '02/09/2026', 'Ari', 'Sem data de fechamento', 'X', 1, 'Finalizado', 1, ''],
+    ['', '01/09/2026', 'Ari', 'Pausada', 'X', 1, 'Pausado', 0, '']
+  ];
+  const pv = b.ok('previewImportacao', { aba: 'RECRUTAMENTO', empresa: 'Via Dupla', desde: '2026-08-17' });
+  assert.strictEqual(pv.novas, 3);
+  assert.strictEqual(pv.foraPeriodo, 1);
+  assert.strictEqual(pv.invalidas.length, 1);
+  assert.ok(pv.amostra.some(x => x.status === 'Suspensa'));
+  assert.strictEqual(b.ok('executarImportacao', { aba: 'RECRUTAMENTO', empresa: 'Via Dupla', desde: '2026-08-17' }).importadas, 3);
+  const antes = b.ok('listVagas', {}).length;
+  const r = b.ok('desfazerImportacao', { aba: 'RECRUTAMENTO' });
+  assert.strictEqual(r.removidas, 3);
+  assert.strictEqual(b.ok('listVagas', {}).length, antes - 3);
+  assert.ok(b.ok('listVagas', {}).length >= 3); // vagas criadas no sistema continuam
+});

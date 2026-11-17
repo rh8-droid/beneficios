@@ -2302,19 +2302,26 @@ function renderCfgAlertas() {
   $('#alTeste').addEventListener('click', function () { api('enviarAlertasAgora').then(function (m) { toast(m); }).catch(fail); });
 }
 
+function tresMesesAtras() {
+  var d = new Date(); d.setMonth(d.getMonth() - 3);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 function renderCfgImportacao() {
   $('#cfgTable').innerHTML = '<div class="panel"><h2>Importar vagas de planilha antiga</h2><p class="sub">Lê uma aba desta mesma planilha (ex.: <b>RECRUTAMENTO</b> ou <b>Página6</b>) com as colunas ABERTURA DA VAGA, ANALISTA RESPONSÁVEL, FUNÇÃO, SETOR, VAGAS, STATUS DO PROCESSO, Vagas fechadas, Data Aprovação e Candidato Aprovado. ' +
     'Cada linha vira uma vaga com posições; linhas já importadas são ignoradas. Unidade e gestor ficam como "Não informado" para ajuste posterior.</p>' +
-    '<div class="form-grid" style="max-width:720px"><label class="field span-2">Aba<select id="impAba"><option>Carregando…</option></select></label><label class="field span-2">Empresa<select id="impEmp">' + options(names(S.lk.empresas), 'Via Dupla') + '</select></label></div>' +
-    '<div class="toolbar" style="margin-top:14px"><button class="btn" id="impPrev">Pré-visualizar</button><button class="btn primary" id="impExec" disabled>Importar</button></div><div id="impResultado"></div></div>';
+    '<div class="form-grid" style="max-width:960px"><label class="field">Aba<select id="impAba"><option>Carregando…</option></select></label><label class="field">Empresa<select id="impEmp">' + options(names(S.lk.empresas), 'Via Dupla') + '</select></label>' +
+    '<label class="field span-2">Somente vagas com movimentação a partir de<input type="date" id="impDesde" value="' + tresMesesAtras() + '"><span class="muted">Abertas ou fechadas a partir desta data. Deixe vazio para importar tudo.</span></label></div>' +
+    '<div class="toolbar" style="margin-top:14px"><button class="btn" id="impPrev">Pré-visualizar</button><button class="btn primary" id="impExec" disabled>Importar</button><span style="margin-left:auto"></span><button class="btn danger" id="impDesfazer">Desfazer importação desta aba</button></div><div id="impResultado"></div></div>';
   api('listAbasPlanilha').then(function (abas) {
     $('#impAba').innerHTML = options(abas, abas.indexOf('RECRUTAMENTO') >= 0 ? 'RECRUTAMENTO' : abas[0]);
   }).catch(fail);
   $('#impPrev').addEventListener('click', function () {
     $('#impResultado').innerHTML = '<p class="muted">Lendo a aba…</p>';
-    api('previewImportacao', { aba: $('#impAba').value, empresa: $('#impEmp').value }).then(function (r) {
+    api('previewImportacao', { aba: $('#impAba').value, empresa: $('#impEmp').value, desde: $('#impDesde').value }).then(function (r) {
       $('#impExec').disabled = !r.novas;
-      $('#impResultado').innerHTML = '<div class="cards" style="margin-top:12px">' + card('Vagas a importar', r.novas, 'accent', '', 'file') + card('Já importadas', r.ignoradas, '', 'serão ignoradas', 'check') + card('Linhas com problema', r.invalidas.length, r.invalidas.length ? 'orange' : '', '', 'alert') + '</div>' +
+      $('#impResultado').innerHTML = '<div class="cards" style="margin-top:12px">' + card('Vagas a importar', r.novas, 'accent', r.desde ? 'movimentação desde ' + fmtDate(r.desde) : 'todo o histórico', 'file') + card('Fora do período', r.foraPeriodo, '', 'não serão importadas', 'calendar') +
+        card('Já importadas', r.ignoradas, '', r.jaImportadasTotal + ' desta aba no sistema', 'check') + card('Linhas com problema', r.invalidas.length, r.invalidas.length ? 'orange' : '', '', 'alert') + '</div>' +
         '<p class="muted">Status convertidos: ' + r.porStatus.map(function (x) { return esc(x.label) + ' (' + x.valor + ')'; }).join(' · ') + '</p>' +
         (r.invalidas.length ? '<p class="muted">Problemas: ' + r.invalidas.slice(0, 20).map(function (x) { return 'linha ' + x.linha + ': ' + esc(x.motivo); }).join(' · ') + '</p>' : '') +
         (r.amostra.length ? '<div class="table-wrap"><table><thead><tr><th>Linha</th><th>Abertura</th><th>Cargo</th><th>Analista</th><th>Posições</th><th>Status original</th><th>Status no sistema</th><th>Preenchidas</th><th>Fechamento</th><th>Contratado</th></tr></thead><tbody>' +
@@ -2326,8 +2333,16 @@ function renderCfgImportacao() {
     if (!confirm('Importar as vagas da aba "' + $('#impAba').value + '"?')) return;
     $('#impExec').disabled = true;
     $('#impResultado').insertAdjacentHTML('afterbegin', '<p class="muted">Importando… isso pode levar alguns segundos.</p>');
-    api('executarImportacao', { aba: $('#impAba').value, empresa: $('#impEmp').value }).then(function (r) {
+    api('executarImportacao', { aba: $('#impAba').value, empresa: $('#impEmp').value, desde: $('#impDesde').value }).then(function (r) {
       toast(r.importadas + ' vaga(s) importada(s). ' + r.ignoradas + ' já existiam.');
+      $('#impPrev').click();
+    }).catch(fail);
+  });
+  $('#impDesfazer').addEventListener('click', function () {
+    var aba = $('#impAba').value;
+    if (!confirm('Remover do sistema todas as vagas importadas da aba "' + aba + '"? A planilha antiga não é alterada. Vagas que já receberam candidatos ou artes serão mantidas.')) return;
+    api('desfazerImportacao', { aba: aba }).then(function (r) {
+      toast(r.removidas + ' vaga(s) removida(s).' + (r.mantidas ? ' ' + r.mantidas + ' mantida(s) por já terem candidatos/artes.' : ''));
       $('#impPrev').click();
     }).catch(fail);
   });

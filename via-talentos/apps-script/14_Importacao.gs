@@ -65,7 +65,7 @@ function mapearStatus_(txt) {
   if (!s) return null;
   if (s.indexOf('cancel') >= 0) return VT.STATUS_CANCELADA;
   if (s.indexOf('finaliz') >= 0 || s.indexOf('conclu') >= 0 || s.indexOf('contratad') >= 0 || s.indexOf('fechad') >= 0) return VT.STATUS_CONCLUIDA;
-  if (s.indexOf('suspen') >= 0 || s.indexOf('congel') >= 0) return VT.STATUS_SUSPENSA;
+  if (s.indexOf('suspen') >= 0 || s.indexOf('congel') >= 0 || s.indexOf('pausad') >= 0 || s.indexOf('stand') >= 0) return VT.STATUS_SUSPENSA;
   if (s.indexOf('admiss') >= 0) return 'Processo admissional';
   if (s.indexOf('proposta') >= 0) return 'Proposta enviada';
   if (s.indexOf('dire') >= 0) return 'Entrevistas com direção';
@@ -77,13 +77,14 @@ function mapearStatus_(txt) {
 }
 
 /** Converte as linhas em vagas. Retorna {novas, ignoradas, invalidas}. */
-function prepararImportacao_(aba, empresa) {
+function prepararImportacao_(aba, empresa, desde) {
+  desde = Util.toIsoDate(desde);
   var p = lerPlanilhaAntiga_(aba);
   var m = p.mapa;
   var jaImportadas = {};
   Db.all('Vagas').forEach(function (v) { if (v.ImportKey) jaImportadas[v.ImportKey] = true; });
   function cel(row, k) { return m[k] === undefined ? '' : row[m[k]]; }
-  var novas = [], ignoradas = 0, invalidas = [];
+  var novas = [], ignoradas = 0, invalidas = [], foraPeriodo = 0;
   for (var r = p.inicio; r < p.values.length; r++) {
     var row = p.values[r];
     var funcao = Util.str(cel(row, 'funcao'));
@@ -91,6 +92,10 @@ function prepararImportacao_(aba, empresa) {
     var statusTxt = Util.str(cel(row, 'status'));
     if (!funcao && !abertura) continue;
     var key = aba + '!' + (r + 1);
+    if (desde && abertura && abertura < desde) {
+      var fechTmp = Util.toIsoDate(cel(row, 'dataAprovacao')) || Util.toIsoDate(cel(row, 'finalizacao')) || Util.toIsoDate(cel(row, 'dataContratacao'));
+      if (!fechTmp || fechTmp < desde) { foraPeriodo++; continue; }
+    }
     if (jaImportadas[key]) { ignoradas++; continue; }
     if (!funcao || !abertura || !statusTxt) { invalidas.push({ linha: r + 1, motivo: !funcao ? 'sem função' : (!abertura ? 'data de abertura inválida' : 'sem status') }); continue; }
     var status = mapearStatus_(statusTxt);
@@ -109,27 +114,28 @@ function prepararImportacao_(aba, empresa) {
       obs: [Util.str(cel(row, 'obs')), Util.str(cel(row, 'indicacao')) ? 'Indicação: ' + Util.str(cel(row, 'indicacao')) : ''].filter(Boolean).join(' · ')
     });
   }
-  return { novas: novas, ignoradas: ignoradas, invalidas: invalidas, colunas: Object.keys(m) };
+  return { novas: novas, ignoradas: ignoradas, invalidas: invalidas, foraPeriodo: foraPeriodo, colunas: Object.keys(m) };
 }
 
-function previewImportacao(aba, empresa) {
+function previewImportacao(aba, empresa, desde) {
   Auth.require('Administrador RH');
-  var r = prepararImportacao_(aba, empresa || 'Via Dupla');
+  var r = prepararImportacao_(aba, empresa || 'Via Dupla', desde);
   var porStatus = Util.groupCount(r.novas, function (n) { return n.status; });
   return {
-    aba: aba, novas: r.novas.length, ignoradas: r.ignoradas, invalidas: r.invalidas, colunasReconhecidas: r.colunas,
+    aba: aba, novas: r.novas.length, ignoradas: r.ignoradas, invalidas: r.invalidas, foraPeriodo: r.foraPeriodo, desde: Util.toIsoDate(desde), colunasReconhecidas: r.colunas,
+    jaImportadasTotal: Db.all('Vagas').filter(function (v) { return v.ImportKey && v.ImportKey.indexOf(aba + '!') === 0; }).length,
     porStatus: toSeries_(porStatus),
     amostra: r.novas.slice(0, 15).map(function (n) { return { linha: n.linha, abertura: n.abertura, cargo: n.cargo, analista: n.analista, qtd: n.qtd, statusOriginal: n.statusOriginal, status: n.status, fechadas: n.fechadas, fechamento: n.dataFech, contratado: n.nome }; })
   };
 }
 
 /** Importa em lote (gravações agrupadas por aba para caber no tempo de execução). */
-function executarImportacao(aba, empresa) {
+function executarImportacao(aba, empresa, desde) {
   Auth.require('Administrador RH');
   empresa = empresa || 'Via Dupla';
   if (!Db.all('Empresas').some(function (e) { return Util.norm(e.Nome) === Util.norm(empresa); })) throw UserError('Empresa não cadastrada: ' + empresa);
   return Db.withLock(function () {
-    var r = prepararImportacao_(aba, empresa);
+    var r = prepararImportacao_(aba, empresa, desde);
     if (!r.novas.length) return { importadas: 0, ignoradas: r.ignoradas, invalidas: r.invalidas.length };
     var emp = Db.all('Empresas').filter(function (e) { return Util.norm(e.Nome) === Util.norm(empresa); })[0];
     var seq = {};
@@ -167,7 +173,35 @@ function executarImportacao(aba, empresa) {
     Db.insertMany('Vagas', vagas);
     Db.insertMany('Posicoes', posicoes);
     Db.insertMany('Historico', hist);
-    logHistory_('Config', 'Importacao', '', aba, vagas.length + ' vaga(s) importada(s) da aba ' + aba);
+    logHistory_('Config', 'Importacao', '', aba, vagas.length + ' vaga(s) importada(s) da aba ' + aba + (desde ? ' (movimentação a partir de ' + br_(Util.toIsoDate(desde)) + ')' : ''));
     return { importadas: vagas.length, ignoradas: r.ignoradas, invalidas: r.invalidas.length };
+  });
+}
+
+/**
+ * Desfaz a importação de uma aba: remove as vagas importadas (e suas posições e histórico).
+ * Vagas importadas que já receberam candidatos ou artes são mantidas.
+ */
+function desfazerImportacao(aba) {
+  Auth.require('Administrador RH');
+  return Db.withLock(function () {
+    var prefixo = aba + '!';
+    var usadas = {};
+    Db.all('Candidaturas').forEach(function (c) { usadas[c.VagaID] = true; });
+    Db.all('Artes').forEach(function (a) { usadas[a.VagaID] = true; });
+    var alvo = {}, mantidas = 0;
+    Db.all('Vagas').forEach(function (v) {
+      if (!v.ImportKey || v.ImportKey.indexOf(prefixo) !== 0) return;
+      if (usadas[v.ID]) mantidas++; else alvo[v.ID] = true;
+    });
+    var posIds = {};
+    Db.all('Posicoes').forEach(function (p) { if (alvo[p.VagaID]) posIds[p.ID] = true; });
+    var removidas = Db.removeWhere('Vagas', function (v) { return alvo[v.ID]; });
+    Db.removeWhere('Posicoes', function (p) { return alvo[p.VagaID]; });
+    Db.removeWhere('Historico', function (h) { return alvo[h.ReferenciaID] || posIds[h.ReferenciaID]; });
+    Db.removeWhere('Suspensoes', function (x) { return alvo[x.VagaID]; });
+    Db.removeWhere('ExcecoesSLA', function (x) { return alvo[x.VagaID]; });
+    logHistory_('Config', 'Importacao', aba, '', 'Importação desfeita: ' + removidas + ' vaga(s) removida(s)' + (mantidas ? ', ' + mantidas + ' mantida(s) por já terem candidatos/artes' : ''));
+    return { removidas: removidas, mantidas: mantidas };
   });
 }

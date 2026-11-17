@@ -159,6 +159,27 @@ var Db = (function () {
     return true;
   }
 
+  /** Remove de uma vez todas as linhas que atendem ao filtro (reescreve a aba). Retorna a quantidade. */
+  function removeWhere(name, pred) {
+    var sheet = ensure(name);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return 0;
+    var headers = headersOf(sheet);
+    var rows = all(name);
+    var manter = rows.filter(function (r) { return !pred(r); });
+    var removidas = rows.length - manter.length;
+    if (!removidas) return 0;
+    var range = sheet.getRange(2, 1, lastRow - 1, headers.length);
+    range.clearContent();
+    if (manter.length) {
+      var out = sheet.getRange(2, 1, manter.length, headers.length);
+      out.setNumberFormat('@');
+      out.setValues(manter.map(function (o) { return rowValues_(headers, o); }));
+    }
+    delete cache[name];
+    return removidas;
+  }
+
   function config(key) {
     var row = find('Config', key);
     var v = row ? Util.str(row.Valor) : '';
@@ -183,7 +204,7 @@ var Db = (function () {
 
   return {
     spreadsheet: spreadsheet, ensure: ensure, all: all, find: find, insert: insert,
-    insertMany: insertMany, update: update, remove: remove, config: config,
+    insertMany: insertMany, update: update, remove: remove, removeWhere: removeWhere, config: config,
     withLock: withLock, reset: reset
   };
 })();

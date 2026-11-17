@@ -53,8 +53,9 @@ var API_ROUTES = {
   enviarAlertasAgora: function () { return enviarAlertasAgora(); },
   configurarAlertasEmail: function (p) { return configurarAlertasEmail(p.ativar, p.hora); },
   listAbasPlanilha: function () { return listAbasPlanilha(); },
-  previewImportacao: function (p) { return previewImportacao(p.aba, p.empresa); },
-  executarImportacao: function (p) { return executarImportacao(p.aba, p.empresa); },
+  previewImportacao: function (p) { return previewImportacao(p.aba, p.empresa, p.desde); },
+  executarImportacao: function (p) { return executarImportacao(p.aba, p.empresa, p.desde); },
+  desfazerImportacao: function (p) { return desfazerImportacao(p.aba); },
   // Fase 4
   assetsArte: function () { return getAssetsArte(); },
   uploadAsset: function (p) { return uploadAsset(p.tipo, p.arquivo); },

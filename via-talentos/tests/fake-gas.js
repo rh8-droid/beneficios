@@ -31,6 +31,10 @@ class FakeRange {
     return this;
   }
   setNumberFormat() { return this; }
+  clearContent() {
+    for (let r = 0; r < this.rows; r++) { const line = this.sheet.data[this.row - 1 + r]; if (line) for (let c = 0; c < this.cols; c++) line[this.col - 1 + c] = ''; }
+    return this;
+  }
   setFontWeight() { return this; }
   setBackground() { return this; }
   setFontColor() { return this; }
