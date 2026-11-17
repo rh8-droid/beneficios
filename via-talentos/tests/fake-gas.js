@@ -97,7 +97,7 @@ function createBackend(opts = {}) {
     HtmlService: {}
   };
   vm.createContext(sandbox);
-  const dir = path.join(__dirname, '..', 'apps-script');
+  const dir = opts.dir || path.join(__dirname, '..', 'apps-script');
   fs.readdirSync(dir).filter(f => f.endsWith('.gs')).sort().forEach(f => {
     vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), sandbox, { filename: f });
   });

@@ -23,14 +23,20 @@ Os cards e gráficos de candidatos (funil, conversão, reprovações, origem) j�
 
 ## Como publicar (planilha "Processo de Contratação - VD")
 
-1. Abra a planilha, vá em **Extensões → Apps Script**.
-2. Crie os arquivos com os mesmos nomes da pasta `apps-script/` (`.gs` como *Script*, `.html` como *HTML*) e cole o conteúdo. Em **Configurações do projeto**, marque "Mostrar arquivo de manifesto" e substitua o `appsscript.json`.
-   *Alternativa:* `npm i -g @google/clasp`, `clasp clone <scriptId>` e copie os arquivos, depois `clasp push`.
-3. No editor, selecione a função **`setup`** e clique em **Executar** (autorize). Ela cria as abas e colunas que faltam sem apagar nada. Vagas já existentes recebem código e, se já estiverem em andamento, a data de abertura passa a ser o início do SLA.
-4. (Opcional) Execute **`cadastrarFeriadosNacionais`** (ano corrente) e cadastre os feriados estaduais e municipais por unidade.
-5. Confira a aba **Usuarios** (Email, Nome, Perfil, Ativo). Só e-mails ativos acessam o sistema.
-6. **Implantar → Nova implantação → App da Web**: *Executar como: eu* e *Quem pode acessar: qualquer pessoa em viadupla.com*. Compartilhe o link.
-7. Para usar a logo e a foto oficial: envie os arquivos ao Drive e informe os IDs em `Config` (`LOGO_DRIVE_ID`, `FOTO_DRIVE_ID`).
+Basta copiar e colar **2 arquivos** da pasta [`dist/`](dist):
+
+1. Abra a planilha e vá em **Extensões → Apps Script**.
+2. No arquivo `Código.gs` que já existe, apague tudo e cole o conteúdo de **`dist/Codigo.gs`**.
+3. Clique em **+ → HTML**, dê o nome **`Index`** (sem ".html") e cole o conteúdo de **`dist/Index.html`**.
+4. Salve. No topo, selecione a função **`setup`** e clique em **Executar** (autorize na primeira vez). Ela cria as abas e colunas que faltam sem apagar nada.
+5. (Opcional) Execute **`cadastrarFeriadosNacionais`**; cadastre feriados estaduais e municipais pela tela de Configurações.
+6. Confira a aba **Usuarios** (Email, Nome, Perfil, Ativo): só e-mails ativos acessam.
+7. **Implantar → Nova implantação → App da Web** com *Executar como: eu* e *Quem pode acessar: qualquer pessoa em viadupla.com*. Compartilhe o link gerado.
+8. Logo e foto oficial: envie ao Drive e informe os IDs em `Config` (`LOGO_DRIVE_ID`, `FOTO_DRIVE_ID`).
+
+Nas próximas versões, repita só os passos 2, 3 e **Implantar → Gerenciar implantações → editar → Nova versão**, e o link continua o mesmo.
+
+Os arquivos de `dist/` são gerados a partir de `apps-script/` com `node dev/build-bundle.js`. Quem preferir pode usar o [clasp](https://github.com/google/clasp) com a pasta `apps-script/`.
 
 > A planilha e a pasta de currículos não precisam ser compartilhadas com gestores. O acesso é controlado pelo perfil dentro do app (LGPD).
 
